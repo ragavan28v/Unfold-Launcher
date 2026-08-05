@@ -38,9 +38,14 @@ class AppRepositoryImpl @Inject constructor(
             GestureEntity("SWIPE_RIGHT_1F", "LAUNCH_APP", targetPackage = "com.whatsapp"),
             GestureEntity("SWIPE_LEFT_2F", "OPEN_SCREEN", targetScreenRoute = VoltRoute.HiddenSpace.route),
             GestureEntity("SWIPE_RIGHT_2F", "OPEN_INTENT", targetIntentUri = "market://details?id="),
+            GestureEntity("SWIPE_DOWN_1F", "OPEN_SCREEN", targetScreenRoute = VoltRoute.UniversalSearch.route),
             GestureEntity("SWIPE_UP_1F", "OPEN_SCREEN", targetScreenRoute = VoltRoute.AppDrawer.route)
         )
-        gestureDao.insertAll(defaultGestures)
+        defaultGestures.forEach { defaultGesture ->
+            if (gestureDao.getBinding(defaultGesture.gestureType) == null) {
+                gestureDao.insertBinding(defaultGesture)
+            }
+        }
 
         val pm = context.packageManager
         val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
@@ -60,10 +65,10 @@ class AppRepositoryImpl @Inject constructor(
             val assignedPosition = if (existing != null) {
                 existing.gridPosition
             } else {
-                val pos = if (nextGridPosIndex < 4) {
+                val pos = if (nextGridPosIndex < 6) {
                     100 + nextGridPosIndex
-                } else if (nextGridPosIndex < 16) {
-                    nextGridPosIndex - 4
+                } else if (nextGridPosIndex < 12) {
+                    nextGridPosIndex - 6
                 } else {
                     null
                 }
@@ -93,8 +98,8 @@ class AppRepositoryImpl @Inject constructor(
         val finalEntities = if (!hasDockApps && allPositionedApps.isNotEmpty()) {
             newEntities.mapIndexed { index, entity ->
                 if (entity.gridPosition != null) {
-                    val newPos = if (index < 4) 100 + index else index - 4
-                    entity.copy(gridPosition = newPos)
+                    val newPos = if (index < 6) 100 + index else index - 6
+                    entity.copy(gridPosition = if (newPos < 100 && newPos >= 18) null else newPos)
                 } else {
                     entity
                 }

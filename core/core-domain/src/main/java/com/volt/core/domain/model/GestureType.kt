@@ -7,6 +7,7 @@ enum class GestureType {
     SWIPE_RIGHT_2F,
     SWIPE_UP_1F,
     SWIPE_UP_2F,
+    SWIPE_DOWN_1F,
     PINCH,
     LONG_PRESS_HOLD,
     DOUBLE_TAP_BG,

@@ -2,6 +2,7 @@ package com.volt.feature.home
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -10,6 +11,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Home
@@ -20,20 +22,41 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.alpha
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import coil.compose.rememberAsyncImagePainter
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
 import com.volt.core.domain.model.AppInfo
+import com.volt.core.domain.model.DockBackgroundMode
+import com.volt.core.domain.model.DockRowsMode
 import com.volt.core.ui.components.*
 import com.volt.core.ui.theme.LocalVoltTheme
 import kotlinx.coroutines.launch
@@ -43,6 +66,7 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel,
+    onNavigateToSearch: () -> Unit,
     onNavigateToDrawer: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
@@ -61,21 +85,47 @@ fun HomeScreen(
     // Separate grid apps (positions < 100) and dock apps (positions >= 100)
     val gridApps = state.gridApps.filter { (it.gridPosition ?: 0) < 100 }
     val dockApps = state.gridApps.filter { (it.gridPosition ?: 0) >= 100 }
+    val dockRows = if (state.dockRowsMode == DockRowsMode.TWO_ROWS) 2 else 1
+    val dockVisible = state.dockRowsMode != DockRowsMode.HIDDEN
+    val dockVisibleCount = state.dockIconCount.coerceIn(0, 6)
+    val dockColumns = dockVisibleCount
+    val dockSolidColor = remember(state.dockBackgroundHex) {
+        runCatching { Color(android.graphics.Color.parseColor(state.dockBackgroundHex)) }
+            .getOrElse { theme.bgPanel }
+    }
+    val rows = state.gridRows
+    val columns = state.gridColumns
+    val gridIconSize = remember(state.homeIconSize, columns) {
+        launcherGridIconSize(state.homeIconSize, columns)
+    }
+    val gridSlotHeight = gridIconSize + if (state.homeLabelsEnabled) 28.dp else 14.dp
 
-    Column(
+    var draggedApp by remember { mutableStateOf<AppInfo?>(null) }
+    var dragPosition by remember { mutableStateOf(Offset.Zero) }
+    val slotBounds = remember { mutableMapOf<Int, androidx.compose.ui.geometry.Rect>() }
+    val itemBounds = remember { mutableMapOf<String, androidx.compose.ui.geometry.Rect>() }
+
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(theme.bgVoid)
+            .combinedClickable(
+                onClick = {},
+                onLongClick = onNavigateToSettings
+            )
     ) {
-        // 1. Top HUD Area (HUD panels nested inside NodeRail horizontally, takes ~260dp height)
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+        // 1. Top HUD Area (HUD panels nested inside NodeRail horizontally, stretches dynamically)
         Row(
             modifier = Modifier
+                .weight(1f)
                 .fillMaxWidth()
-                .height(260.dp)
                 .padding(top = 16.dp, start = 8.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Navigation Rail on the left (only spans the height of the HUD area)
+            // Navigation Rail on the left
             NodeRail(
                 nodes = railNodes,
                 activeNodeId = when (pagerState.currentPage) {
@@ -96,116 +146,429 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxHeight()
             )
 
-            // Active HUD panel on the right
-            HorizontalPager(
-                state = pagerState,
+            Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-            ) { page ->
-                when (page) {
-                    0 -> ClockWeatherPanel()
-                    1 -> SystemHUDPanel(state = state)
-                    2 -> MediaPanel()
+            ) {
+                // Active HUD panel on the right
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) { page ->
+                    when (page) {
+                        0 -> ClockWeatherPanel()
+                        1 -> SystemHUDPanel(state = state)
+                        2 -> MediaPanel()
+                    }
+                }
+
+                // Pager indicator dots (under the HUD panel)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    repeat(3) { index ->
+                        val active = pagerState.currentPage == index
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 4.dp)
+                                .size(if (active) 8.dp else 6.dp)
+                                .background(
+                                    color = if (active) theme.accentPrimary else theme.textSecondary.copy(alpha = 0.4f),
+                                    shape = androidx.compose.foundation.shape.CircleShape
+                                )
+                        )
+                    }
                 }
             }
         }
 
-        // Pager indicator dots (under the HUD panel)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            repeat(3) { index ->
-                val active = pagerState.currentPage == index
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .size(if (active) 8.dp else 6.dp)
-                        .background(
-                            color = if (active) theme.accentPrimary else theme.textSecondary.copy(alpha = 0.4f),
-                            shape = androidx.compose.foundation.shape.CircleShape
-                        )
-                )
-            }
-        }
+        // 2. Home App Grid Area (placed at the bottom, just above the dock!)
 
-        // 2. Middle App Grid Area (occupies full width of the screen!)
         Column(
             modifier = Modifier
-                .weight(1f)
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            val columns = 4
-            val chunkedApps = gridApps.chunked(columns)
-            chunkedApps.forEach { rowApps ->
+            for (r in 0 until rows) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    rowApps.forEach { app ->
-                        HomeAppGridItem(
-                            app = app,
-                            onClick = {
-                                try {
-                                    val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
-                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    for (c in 0 until columns) {
+                        val index = r * columns + c
+                        val app = gridApps.firstOrNull { it.gridPosition == index }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(gridSlotHeight)
+                                .onGloballyPositioned { coords ->
+                                    slotBounds[index] = coords.boundsInRoot()
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (app != null) {
+                                val isDraggingThisApp = draggedApp?.packageName == app.packageName
+                                var showContextMenu by remember(app.packageName) { mutableStateOf(false) }
+                                var dragDistance by remember(app.packageName) { mutableStateOf(0f) }
+                                Box(
+                                    modifier = Modifier
+                                        .alpha(if (isDraggingThisApp) 0.3f else 1.0f)
+                                        .onGloballyPositioned { coords ->
+                                            itemBounds[app.packageName] = coords.boundsInRoot()
+                                        }
+                                        .pointerInput(app.packageName) {
+                                            awaitEachGesture {
+                                                val down = awaitFirstDown(requireUnconsumed = false)
+                                                Log.d("UnfoldDrag", "Pointer down on app: ${app.label}")
+                                                val longPress = awaitLongPressOrCancellation(down.id)
+                                                if (longPress != null) {
+                                                    Log.d("UnfoldDrag", "Long press triggered for: ${app.label}")
+                                                    // Long press triggered: start drag!
+                                                    draggedApp = app
+                                                    val bounds = itemBounds[app.packageName]
+                                                    Log.d("UnfoldDrag", "Item bounds: $bounds")
+                                                    dragPosition = bounds?.topLeft ?: Offset.Zero
+                                                    Log.d("UnfoldDrag", "Initial dragPosition: $dragPosition")
+                                                    dragDistance = 0f
+                                                    val currentDownId = down.id
+                                                    
+                                                    try {
+                                                        while (true) {
+                                                            val event = awaitPointerEvent()
+                                                            val change = event.changes.firstOrNull { it.id == currentDownId } ?: break
+                                                            Log.d("UnfoldDrag", "Pointer change: pressed=${change.pressed}, isConsumed=${change.isConsumed}")
+                                                            if (!change.pressed) {
+                                                                val itemWidth = bounds?.width ?: 0f
+                                                                val itemHeight = bounds?.height ?: 0f
+                                                                val dropCenter = dragPosition + Offset(itemWidth / 2f, itemHeight / 2f)
+                                                                Log.d("UnfoldDrag", "Pointer released. Drag distance: $dragDistance, dropCenter: $dropCenter")
+                                                                if (dragDistance < 15f) {
+                                                                    showContextMenu = true
+                                                                } else {
+                                                                    handleAppDrop(
+                                                                        app = app,
+                                                                        dropCenter = dropCenter,
+                                                                        slotBounds = slotBounds,
+                                                                        allApps = state.gridApps,
+                                                                        dockCapacity = dockVisibleCount * dockRows,
+                                                                        viewModel = viewModel
+                                                                    )
+                                                                }
+                                                                draggedApp = null
+                                                                break
+                                                            }
+                                                            val dragAmount = change.position - change.previousPosition
+                                                            change.consume()
+                                                            dragPosition += dragAmount
+                                                            dragDistance += dragAmount.getDistance()
+                                                            Log.d("UnfoldDrag", "Dragged. dragAmount: $dragAmount, new dragPosition: $dragPosition, totalDistance: $dragDistance")
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        Log.e("UnfoldDrag", "Error in drag loop", e)
+                                                        draggedApp = null
+                                                    }
+                                                } else {
+                                                    Log.d("UnfoldDrag", "Long press returned null (cancelled/tapped)")
+                                                    // Released before long press: click!
+                                                    try {
+                                                        val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
+                                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                        }
+                                                        intent?.let { context.startActivity(it) }
+                                                    } catch (e: Exception) {
+                                                        // ignored
+                                                    }
+                                                }
+                                            }
+                                        }
+                                ) {
+                                    HomeAppGridItem(
+                                        app = app,
+                                        iconSize = gridIconSize,
+                                        showLabel = state.homeLabelsEnabled,
+                                        onClick = {}
+                                    )
+
+                                    if (showContextMenu) {
+                                        DropdownMenu(
+                                            expanded = showContextMenu,
+                                            onDismissRequest = { showContextMenu = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("REMOVE FROM HOME") },
+                                                onClick = {
+                                                    viewModel.onIntent(HomeUiIntent.UnpinApp(app.packageName))
+                                                    showContextMenu = false
+                                                }
+                                            )
+                                        }
                                     }
-                                    intent?.let { context.startActivity(it) }
-                                } catch (e: Exception) {
-                                    // ignored
                                 }
+                            } else {
+                                // Empty slot placeholder to maintain layout grid alignment
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .border(1.dp, theme.panelBorder.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape)
+                                )
                             }
-                        )
-                    }
-                    // Keep empty slots spaced properly
-                    repeat(columns - rowApps.size) {
-                        Spacer(modifier = Modifier.size(56.dp))
+                        }
                     }
                 }
             }
         }
 
-        // 3. Floating App Dock (Bottom Panel - occupies full width!)
-        GlassPanel(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(86.dp)
-                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-            cornerRadius = 24.dp
-        ) {
-            Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Search drawer navigation
-                CarvedIcon(
-                    size = 48.dp,
-                    icon = { Icon(Icons.Default.Search, "App Drawer", tint = theme.accentSecondary) },
-                    contentDescription = "Search Drawer",
-                    onClick = onNavigateToDrawer
-                )
+        if (dockVisible) {
+            Spacer(modifier = Modifier.height(24.dp))
 
-                // Pinned applications
-                dockApps.forEach { app ->
-                    val iconDrawable = androidx.compose.runtime.remember(app.packageName) {
-                        try {
-                            context.packageManager.getApplicationIcon(app.packageName)
-                        } catch (e: Exception) {
-                            null
+            val dockHeight = when (dockRows) {
+                2 -> 140.dp
+                else -> 88.dp
+            }
+
+            val dockContent: @Composable () -> Unit = {
+                val calculatedSize = state.dockIconSize.dp.coerceAtMost(56.dp).coerceAtLeast(36.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 8.dp),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    repeat(dockRows) { rowIndex ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            repeat(dockColumns) { colIndex ->
+                                val slotIndex = rowIndex * dockColumns + colIndex
+                                val dockIdx = 100 + slotIndex
+                                val app = dockApps.firstOrNull { it.gridPosition == dockIdx }
+                                Box(
+                                    modifier = Modifier
+                                        .size(calculatedSize)
+                                        .onGloballyPositioned { coords ->
+                                            slotBounds[dockIdx] = coords.boundsInRoot()
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (app != null) {
+                                        val isDraggingThisApp = draggedApp?.packageName == app.packageName
+                                        val iconDrawable = androidx.compose.runtime.remember(app.packageName) {
+                                            try {
+                                                context.packageManager.getApplicationIcon(app.packageName)
+                                            } catch (e: Exception) {
+                                                null
+                                            }
+                                        }
+                                        val dockIconDiameter = if (calculatedSize < state.dockIconSize.dp) {
+                                            calculatedSize
+                                        } else {
+                                            state.dockIconSize.dp
+                                        }
+                                        var showDockMenu by remember(app.packageName) { mutableStateOf(false) }
+                                        var dragDistance by remember(app.packageName) { mutableStateOf(0f) }
+                                        Box(
+                                            modifier = Modifier
+                                                .alpha(if (isDraggingThisApp) 0.3f else 1.0f)
+                                                .onGloballyPositioned { coords ->
+                                                    itemBounds[app.packageName] = coords.boundsInRoot()
+                                                }
+                                                .pointerInput(app.packageName) {
+                                                    awaitEachGesture {
+                                                        val down = awaitFirstDown(requireUnconsumed = false)
+                                                        val longPress = awaitLongPressOrCancellation(down.id)
+                                                        if (longPress != null) {
+                                                            draggedApp = app
+                                                            dragPosition = itemBounds[app.packageName]?.topLeft ?: Offset.Zero
+                                                            dragDistance = 0f
+                                                            val currentDownId = down.id
+                                                            while (true) {
+                                                                val event = awaitPointerEvent()
+                                                                val change = event.changes.firstOrNull { it.id == currentDownId } ?: break
+                                                                if (!change.pressed) {
+                                                                    val itemWidth = itemBounds[app.packageName]?.width ?: 0f
+                                                                    val itemHeight = itemBounds[app.packageName]?.height ?: 0f
+                                                                    val dropCenter = dragPosition + Offset(itemWidth / 2f, itemHeight / 2f)
+                                                                    if (dragDistance < 15f) {
+                                                                        showDockMenu = true
+                                                                    } else {
+                                                                        handleAppDrop(
+                                                                            app = app,
+                                                                            dropCenter = dropCenter,
+                                                                            slotBounds = slotBounds,
+                                                                            allApps = state.gridApps,
+                                                                            dockCapacity = dockVisibleCount * dockRows,
+                                                                            viewModel = viewModel
+                                                                        )
+                                                                    }
+                                                                    draggedApp = null
+                                                                    break
+                                                                }
+                                                                val dragAmount = change.position - change.previousPosition
+                                                                change.consume()
+                                                                dragPosition += dragAmount
+                                                                dragDistance += dragAmount.getDistance()
+                                                            }
+                                                        } else {
+                                                            try {
+                                                                val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
+                                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                                }
+                                                                intent?.let { context.startActivity(it) }
+                                                            } catch (e: Exception) {
+                                                                // ignored
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                        ) {
+                                            CarvedIcon(
+                                                size = dockIconDiameter,
+                                                icon = {
+                                                    val imageBitmap = remember(app.packageName) {
+                                                        iconDrawable?.let { drawableToImageBitmap(it) }
+                                                    }
+                                                    if (imageBitmap != null) {
+                                                        Image(
+                                                            bitmap = imageBitmap,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.fillMaxSize()
+                                                        )
+                                                    } else {
+                                                        Text(
+                                                            text = app.label.take(2).uppercase(),
+                                                            color = theme.accentPrimary,
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                },
+                                                contentDescription = app.label,
+                                                onClick = {}
+                                            )
+
+                                            if (showDockMenu) {
+                                                DropdownMenu(
+                                                    expanded = showDockMenu,
+                                                    onDismissRequest = { showDockMenu = false }
+                                                ) {
+                                                    DropdownMenuItem(
+                                                        text = { Text("REMOVE FROM DOCK") },
+                                                        onClick = {
+                                                            viewModel.onIntent(HomeUiIntent.UnpinApp(app.packageName))
+                                                            showDockMenu = false
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(calculatedSize - 12.dp)
+                                                .border(1.dp, theme.panelBorder.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        if (dockRows == 2) {
+                            Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
+                }
+            }
+
+            when (state.dockBackgroundMode) {
+                DockBackgroundMode.TRANSPARENT -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(dockHeight)
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        dockContent()
+                    }
+                }
+                DockBackgroundMode.SOLID -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(dockHeight)
+                            .padding(horizontal = 16.dp)
+                            .background(dockSolidColor.copy(alpha = 0.96f), RoundedCornerShape(24.dp))
+                            .border(1.dp, theme.panelBorder, RoundedCornerShape(24.dp))
+                    ) {
+                        dockContent()
+                    }
+                }
+                DockBackgroundMode.BLUR -> {
+                    GlassPanel(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(dockHeight)
+                            .padding(horizontal = 16.dp),
+                        cornerRadius = 24.dp,
+                        opacity = 0.52f
+                    ) {
+                        dockContent()
+                    }
+                }
+                DockBackgroundMode.DEFAULT -> {
+                    GlassPanel(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(dockHeight)
+                            .padding(horizontal = 16.dp),
+                        cornerRadius = 24.dp
+                    ) {
+                        dockContent()
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        // Floating drag preview overlay
+        draggedApp?.let { app ->
+            val iconDrawable = remember(app.packageName) {
+                try {
+                    context.packageManager.getApplicationIcon(app.packageName)
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .offset {
+                        androidx.compose.ui.unit.IntOffset(
+                            dragPosition.x.toInt(),
+                            dragPosition.y.toInt()
+                        )
+                    }
+                    .size(64.dp, 72.dp)
+                    .alpha(0.8f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CarvedIcon(
-                        size = 48.dp,
+                        size = gridIconSize,
                         icon = {
-                            if (iconDrawable != null) {
+                            val imageBitmap = remember(app.packageName) {
+                                iconDrawable?.let { drawableToImageBitmap(it) }
+                            }
+                            if (imageBitmap != null) {
                                 Image(
-                                    painter = rememberAsyncImagePainter(iconDrawable),
+                                    bitmap = imageBitmap,
                                     contentDescription = null,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -218,36 +581,27 @@ fun HomeScreen(
                                 )
                             }
                         },
-                        contentDescription = app.label,
-                        onClick = {
-                            try {
-                                val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                intent?.let { context.startActivity(it) }
-                            } catch (e: Exception) {
-                                // ignored
-                            }
-                        }
+                        contentDescription = app.label
+                    )
+                    Text(
+                        text = app.label,
+                        color = theme.textSecondary,
+                        fontSize = 9.sp,
+                        maxLines = 1
                     )
                 }
-
-                // Launcher settings shortcut
-                CarvedIcon(
-                    size = 48.dp,
-                    icon = { Icon(Icons.Default.Settings, "Launcher Settings", tint = theme.accentPrimary) },
-                    contentDescription = "Settings",
-                    onClick = onNavigateToSettings
-                )
             }
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+}
+
 @Composable
 fun HomeAppGridItem(
     app: AppInfo,
+    iconSize: Dp,
+    showLabel: Boolean,
     onClick: () -> Unit
 ) {
     val theme = LocalVoltTheme.current
@@ -264,15 +618,19 @@ fun HomeAppGridItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .clickable(onClick = onClick)
-            .padding(4.dp)
-            .width(64.dp)
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+            .width(iconSize + 12.dp)
+            .height(iconSize + if (showLabel) 26.dp else 12.dp)
     ) {
         CarvedIcon(
-            size = 48.dp,
+            size = iconSize,
             icon = {
-                if (iconDrawable != null) {
+                val imageBitmap = remember(app.packageName) {
+                    iconDrawable?.let { drawableToImageBitmap(it) }
+                }
+                if (imageBitmap != null) {
                     Image(
-                        painter = coil.compose.rememberAsyncImagePainter(iconDrawable),
+                        bitmap = imageBitmap,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -288,15 +646,34 @@ fun HomeAppGridItem(
             contentDescription = app.label,
             onClick = onClick
         )
-        Text(
-            text = app.label,
-            color = theme.textSecondary,
-            fontSize = 9.sp,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            modifier = Modifier.padding(top = 4.dp)
-        )
+        if (showLabel) {
+            Text(
+                text = app.label,
+                color = theme.textSecondary,
+                fontSize = 10.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
     }
+}
+
+private fun launcherGridIconSize(rawSize: Int, columns: Int): Dp {
+    val normalized = ((rawSize.coerceIn(30, 100) - 30) / 70f).coerceIn(0f, 1f)
+    val maxSize = when (columns.coerceIn(3, 6)) {
+        3 -> 56f
+        4 -> 50f
+        5 -> 44f
+        else -> 40f
+    }
+    val minSize = when (columns.coerceIn(3, 6)) {
+        3 -> 34f
+        4 -> 32f
+        5 -> 30f
+        else -> 28f
+    }
+    return (minSize + (maxSize - minSize) * normalized).dp
 }
 
 @Composable
@@ -419,7 +796,7 @@ fun MediaPanel() {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Volt Ambient Stream",
+                text = "Unfold Ambient Stream",
                 color = theme.textPrimary,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
@@ -450,6 +827,129 @@ fun MediaPanel() {
                     icon = { Text(">", color = theme.textPrimary, fontSize = 14.sp) },
                     contentDescription = "Next"
                 )
+            }
+        }
+    }
+}
+
+private fun handleAppDrop(
+    app: AppInfo,
+    dropCenter: Offset,
+    slotBounds: Map<Int, androidx.compose.ui.geometry.Rect>,
+    allApps: List<AppInfo>,
+    dockCapacity: Int,
+    viewModel: HomeViewModel
+) {
+    val targetSlot = slotBounds.entries.firstOrNull { it.value.contains(dropCenter) }?.key
+    if (targetSlot != null) {
+        val sourcePos = app.gridPosition ?: -1
+        val appAtTarget = allApps.firstOrNull { it.gridPosition == targetSlot }
+
+        if (targetSlot >= 100 && sourcePos < 100) {
+            // Moving from Grid to Dock
+            val dockAppsCount = allApps.count { (it.gridPosition ?: 0) >= 100 }
+            if (dockAppsCount >= dockCapacity && appAtTarget == null) {
+                // Dock is full and target is empty slot: reject drag (goes back)
+                return
+            }
+        }
+
+        // Move app to target
+        viewModel.onIntent(HomeUiIntent.MoveApp(app.packageName, targetSlot))
+        if (appAtTarget != null) {
+            // Swap: move the other app to source slot
+            viewModel.onIntent(HomeUiIntent.MoveApp(appAtTarget.packageName, sourcePos))
+        }
+    }
+}
+
+private fun drawableToImageBitmap(drawable: android.graphics.drawable.Drawable): ImageBitmap? {
+    return try {
+        if (drawable is android.graphics.drawable.BitmapDrawable) {
+            drawable.bitmap.asImageBitmap()
+        } else {
+            val width = drawable.intrinsicWidth.coerceAtLeast(1)
+            val height = drawable.intrinsicHeight.coerceAtLeast(1)
+            val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bitmap)
+            drawable.setBounds(0, 0, width, height)
+            drawable.draw(canvas)
+            bitmap.asImageBitmap()
+        }
+    } catch (e: Exception) {
+        null
+    }
+}
+
+@Composable
+fun SettingsScreen(onBack: () -> Unit) {
+    val theme = LocalVoltTheme.current
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(theme.bgVoid)
+            .padding(24.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Text(
+                text = "UNFOLD LAUNCHER SETTINGS",
+                color = theme.textPrimary,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            GlassPanel(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                cornerRadius = 16.dp
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "GRID SYSTEM CONFIG",
+                        color = theme.accentPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Current configuration is set dynamically. Long-press on the wallpaper to customize layout bindings.",
+                        color = theme.textSecondary,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+
+            GlassPanel(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                cornerRadius = 16.dp
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "GESTURE CONTROL CONFIG",
+                        color = theme.accentSecondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "• Swipe down: Opens search/drawer\n• Swipe up: Opens search/drawer\n• Wallpaper long-press: Opens settings",
+                        color = theme.textSecondary,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+
+            androidx.compose.material3.Button(
+                onClick = onBack,
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = theme.accentPrimary)
+            ) {
+                Text("GO BACK", color = theme.bgVoid, fontWeight = FontWeight.Bold)
             }
         }
     }

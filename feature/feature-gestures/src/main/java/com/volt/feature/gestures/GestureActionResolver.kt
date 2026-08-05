@@ -1,8 +1,11 @@
 package com.volt.feature.gestures
 
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.LauncherApps
 import android.net.Uri
+import android.os.Process
 import androidx.navigation.NavController
 import com.volt.core.domain.model.ActionType
 import com.volt.core.domain.model.GestureType
@@ -18,12 +21,39 @@ class GestureActionResolver @Inject constructor(
 ) {
     suspend fun execute(gestureType: GestureType, navController: NavController) {
         val binding = resolveAction(gestureType) ?: return
+
+        val horizontalGestures = setOf(
+            GestureType.SWIPE_LEFT_1F,
+            GestureType.SWIPE_RIGHT_1F,
+            GestureType.SWIPE_LEFT_2F,
+            GestureType.SWIPE_RIGHT_2F
+        )
+
+        if (!binding.isUserModified && gestureType in horizontalGestures) {
+            return
+        }
+
         when (binding.actionType) {
             ActionType.LAUNCH_APP -> {
                 val packageName = binding.targetPackage ?: return
-                val intent = context.packageManager.getLaunchIntentForPackage(packageName)?.apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
+                val intent = runCatching {
+                    val launcherIntent = Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_LAUNCHER)
+                        setPackage(packageName)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    val resolveInfo = context.packageManager.queryIntentActivities(launcherIntent, 0)
+                        .firstOrNull()
+                    resolveInfo?.activityInfo?.let { activityInfo ->
+                        Intent(Intent.ACTION_MAIN).apply {
+                            addCategory(Intent.CATEGORY_LAUNCHER)
+                            component = ComponentName(activityInfo.packageName, activityInfo.name)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                    } ?: context.packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                }.getOrNull()
                 intent?.let { context.startActivity(it) }
             }
             ActionType.OPEN_INTENT -> {
@@ -46,7 +76,30 @@ class GestureActionResolver @Inject constructor(
                 // System toggles
             }
             ActionType.SHORTCUT -> {
-                // Launch shortcuts
+                val packageName = binding.targetPackage ?: return
+                val shortcutId = binding.targetShortcutId
+                if (shortcutId.isNullOrBlank()) {
+                    val fallback = context.packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    fallback?.let { context.startActivity(it) }
+                } else {
+                    try {
+                        val launcherApps = context.getSystemService(LauncherApps::class.java) ?: return
+                        launcherApps.startShortcut(
+                            packageName,
+                            shortcutId,
+                            null,
+                            null,
+                            Process.myUserHandle()
+                        )
+                    } catch (_: Exception) {
+                        val fallback = context.packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        fallback?.let { context.startActivity(it) }
+                    }
+                }
             }
         }
     }

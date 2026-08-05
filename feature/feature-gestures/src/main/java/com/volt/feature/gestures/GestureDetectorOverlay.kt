@@ -23,21 +23,35 @@ fun GestureDetectorOverlay(
                 val down = awaitFirstDown(requireUnconsumed = false)
                 var fingerCount = 1
                 var totalDrag = Offset.Zero
+                var gestureRecognized = false
+                var childConsumed = false
                 
                 while (true) {
                     val event = awaitPointerEvent()
                     val change = event.changes.firstOrNull { it.id == down.id } ?: break
                     if (!change.pressed) break
                     
+                    if (change.isConsumed || childConsumed) {
+                        childConsumed = true
+                        continue
+                    }
+                    
                     fingerCount = maxOf(fingerCount, event.changes.size)
                     totalDrag += change.positionChange()
                     
-                    // Consume the change so it doesn't propagate to scroll parent
-                    change.consume()
+                    if (totalDrag.getDistance() > SWIPE_THRESHOLD_PX) {
+                        gestureRecognized = true
+                    }
+                    
+                    if (gestureRecognized) {
+                        change.consume()
+                    }
                 }
 
-                val gesture = classifyGesture(totalDrag, fingerCount)
-                gesture?.let(onGestureDetected)
+                if (gestureRecognized) {
+                    val gesture = classifyGesture(totalDrag, fingerCount)
+                    gesture?.let(onGestureDetected)
+                }
             }
         }
     ) { content() }
@@ -55,6 +69,7 @@ private fun classifyGesture(drag: Offset, fingerCount: Int): GestureType? {
         isHorizontal && drag.x > 0 && fingerCount == 2 -> GestureType.SWIPE_RIGHT_2F
         !isHorizontal && drag.y < 0 && fingerCount == 1 -> GestureType.SWIPE_UP_1F
         !isHorizontal && drag.y < 0 && fingerCount == 2 -> GestureType.SWIPE_UP_2F
+        !isHorizontal && drag.y > 0 && fingerCount == 1 -> GestureType.SWIPE_DOWN_1F
         else -> null
     }
 }

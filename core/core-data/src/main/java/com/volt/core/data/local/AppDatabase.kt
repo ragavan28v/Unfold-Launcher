@@ -50,6 +50,7 @@ abstract class AppDatabase : RoomDatabase() {
                                  GestureEntity("SWIPE_RIGHT_1F", "LAUNCH_APP", targetPackage = "com.whatsapp"),
                                  GestureEntity("SWIPE_LEFT_2F", "OPEN_SCREEN", targetScreenRoute = VoltRoute.HiddenSpace.route),
                                  GestureEntity("SWIPE_RIGHT_2F", "OPEN_INTENT", targetIntentUri = "market://details?id="),
+                                 GestureEntity("SWIPE_DOWN_1F", "OPEN_SCREEN", targetScreenRoute = VoltRoute.UniversalSearch.route),
                                  GestureEntity("SWIPE_UP_1F", "OPEN_SCREEN", targetScreenRoute = VoltRoute.AppDrawer.route)
                              )
                              getInstance(context).gestureDao().insertAll(defaultGestures)

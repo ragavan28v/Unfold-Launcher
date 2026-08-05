@@ -546,4 +546,4 @@ fixed contracts. Ask before introducing any new library not in the version
 catalog.
 ```
 
-That last line matters most — it stops the agent from silently swapping in a different DI framework, a different image loader, or Material 2 instead of 3 halfway through.
+That last line matters most — it stops the agent from silently swapping in a different DI framework, a different image loader, or Material 2 instead of 3 halfway through.git branch -M main
