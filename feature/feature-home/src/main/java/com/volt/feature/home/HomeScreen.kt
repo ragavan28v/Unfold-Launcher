@@ -37,6 +37,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -56,6 +57,7 @@ import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.window.PopupProperties
 import com.volt.core.domain.model.AppInfo
 import com.volt.core.domain.model.DockBackgroundMode
 import com.volt.core.domain.model.DockRowsMode
@@ -129,15 +131,19 @@ fun HomeScreen(
         )
 
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(top = 8.dp)
         ) {
+        Spacer(modifier = Modifier.height(2.dp))
         // 1. Top HUD Area (HUD panels nested inside NodeRail horizontally, stretches dynamically)
         Row(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(top = 16.dp, start = 8.dp, end = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(top = 2.dp, start = 8.dp, end = 16.dp),
+            verticalAlignment = Alignment.Top
         ) {
             // Navigation Rail on the left
             NodeRail(
@@ -164,6 +170,7 @@ fun HomeScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
+                    .padding(top = 2.dp)
             ) {
                 // Active HUD panel on the right
                 HorizontalPager(
@@ -259,19 +266,22 @@ fun HomeScreen(
                                                             val change = event.changes.firstOrNull { it.id == currentDownId } ?: break
                                                             Log.d("UnfoldDrag", "Pointer change: pressed=${change.pressed}, isConsumed=${change.isConsumed}")
                                                             if (!change.pressed) {
-                                                                val itemWidth = bounds?.width ?: 0f
-                                                                val itemHeight = bounds?.height ?: 0f
-                                                                val dropCenter = dragPosition + Offset(itemWidth / 2f, itemHeight / 2f)
-                                                                Log.d("UnfoldDrag", "Pointer released. Drag distance: $dragDistance, dropCenter: $dropCenter")
+                                                                val dragBounds = Rect(
+                                                                    left = dragPosition.x,
+                                                                    top = dragPosition.y,
+                                                                    right = dragPosition.x + (bounds?.width ?: 0f),
+                                                                    bottom = dragPosition.y + (bounds?.height ?: 0f)
+                                                                )
                                                                 if (dragDistance < 15f) {
                                                                     showContextMenu = true
                                                                 } else {
                                                                     handleAppDrop(
                                                                         app = app,
-                                                                        dropCenter = dropCenter,
+                                                                        dropBounds = dragBounds,
                                                                         slotBounds = slotBounds,
                                                                         allApps = state.gridApps,
                                                                         dockCapacity = dockVisibleCount * dockRows,
+                                                                        sourcePosition = app.gridPosition,
                                                                         viewModel = viewModel
                                                                     )
                                                                 }
@@ -313,10 +323,23 @@ fun HomeScreen(
                                     if (showContextMenu) {
                                         DropdownMenu(
                                             expanded = showContextMenu,
-                                            onDismissRequest = { showContextMenu = false }
+                                            onDismissRequest = { showContextMenu = false },
+                                            modifier = Modifier
+                                                .border(1.dp, theme.panelBorder, RoundedCornerShape(18.dp)),
+                                            shape = RoundedCornerShape(18.dp),
+                                            containerColor = theme.bgPanel.copy(alpha = 0.96f),
+                                            tonalElevation = 0.dp,
+                                            shadowElevation = 14.dp,
+                                            properties = PopupProperties(focusable = true)
                                         ) {
                                             DropdownMenuItem(
-                                                text = { Text("REMOVE FROM HOME") },
+                                                text = {
+                                                    Text(
+                                                        text = "REMOVE FROM HOME",
+                                                        color = theme.textPrimary,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                },
                                                 onClick = {
                                                     viewModel.onIntent(HomeUiIntent.UnpinApp(app.packageName))
                                                     showContextMenu = false
@@ -405,16 +428,22 @@ fun HomeScreen(
                                                                 if (!change.pressed) {
                                                                     val itemWidth = itemBounds[app.packageName]?.width ?: 0f
                                                                     val itemHeight = itemBounds[app.packageName]?.height ?: 0f
-                                                                    val dropCenter = dragPosition + Offset(itemWidth / 2f, itemHeight / 2f)
+                                                                    val dropBounds = Rect(
+                                                                        left = dragPosition.x,
+                                                                        top = dragPosition.y,
+                                                                        right = dragPosition.x + itemWidth,
+                                                                        bottom = dragPosition.y + itemHeight
+                                                                    )
                                                                     if (dragDistance < 15f) {
                                                                         showDockMenu = true
                                                                     } else {
                                                                         handleAppDrop(
                                                                             app = app,
-                                                                            dropCenter = dropCenter,
+                                                                            dropBounds = dropBounds,
                                                                             slotBounds = slotBounds,
                                                                             allApps = state.gridApps,
                                                                             dockCapacity = dockVisibleCount * dockRows,
+                                                                            sourcePosition = app.gridPosition,
                                                                             viewModel = viewModel
                                                                         )
                                                                     }
@@ -467,10 +496,23 @@ fun HomeScreen(
                                             if (showDockMenu) {
                                                 DropdownMenu(
                                                     expanded = showDockMenu,
-                                                    onDismissRequest = { showDockMenu = false }
+                                                    onDismissRequest = { showDockMenu = false },
+                                                    modifier = Modifier
+                                                        .border(1.dp, theme.panelBorder, RoundedCornerShape(18.dp)),
+                                                    shape = RoundedCornerShape(18.dp),
+                                                    containerColor = theme.bgPanel.copy(alpha = 0.96f),
+                                                    tonalElevation = 0.dp,
+                                                    shadowElevation = 14.dp,
+                                                    properties = PopupProperties(focusable = true)
                                                 ) {
                                                     DropdownMenuItem(
-                                                        text = { Text("REMOVE FROM DOCK") },
+                                                        text = {
+                                                            Text(
+                                                                text = "REMOVE FROM DOCK",
+                                                                color = theme.textPrimary,
+                                                                fontWeight = FontWeight.SemiBold
+                                                            )
+                                                        },
                                                         onClick = {
                                                             viewModel.onIntent(HomeUiIntent.UnpinApp(app.packageName))
                                                             showDockMenu = false
@@ -540,7 +582,7 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
         // Floating drag preview overlay
@@ -927,13 +969,14 @@ fun MediaPanel() {
 
 private fun handleAppDrop(
     app: AppInfo,
-    dropCenter: Offset,
+    dropBounds: Rect,
     slotBounds: Map<Int, androidx.compose.ui.geometry.Rect>,
     allApps: List<AppInfo>,
     dockCapacity: Int,
+    sourcePosition: Int?,
     viewModel: HomeViewModel
 ) {
-    val targetSlot = slotBounds.entries.firstOrNull { it.value.contains(dropCenter) }?.key
+    val targetSlot = resolveDropTarget(dropBounds, slotBounds, sourcePosition)
     if (targetSlot != null) {
         val sourcePos = app.gridPosition ?: -1
         val appAtTarget = allApps.firstOrNull { it.gridPosition == targetSlot }
@@ -954,6 +997,71 @@ private fun handleAppDrop(
             viewModel.onIntent(HomeUiIntent.MoveApp(appAtTarget.packageName, sourcePos))
         }
     }
+}
+
+private fun resolveDropTarget(
+    dropBounds: Rect,
+    slotBounds: Map<Int, androidx.compose.ui.geometry.Rect>,
+    sourcePosition: Int?
+): Int? {
+    if (slotBounds.isEmpty()) return null
+
+    val expandedDropBounds = Rect(
+        left = dropBounds.left - 24f,
+        top = dropBounds.top - 24f,
+        right = dropBounds.right + 24f,
+        bottom = dropBounds.bottom + 24f
+    )
+
+    val overlapTarget = slotBounds.entries
+        .mapNotNull { (slot, bounds) ->
+            val overlapLeft = maxOf(expandedDropBounds.left, bounds.left)
+            val overlapTop = maxOf(expandedDropBounds.top, bounds.top)
+            val overlapRight = minOf(expandedDropBounds.right, bounds.right)
+            val overlapBottom = minOf(expandedDropBounds.bottom, bounds.bottom)
+            if (overlapRight > overlapLeft && overlapBottom > overlapTop) {
+                val overlapArea = (overlapRight - overlapLeft) * (overlapBottom - overlapTop)
+                slot to overlapArea
+            } else {
+                null
+            }
+        }
+        .maxByOrNull { it.second }
+        ?.first
+
+    if (overlapTarget != null) return overlapTarget
+
+    val dropCenter = Offset(
+        x = (dropBounds.left + dropBounds.right) / 2f,
+        y = (dropBounds.top + dropBounds.bottom) / 2f
+    )
+
+    fun nearestSlot(boundsMap: Map<Int, androidx.compose.ui.geometry.Rect>): Int? {
+        if (boundsMap.isEmpty()) return null
+        return boundsMap.entries.minByOrNull { (_, bounds) ->
+            val slotCenter = Offset(
+                x = (bounds.left + bounds.right) / 2f,
+                y = (bounds.top + bounds.bottom) / 2f
+            )
+            val dx = dropCenter.x - slotCenter.x
+            val dy = dropCenter.y - slotCenter.y
+            dx * dx + dy * dy
+        }?.key
+    }
+
+    val homeSlots = slotBounds.filterKeys { it < 100 }
+    val dockSlots = slotBounds.filterKeys { it >= 100 }
+    val dockTop = dockSlots.values.minOfOrNull { it.top } ?: Float.MAX_VALUE
+    val homeBottom = homeSlots.values.maxOfOrNull { it.bottom } ?: Float.MIN_VALUE
+
+    if (sourcePosition != null && sourcePosition < 100 && dropCenter.y > dockTop - 48f) {
+        nearestSlot(dockSlots)?.let { return it }
+    }
+    if (sourcePosition != null && sourcePosition >= 100 && dropCenter.y < homeBottom + 48f) {
+        nearestSlot(homeSlots)?.let { return it }
+    }
+
+    return nearestSlot(slotBounds)
 }
 
 private fun drawableToImageBitmap(drawable: android.graphics.drawable.Drawable): ImageBitmap? {

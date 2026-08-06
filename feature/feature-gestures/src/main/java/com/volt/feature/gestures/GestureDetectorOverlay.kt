@@ -3,6 +3,7 @@ package com.volt.feature.gestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -18,7 +19,9 @@ fun GestureDetectorOverlay(
     content: @Composable () -> Unit
 ) {
     Box(
-        modifier = modifier.pointerInput(Unit) {
+        modifier = modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
                 var fingerCount = 1

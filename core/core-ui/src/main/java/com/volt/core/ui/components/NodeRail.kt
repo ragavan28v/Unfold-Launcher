@@ -39,12 +39,12 @@ fun NodeRail(
         modifier = modifier
             .width(72.dp)
             .fillMaxHeight(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.TopCenter
     ) {
         // Draw the vertical connector line in background
         Canvas(modifier = Modifier.fillMaxHeight()) {
-            val startY = 40.dp.toPx()
-            val endY = size.height - 40.dp.toPx()
+            val startY = 24.dp.toPx()
+            val endY = size.height - 24.dp.toPx()
             val x = size.width / 2f
             drawLine(
                 color = theme.panelBorder,
@@ -55,8 +55,10 @@ fun NodeRail(
         }
 
         Column(
-            modifier = Modifier.fillMaxHeight(),
-            verticalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(top = 8.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             nodes.forEach { node ->
@@ -89,7 +91,7 @@ fun NodeRail(
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
                     )
                 }
             }
