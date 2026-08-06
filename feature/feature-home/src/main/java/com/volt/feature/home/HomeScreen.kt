@@ -594,48 +594,58 @@ fun HomeScreen(
                     null
                 }
             }
-            Box(
-                modifier = Modifier
-                    .offset {
-                        androidx.compose.ui.unit.IntOffset(
-                            dragPosition.x.toInt(),
-                            dragPosition.y.toInt()
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val statusBarHeight = WindowInsets.statusBars.getTop(density)
+            androidx.compose.ui.window.Popup(
+                alignment = Alignment.TopStart,
+                offset = androidx.compose.ui.unit.IntOffset(
+                    dragPosition.x.toInt(),
+                    (dragPosition.y - statusBarHeight).toInt()
+                ),
+                properties = androidx.compose.ui.window.PopupProperties(
+                    focusable = false,
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false,
+                    excludeFromSystemGesture = true
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp, 72.dp)
+                        .alpha(0.8f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CarvedIcon(
+                            size = gridIconSize,
+                            icon = {
+                                val imageBitmap = remember(app.packageName) {
+                                    iconDrawable?.let { drawableToImageBitmap(it) }
+                                }
+                                if (imageBitmap != null) {
+                                    Image(
+                                        bitmap = imageBitmap,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Text(
+                                        text = app.label.take(2).uppercase(),
+                                        color = theme.accentPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            },
+                            contentDescription = app.label
+                        )
+                        Text(
+                            text = app.label,
+                            color = theme.textSecondary,
+                            fontSize = 9.sp,
+                            maxLines = 1
                         )
                     }
-                    .size(64.dp, 72.dp)
-                    .alpha(0.8f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CarvedIcon(
-                        size = gridIconSize,
-                        icon = {
-                            val imageBitmap = remember(app.packageName) {
-                                iconDrawable?.let { drawableToImageBitmap(it) }
-                            }
-                            if (imageBitmap != null) {
-                                Image(
-                                    bitmap = imageBitmap,
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else {
-                                Text(
-                                    text = app.label.take(2).uppercase(),
-                                    color = theme.accentPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        },
-                        contentDescription = app.label
-                    )
-                    Text(
-                        text = app.label,
-                        color = theme.textSecondary,
-                        fontSize = 9.sp,
-                        maxLines = 1
-                    )
                 }
             }
         }
