@@ -9,6 +9,8 @@ import com.volt.core.domain.model.GestureBinding
 import com.volt.core.domain.model.GestureType
 import com.volt.core.domain.model.FolderInfo
 import com.volt.core.domain.model.SystemStats
+import com.volt.core.domain.model.WallpaperMode
+import com.volt.core.domain.model.WallpaperPatternMode
 import com.volt.core.domain.usecase.GetInstalledAppsUseCase
 import com.volt.core.domain.usecase.GetSystemStatsUseCase
 import com.volt.core.domain.usecase.ReorderHomeGridUseCase
@@ -43,7 +45,16 @@ data class HomeUiState(
     val dockIconCount: Int = 6,
     val dockRowsMode: DockRowsMode = DockRowsMode.ONE_ROW,
     val dockBackgroundMode: DockBackgroundMode = DockBackgroundMode.DEFAULT,
-    val dockBackgroundHex: String = "#12161E"
+    val dockBackgroundHex: String = "#12161E",
+    val homeWallpaperMode: WallpaperMode = WallpaperMode.SOLID,
+    val homeWallpaperHex: String = "#0B1020",
+    val homeWallpaperPattern: WallpaperPatternMode = WallpaperPatternMode.MINIMAL,
+    val homeWallpaperImageUri: String = "",
+    val drawerWallpaperSyncWithHome: Boolean = true,
+    val drawerWallpaperMode: WallpaperMode = WallpaperMode.SOLID,
+    val drawerWallpaperHex: String = "#0B1020",
+    val drawerWallpaperPattern: WallpaperPatternMode = WallpaperPatternMode.MINIMAL,
+    val drawerWallpaperImageUri: String = ""
 )
 
 sealed interface HomeUiIntent {
@@ -116,7 +127,16 @@ class HomeViewModel @Inject constructor(
                     dockIconCount = themeConfig.dockIconCount.coerceIn(0, 6),
                     dockRowsMode = themeConfig.dockRowsMode,
                     dockBackgroundMode = themeConfig.dockBackgroundMode,
-                    dockBackgroundHex = themeConfig.dockBackgroundHex
+                    dockBackgroundHex = themeConfig.dockBackgroundHex,
+                    homeWallpaperMode = themeConfig.homeWallpaperMode,
+                    homeWallpaperHex = themeConfig.homeWallpaperHex,
+                    homeWallpaperPattern = themeConfig.homeWallpaperPattern,
+                    homeWallpaperImageUri = themeConfig.homeWallpaperImageUri,
+                    drawerWallpaperSyncWithHome = themeConfig.drawerWallpaperSyncWithHome,
+                    drawerWallpaperMode = themeConfig.drawerWallpaperMode,
+                    drawerWallpaperHex = themeConfig.drawerWallpaperHex,
+                    drawerWallpaperPattern = themeConfig.drawerWallpaperPattern,
+                    drawerWallpaperImageUri = themeConfig.drawerWallpaperImageUri
                 )
             }
             .launchIn(viewModelScope)

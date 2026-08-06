@@ -39,6 +39,18 @@ enum class AppDrawerStyleMode {
     CARD
 }
 
+enum class WallpaperMode {
+    SOLID,
+    PATTERN,
+    CUSTOM
+}
+
+enum class WallpaperPatternMode {
+    GEOMETRIC,
+    ABSTRACT,
+    MINIMAL
+}
+
 data class ThemeConfig(
     val accentPrimaryHex: String = "#38BDF8",
     val accentSecondaryHex: String = "#6366F1",
@@ -58,6 +70,15 @@ data class ThemeConfig(
     val dockLabelsEnabled: Boolean = true,
     val dockBackgroundMode: DockBackgroundMode = DockBackgroundMode.DEFAULT,
     val dockBackgroundHex: String = "#12161E",
+    val homeWallpaperMode: WallpaperMode = WallpaperMode.SOLID,
+    val homeWallpaperHex: String = "#0B1020",
+    val homeWallpaperPattern: WallpaperPatternMode = WallpaperPatternMode.MINIMAL,
+    val homeWallpaperImageUri: String = "",
+    val drawerWallpaperSyncWithHome: Boolean = true,
+    val drawerWallpaperMode: WallpaperMode = WallpaperMode.SOLID,
+    val drawerWallpaperHex: String = "#0B1020",
+    val drawerWallpaperPattern: WallpaperPatternMode = WallpaperPatternMode.MINIMAL,
+    val drawerWallpaperImageUri: String = "",
     val appDrawerLayoutMode: AppDrawerLayoutMode = AppDrawerLayoutMode.ALPHABETIC_GRID,
     val appDrawerGridRows: Int = 5,
     val appDrawerGridColumns: Int = 4,

@@ -37,7 +37,7 @@ fun GlassPanel(
         // Blurred background layer
         Box(
             modifier = Modifier
-                .matchParentSize()
+                .fillMaxSize()
                 .background(basePanelColor)
                 .then(
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blurRadius > 0.dp) {
@@ -45,14 +45,9 @@ fun GlassPanel(
                     } else {
                         Modifier
                     }
-                )
+            )
         )
 
-        // Sharp content layer
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            content()
-        }
+        content()
     }
 }

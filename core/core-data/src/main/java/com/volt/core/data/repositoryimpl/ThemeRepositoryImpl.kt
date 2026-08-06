@@ -10,6 +10,8 @@ import com.volt.core.domain.model.AppDrawerStyleMode
 import com.volt.core.domain.model.DockBackgroundMode
 import com.volt.core.domain.model.DockRowsMode
 import com.volt.core.domain.model.HomeAppPlacementMode
+import com.volt.core.domain.model.WallpaperMode
+import com.volt.core.domain.model.WallpaperPatternMode
 import com.volt.core.domain.model.ThemeConfig
 import com.volt.core.domain.repository.ThemeRepository
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +61,23 @@ object ThemeConfigSerializer : Serializer<ThemeConfig> {
                     DockBackgroundMode.valueOf(json.optString("dock_background_mode", DockBackgroundMode.DEFAULT.name))
                 }.getOrDefault(DockBackgroundMode.DEFAULT),
                 dockBackgroundHex = json.optString("dock_background_hex", "#12161E"),
+                homeWallpaperMode = runCatching {
+                    WallpaperMode.valueOf(json.optString("home_wallpaper_mode", WallpaperMode.SOLID.name))
+                }.getOrDefault(WallpaperMode.SOLID),
+                homeWallpaperHex = json.optString("home_wallpaper_hex", "#0B1020"),
+                homeWallpaperPattern = runCatching {
+                    WallpaperPatternMode.valueOf(json.optString("home_wallpaper_pattern", WallpaperPatternMode.MINIMAL.name))
+                }.getOrDefault(WallpaperPatternMode.MINIMAL),
+                homeWallpaperImageUri = json.optString("home_wallpaper_image_uri", ""),
+                drawerWallpaperSyncWithHome = json.optBoolean("drawer_wallpaper_sync_with_home", true),
+                drawerWallpaperMode = runCatching {
+                    WallpaperMode.valueOf(json.optString("drawer_wallpaper_mode", WallpaperMode.SOLID.name))
+                }.getOrDefault(WallpaperMode.SOLID),
+                drawerWallpaperHex = json.optString("drawer_wallpaper_hex", "#0B1020"),
+                drawerWallpaperPattern = runCatching {
+                    WallpaperPatternMode.valueOf(json.optString("drawer_wallpaper_pattern", WallpaperPatternMode.MINIMAL.name))
+                }.getOrDefault(WallpaperPatternMode.MINIMAL),
+                drawerWallpaperImageUri = json.optString("drawer_wallpaper_image_uri", ""),
                 appDrawerLayoutMode = runCatching {
                     AppDrawerLayoutMode.valueOf(json.optString("app_drawer_layout_mode", AppDrawerLayoutMode.ALPHABETIC_GRID.name))
                 }.getOrDefault(AppDrawerLayoutMode.ALPHABETIC_GRID),
@@ -99,6 +118,15 @@ object ThemeConfigSerializer : Serializer<ThemeConfig> {
             put("dock_labels_enabled", t.dockLabelsEnabled)
             put("dock_background_mode", t.dockBackgroundMode.name)
             put("dock_background_hex", t.dockBackgroundHex)
+            put("home_wallpaper_mode", t.homeWallpaperMode.name)
+            put("home_wallpaper_hex", t.homeWallpaperHex)
+            put("home_wallpaper_pattern", t.homeWallpaperPattern.name)
+            put("home_wallpaper_image_uri", t.homeWallpaperImageUri)
+            put("drawer_wallpaper_sync_with_home", t.drawerWallpaperSyncWithHome)
+            put("drawer_wallpaper_mode", t.drawerWallpaperMode.name)
+            put("drawer_wallpaper_hex", t.drawerWallpaperHex)
+            put("drawer_wallpaper_pattern", t.drawerWallpaperPattern.name)
+            put("drawer_wallpaper_image_uri", t.drawerWallpaperImageUri)
             put("app_drawer_layout_mode", t.appDrawerLayoutMode.name)
             put("app_drawer_grid_rows", t.appDrawerGridRows)
             put("app_drawer_grid_columns", t.appDrawerGridColumns)

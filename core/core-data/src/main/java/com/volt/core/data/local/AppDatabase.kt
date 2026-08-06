@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
         LayoutSnapshotEntity::class
     ],
     version = 1,
-    exportSchema = true
+    exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun appDao(): AppDao

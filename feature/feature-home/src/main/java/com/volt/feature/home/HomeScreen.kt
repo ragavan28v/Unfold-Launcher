@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
@@ -57,8 +59,11 @@ import androidx.compose.ui.layout.boundsInRoot
 import com.volt.core.domain.model.AppInfo
 import com.volt.core.domain.model.DockBackgroundMode
 import com.volt.core.domain.model.DockRowsMode
+import com.volt.core.domain.model.WallpaperMode
+import com.volt.core.domain.model.WallpaperPatternMode
 import com.volt.core.ui.components.*
 import com.volt.core.ui.theme.LocalVoltTheme
+import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -114,6 +119,15 @@ fun HomeScreen(
                 onLongClick = onNavigateToSettings
             )
     ) {
+        LauncherWallpaperBackdrop(
+            modifier = Modifier.fillMaxSize(),
+            mode = state.homeWallpaperMode,
+            colorHex = state.homeWallpaperHex,
+            pattern = state.homeWallpaperPattern,
+            imageUri = state.homeWallpaperImageUri,
+            fallbackColor = theme.bgVoid
+        )
+
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -312,12 +326,7 @@ fun HomeScreen(
                                     }
                                 }
                             } else {
-                                // Empty slot placeholder to maintain layout grid alignment
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .border(1.dp, theme.panelBorder.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape)
-                                )
+                                Spacer(modifier = Modifier.size(36.dp))
                             }
                         }
                     }
@@ -471,11 +480,7 @@ fun HomeScreen(
                                             }
                                         }
                                     } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(calculatedSize - 12.dp)
-                                                .border(1.dp, theme.panelBorder.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape)
-                                        )
+                                        Spacer(modifier = Modifier.size(calculatedSize - 12.dp))
                                     }
                                 }
                             }
@@ -594,7 +599,95 @@ fun HomeScreen(
         }
     }
 }
+}
 
+
+@Composable
+private fun LauncherWallpaperBackdrop(
+    modifier: Modifier = Modifier,
+    mode: WallpaperMode,
+    colorHex: String,
+    pattern: WallpaperPatternMode,
+    imageUri: String,
+    fallbackColor: Color
+) {
+    val baseColor = remember(colorHex) {
+        runCatching { Color(android.graphics.Color.parseColor(colorHex)) }
+            .getOrElse { fallbackColor }
+    }
+    Box(modifier = modifier) {
+        when (mode) {
+            WallpaperMode.SOLID -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(baseColor)
+                )
+            }
+            WallpaperMode.PATTERN -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(baseColor)
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val tint = Color.White.copy(alpha = 0.05f)
+                        when (pattern) {
+                            WallpaperPatternMode.GEOMETRIC -> {
+                                repeat(7) { index ->
+                                    val size = (40 + index * 18).dp.toPx()
+                                    drawCircle(
+                                        color = tint,
+                                        radius = size,
+                                        center = Offset(size * 1.8f, size * 0.9f + index * 110f)
+                                    )
+                                }
+                            }
+                            WallpaperPatternMode.ABSTRACT -> {
+                                repeat(6) { index ->
+                                    val y = 120f + index * 160f
+                                    drawLine(
+                                        color = tint,
+                                        start = Offset(0f, y),
+                                        end = Offset(size.width, y + 24f),
+                                        strokeWidth = 10f
+                                    )
+                                }
+                            }
+                            WallpaperPatternMode.MINIMAL -> {
+                                repeat(22) { index ->
+                                    drawCircle(
+                                        color = tint.copy(alpha = 0.03f),
+                                        radius = 18f + (index % 4) * 3f,
+                                        center = Offset(
+                                            (index * 67f) % size.width,
+                                            (index * 103f) % size.height
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            WallpaperMode.CUSTOM -> {
+                if (imageUri.isNotBlank()) {
+                    Image(
+                        painter = rememberAsyncImagePainter(imageUri),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(baseColor)
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

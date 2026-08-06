@@ -11,6 +11,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -41,6 +42,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
@@ -71,9 +73,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -95,6 +99,8 @@ import com.volt.core.domain.model.AppDrawerSortingMode
 import com.volt.core.domain.model.AppDrawerStyleMode
 import com.volt.core.domain.model.AppDrawerViewMode
 import com.volt.core.domain.model.AppInfo
+import com.volt.core.domain.model.WallpaperMode
+import com.volt.core.domain.model.WallpaperPatternMode
 import com.volt.core.ui.components.CarvedIcon
 import com.volt.core.ui.components.PillBadge
 import com.volt.core.ui.theme.LocalVoltTheme
@@ -189,6 +195,20 @@ fun AppDrawerScreen(
                 .fillMaxSize()
                 .background(drawerBackdropColor)
     ) {
+        val wallpaperMode = if (state.drawerWallpaperSyncWithHome) state.homeWallpaperMode else state.drawerWallpaperMode
+        val wallpaperHex = if (state.drawerWallpaperSyncWithHome) state.homeWallpaperHex else state.drawerWallpaperHex
+        val wallpaperPattern = if (state.drawerWallpaperSyncWithHome) state.homeWallpaperPattern else state.drawerWallpaperPattern
+        val wallpaperUri = if (state.drawerWallpaperSyncWithHome) state.homeWallpaperImageUri else state.drawerWallpaperImageUri
+
+        LauncherWallpaperBackdrop(
+            modifier = Modifier.fillMaxSize(),
+            mode = wallpaperMode,
+            colorHex = wallpaperHex,
+            pattern = wallpaperPattern,
+            imageUri = wallpaperUri,
+            fallbackColor = theme.bgVoid
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -1380,6 +1400,98 @@ fun DrawerContextMenuItem(
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.sp
         )
+    }
+}
+
+@Composable
+private fun LauncherWallpaperBackdrop(
+    modifier: Modifier = Modifier,
+    mode: WallpaperMode,
+    colorHex: String,
+    pattern: WallpaperPatternMode,
+    imageUri: String,
+    fallbackColor: Color
+) {
+    val baseColor = remember(colorHex) {
+        runCatching { Color(android.graphics.Color.parseColor(colorHex)) }
+            .getOrElse { fallbackColor }
+    }
+    Box(modifier = modifier) {
+        when (mode) {
+            WallpaperMode.SOLID -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(baseColor)
+                )
+            }
+
+            WallpaperMode.PATTERN -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(baseColor)
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val tint = Color.White.copy(alpha = 0.05f)
+                        when (pattern) {
+                            WallpaperPatternMode.GEOMETRIC -> {
+                                repeat(7) { index ->
+                                    val radius = 48f + index * 12f
+                                    drawCircle(
+                                        color = tint,
+                                        radius = radius,
+                                        center = Offset((index * 130f) % size.width, (index * 170f) % size.height)
+                                    )
+                                }
+                            }
+
+                            WallpaperPatternMode.ABSTRACT -> {
+                                repeat(6) { index ->
+                                    val y = 90f + index * 150f
+                                    drawLine(
+                                        color = tint,
+                                        start = Offset(0f, y),
+                                        end = Offset(size.width, y + 32f),
+                                        strokeWidth = 12f
+                                    )
+                                }
+                            }
+
+                            WallpaperPatternMode.MINIMAL -> {
+                                repeat(24) { index ->
+                                    drawCircle(
+                                        color = tint.copy(alpha = 0.03f),
+                                        radius = 14f + (index % 4) * 3f,
+                                        center = Offset(
+                                            (index * 61f) % size.width,
+                                            (index * 97f) % size.height
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            WallpaperMode.CUSTOM -> {
+                if (imageUri.isNotBlank()) {
+                    Image(
+                        painter = rememberAsyncImagePainter(imageUri),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(baseColor)
+                    )
+                }
+            }
+        }
     }
 }
 

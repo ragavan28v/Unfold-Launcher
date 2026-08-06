@@ -11,6 +11,8 @@ import com.volt.core.domain.model.AppDrawerSearchBarPosition
 import com.volt.core.domain.model.AppDrawerViewMode
 import com.volt.core.domain.model.DockRowsMode
 import com.volt.core.domain.model.ThemeConfig
+import com.volt.core.domain.model.WallpaperMode
+import com.volt.core.domain.model.WallpaperPatternMode
 import com.volt.core.domain.usecase.GetInstalledAppsUseCase
 import com.volt.core.domain.usecase.ToggleHiddenAppUseCase
 import com.volt.core.domain.repository.ThemeRepository
@@ -41,7 +43,16 @@ data class AppDrawerUiState(
     val dockIconCount: Int = 6,
     val homeGridColumns: Int = 4,
     val homeGridRows: Int = 3,
-    val layoutMode: AppDrawerLayoutMode = AppDrawerLayoutMode.ALPHABETIC_GRID
+    val layoutMode: AppDrawerLayoutMode = AppDrawerLayoutMode.ALPHABETIC_GRID,
+    val homeWallpaperMode: WallpaperMode = WallpaperMode.SOLID,
+    val homeWallpaperHex: String = "#0B1020",
+    val homeWallpaperPattern: WallpaperPatternMode = WallpaperPatternMode.MINIMAL,
+    val homeWallpaperImageUri: String = "",
+    val drawerWallpaperSyncWithHome: Boolean = true,
+    val drawerWallpaperMode: WallpaperMode = WallpaperMode.SOLID,
+    val drawerWallpaperHex: String = "#0B1020",
+    val drawerWallpaperPattern: WallpaperPatternMode = WallpaperPatternMode.MINIMAL,
+    val drawerWallpaperImageUri: String = ""
 )
 
 sealed interface AppDrawerUiIntent {
@@ -88,6 +99,15 @@ class AppDrawerViewModel @Inject constructor(
                     homeGridColumns = config.homeGridColumns.coerceIn(3, 6),
                     homeGridRows = config.homeGridRows.coerceIn(1, 3),
                     layoutMode = config.appDrawerLayoutMode,
+                    homeWallpaperMode = config.homeWallpaperMode,
+                    homeWallpaperHex = config.homeWallpaperHex,
+                    homeWallpaperPattern = config.homeWallpaperPattern,
+                    homeWallpaperImageUri = config.homeWallpaperImageUri,
+                    drawerWallpaperSyncWithHome = config.drawerWallpaperSyncWithHome,
+                    drawerWallpaperMode = config.drawerWallpaperMode,
+                    drawerWallpaperHex = config.drawerWallpaperHex,
+                    drawerWallpaperPattern = config.drawerWallpaperPattern,
+                    drawerWallpaperImageUri = config.drawerWallpaperImageUri,
                     filteredApps = filterApps(
                         _uiState.value.apps,
                         _uiState.value.searchQuery,

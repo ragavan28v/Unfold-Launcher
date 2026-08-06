@@ -2,11 +2,16 @@
 
 package com.volt.feature.settings
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,7 +72,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.verticalScroll
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -92,6 +99,9 @@ import com.volt.core.ui.theme.VoltThemeColors
 import androidx.compose.ui.platform.LocalContext
 import com.volt.core.domain.model.AppDrawerSearchBarPosition
 import com.volt.core.domain.model.AppDrawerViewMode
+import com.volt.core.domain.model.WallpaperMode
+import com.volt.core.domain.model.WallpaperPatternMode
+import androidx.compose.ui.layout.onSizeChanged
 
 private data class SettingsSectionInfo(
     val title: String,
@@ -102,10 +112,17 @@ private data class SettingsSectionInfo(
     val onClick: (() -> Unit)? = null
 )
 
+private data class WallpaperPreset(
+    val name: String,
+    val colorHex: String,
+    val pattern: WallpaperPatternMode
+)
+
 private enum class LauncherSettingsPage {
     HOME,
     DOCK,
-    APP_DRAWER
+    APP_DRAWER,
+    WALLPAPERS
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -123,12 +140,14 @@ fun LauncherSettingsScreen(
         LauncherSettingsPage.HOME -> "HOME"
         LauncherSettingsPage.DOCK -> "DOCK"
         LauncherSettingsPage.APP_DRAWER -> "APP DRAWER"
+        LauncherSettingsPage.WALLPAPERS -> "WALLPAPERS"
         null -> "LAUNCHER SETTINGS"
     }
     val pageSubtitle = when (selectedPage) {
         LauncherSettingsPage.HOME -> "Adjust the home screen grid and placement behavior."
         LauncherSettingsPage.DOCK -> "Adjust dock rows, icon count, icon sizing, and background behavior."
         LauncherSettingsPage.APP_DRAWER -> "Adjust drawer layout, grid, sorting, search position and keyboard behavior."
+        LauncherSettingsPage.WALLPAPERS -> "Manage wallpapers for the home screen and app drawer."
         null -> "Manage launcher preferences and controls."
     }
     val pageBackAction: () -> Unit = when (selectedPage) {
@@ -161,6 +180,14 @@ fun LauncherSettingsScreen(
                 icon = Icons.Default.Menu,
                 clickable = true,
                 onClick = { selectedPage = LauncherSettingsPage.APP_DRAWER }
+            ),
+            SettingsSectionInfo(
+                title = "Wallpapers",
+                subtitle = "Home and drawer wallpaper modes, colors, patterns, custom images, and sync behavior.",
+                badge = "Live",
+                icon = Icons.Default.Settings,
+                clickable = true,
+                onClick = { selectedPage = LauncherSettingsPage.WALLPAPERS }
             ),
             SettingsSectionInfo(
                 title = "Restore Defaults",
@@ -242,6 +269,7 @@ fun LauncherSettingsScreen(
 
             when (selectedPage) {
                 LauncherSettingsPage.HOME -> LauncherSettingsPageScaffold(
+                    modifier = Modifier.weight(1f),
                     content = {
                         HomeSettingsPanel(
                             config = state.themeConfig,
@@ -252,6 +280,7 @@ fun LauncherSettingsScreen(
                     }
                 )
                 LauncherSettingsPage.DOCK -> LauncherSettingsPageScaffold(
+                    modifier = Modifier.weight(1f),
                     content = {
                         DockSettingsPanel(
                             config = state.themeConfig,
@@ -262,6 +291,7 @@ fun LauncherSettingsScreen(
                     }
                 )
                 LauncherSettingsPage.APP_DRAWER -> LauncherSettingsPageScaffold(
+                    modifier = Modifier.weight(1f),
                     content = {
                         AppDrawerSettingsPanel(
                             config = state.themeConfig,
@@ -274,6 +304,17 @@ fun LauncherSettingsScreen(
                             onSetDrawerViewMode = viewModel::setDrawerViewMode,
                             onSetDrawerSearchBarPosition = viewModel::setDrawerSearchBarPosition,
                             onSetDrawerShowKeyboardOnOpen = viewModel::setDrawerShowKeyboardOnOpen
+                        )
+                    }
+                )
+                LauncherSettingsPage.WALLPAPERS -> LauncherSettingsPageScaffold(
+                    modifier = Modifier.weight(1f),
+                    content = {
+                        WallpaperSettingsPanel(
+                            config = state.themeConfig,
+                            onUpdate = { updated ->
+                                viewModel.updateThemeConfig(updated)
+                            }
                         )
                     }
                 )
@@ -391,12 +432,13 @@ private fun SettingsPageHeader(
 
 @Composable
 private fun LauncherSettingsPageScaffold(
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
     val theme = LocalVoltTheme.current
     val scrollState = rememberScrollState()
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -586,6 +628,730 @@ private fun DockSettingsPanel(
             }
         }
     }
+}
+
+@Composable
+private fun WallpaperSettingsPanel(
+    config: com.volt.core.domain.model.ThemeConfig,
+    onUpdate: (com.volt.core.domain.model.ThemeConfig) -> Unit
+) {
+    val theme = LocalVoltTheme.current
+    val context = LocalContext.current
+    var selectedTarget by rememberSaveable { mutableStateOf("Home") }
+
+    val homePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            persistWallpaperUri(context, it)
+            onUpdate(
+                config.copy(
+                    homeWallpaperMode = WallpaperMode.CUSTOM,
+                    homeWallpaperImageUri = it.toString()
+                )
+            )
+        }
+    }
+
+    val drawerPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            persistWallpaperUri(context, it)
+            onUpdate(
+                config.copy(
+                    drawerWallpaperMode = WallpaperMode.CUSTOM,
+                    drawerWallpaperImageUri = it.toString()
+                )
+            )
+        }
+    }
+
+    GlassPanel(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = 18.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "WALLPAPER CONTROLS",
+                color = theme.accentSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+            WallpaperTabRow(
+                options = listOf("Home", "Drawer"),
+                selected = selectedTarget,
+                onSelected = { selectedTarget = it }
+            )
+
+            when (selectedTarget) {
+                "Home" -> WallpaperSourceCard(
+                    title = "Home Wallpaper",
+                    subtitle = "Manage the wallpaper used behind the home screen.",
+                    mode = config.homeWallpaperMode,
+                    colorHex = config.homeWallpaperHex,
+                    pattern = config.homeWallpaperPattern,
+                    imageUri = config.homeWallpaperImageUri,
+                    onModeSelected = { selectedMode ->
+                        onUpdate(config.copy(homeWallpaperMode = selectedMode))
+                    },
+                    onColorHexChanged = { hex ->
+                        onUpdate(config.copy(homeWallpaperHex = normalizeHexColor(hex)))
+                    },
+                    onPatternSelected = { pattern ->
+                        onUpdate(config.copy(homeWallpaperPattern = pattern))
+                    },
+                    onPickImage = { homePicker.launch(arrayOf("image/*")) },
+                    isDrawer = false
+                )
+
+                "Drawer" -> WallpaperSourceCard(
+                    title = "App Drawer Wallpaper",
+                    subtitle = "Set a separate wallpaper for the app drawer or sync it with home.",
+                    mode = config.drawerWallpaperMode,
+                    colorHex = config.drawerWallpaperHex,
+                    pattern = config.drawerWallpaperPattern,
+                    imageUri = config.drawerWallpaperImageUri,
+                    onModeSelected = { selectedMode ->
+                        onUpdate(config.copy(drawerWallpaperMode = selectedMode))
+                    },
+                    onColorHexChanged = { hex ->
+                        onUpdate(config.copy(drawerWallpaperHex = normalizeHexColor(hex)))
+                    },
+                    onPatternSelected = { pattern ->
+                        onUpdate(config.copy(drawerWallpaperPattern = pattern))
+                    },
+                    onPickImage = { drawerPicker.launch(arrayOf("image/*")) },
+                    isDrawer = true,
+                    syncEnabled = config.drawerWallpaperSyncWithHome,
+                    onSyncToggle = { enabled ->
+                        onUpdate(config.copy(drawerWallpaperSyncWithHome = enabled))
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WallpaperTabRow(
+    options: List<String>,
+    selected: String,
+    onSelected: (String) -> Unit
+) {
+    val theme = LocalVoltTheme.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(theme.bgPanel.copy(alpha = 0.35f))
+            .border(1.dp, theme.panelBorder.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+            .padding(4.dp)
+    ) {
+        options.forEach { option ->
+            val active = option == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (active) theme.accentPrimary.copy(alpha = 0.16f) else Color.Transparent)
+                    .clickable { onSelected(option) }
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = option,
+                    color = if (active) theme.accentPrimary else theme.textSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WallpaperSourceCard(
+    title: String,
+    subtitle: String,
+    mode: WallpaperMode,
+    colorHex: String,
+    pattern: WallpaperPatternMode,
+    imageUri: String,
+    onModeSelected: (WallpaperMode) -> Unit,
+    onColorHexChanged: (String) -> Unit,
+    onPatternSelected: (WallpaperPatternMode) -> Unit,
+    onPickImage: () -> Unit,
+    isDrawer: Boolean,
+    syncEnabled: Boolean = false,
+    onSyncToggle: ((Boolean) -> Unit)? = null
+) {
+    val theme = LocalVoltTheme.current
+    var showColorPicker by rememberSaveable { mutableStateOf(false) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(theme.bgPanel.copy(alpha = 0.38f))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = theme.textPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = subtitle,
+                    color = theme.textSecondary,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+            }
+            if (isDrawer && onSyncToggle != null) {
+                Column(horizontalAlignment = Alignment.End) {
+                    PillBadge(
+                        text = if (syncEnabled) "SYNC" else "SEPARATE",
+                        tint = if (syncEnabled) theme.accentPrimary else theme.panelBorder
+                    )
+                }
+            }
+        }
+
+        if (isDrawer && onSyncToggle != null) {
+            ToggleSettingRow(
+                label = "Sync with Home Wallpaper",
+                checked = syncEnabled,
+                onCheckedChange = onSyncToggle
+            )
+        }
+
+        ChoiceRow(
+            label = "Mode",
+            options = listOf("Solid", "Patterns", "Custom"),
+            selected = when (mode) {
+                WallpaperMode.SOLID -> "Solid"
+                WallpaperMode.PATTERN -> "Patterns"
+                WallpaperMode.CUSTOM -> "Custom"
+            },
+            onSelected = {
+                onModeSelected(
+                    when (it) {
+                        "Patterns" -> WallpaperMode.PATTERN
+                        "Custom" -> WallpaperMode.CUSTOM
+                        else -> WallpaperMode.SOLID
+                    }
+                )
+            }
+        )
+
+        when (mode) {
+            WallpaperMode.SOLID -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(colorFromHex(colorHex))
+                            .border(1.dp, theme.panelBorder, RoundedCornerShape(14.dp))
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Current color",
+                            color = theme.textPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = colorHex.uppercase(),
+                            color = theme.textSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+                    OutlinedButton(onClick = { showColorPicker = true }) {
+                        Text("Pick color")
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    wallpaperPalette.forEach { hex ->
+                        val selected = colorHex.equals(hex, ignoreCase = true)
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(colorFromHex(hex))
+                                .border(
+                                    width = if (selected) 2.dp else 1.dp,
+                                    color = if (selected) theme.accentPrimary else theme.panelBorder.copy(alpha = 0.55f),
+                                    shape = RoundedCornerShape(999.dp)
+                                )
+                                .clickable { onColorHexChanged(hex) }
+                        )
+                    }
+                }
+                if (showColorPicker) {
+                    ColorPickerDialog(
+                        initialHex = colorHex,
+                        onDismiss = { showColorPicker = false },
+                        onPick = { chosenHex ->
+                            onColorHexChanged(chosenHex)
+                            showColorPicker = false
+                        }
+                    )
+                }
+            }
+
+            WallpaperMode.PATTERN -> {
+                Text(
+                    text = "Built-in wallpapers",
+                    color = theme.textPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                WallpaperPresetGrid(
+                    currentColorHex = colorHex,
+                    currentPattern = pattern,
+                    onPresetPicked = { preset ->
+                        onModeSelected(WallpaperMode.PATTERN)
+                        onColorHexChanged(preset.colorHex)
+                        onPatternSelected(preset.pattern)
+                    }
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                ChoiceRow(
+                    label = "Pattern",
+                    options = listOf("Geometric", "Abstract", "Minimal"),
+                    selected = when (pattern) {
+                        WallpaperPatternMode.GEOMETRIC -> "Geometric"
+                        WallpaperPatternMode.ABSTRACT -> "Abstract"
+                        WallpaperPatternMode.MINIMAL -> "Minimal"
+                    },
+                    onSelected = {
+                        onPatternSelected(
+                            when (it) {
+                                "Geometric" -> WallpaperPatternMode.GEOMETRIC
+                                "Abstract" -> WallpaperPatternMode.ABSTRACT
+                                else -> WallpaperPatternMode.MINIMAL
+                            }
+                        )
+                    }
+                )
+            }
+
+            WallpaperMode.CUSTOM -> {
+                Text(
+                    text = "Custom wallpaper image",
+                    color = theme.textPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(onClick = onPickImage) {
+                    Text("Pick image from storage")
+                }
+                if (imageUri.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Selected image: ${Uri.parse(imageUri).lastPathSegment ?: "stored"}",
+                        color = theme.textSecondary,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WallpaperPresetGrid(
+    currentColorHex: String,
+    currentPattern: WallpaperPatternMode,
+    onPresetPicked: (WallpaperPreset) -> Unit
+) {
+    val theme = LocalVoltTheme.current
+    val rows = wallpaperPresets.chunked(3)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        rows.forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { preset ->
+                    val selected = preset.colorHex.equals(currentColorHex, ignoreCase = true) &&
+                        preset.pattern == currentPattern
+                    WallpaperPresetTile(
+                        preset = preset,
+                        selected = selected,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onPresetPicked(preset) }
+                    )
+                }
+                repeat((3 - row.size).coerceAtLeast(0)) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+        Text(
+            text = "Tap a tile to load a ready-made wallpaper look.",
+            color = theme.textSecondary,
+            fontSize = 11.sp
+        )
+    }
+}
+
+@Composable
+private fun WallpaperPresetTile(
+    preset: WallpaperPreset,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val theme = LocalVoltTheme.current
+    val baseColor = colorFromHex(preset.colorHex)
+    Box(
+        modifier = modifier
+            .height(74.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(baseColor)
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) theme.accentPrimary else theme.panelBorder.copy(alpha = 0.65f),
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clickable(onClick = onClick)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val tint = Color.White.copy(alpha = 0.18f)
+            when (preset.pattern) {
+                WallpaperPatternMode.GEOMETRIC -> {
+                    repeat(4) { index ->
+                        drawCircle(
+                            color = tint.copy(alpha = 0.18f + index * 0.05f),
+                            radius = 8f + index * 7f,
+                            center = Offset(size.width * (0.2f + index * 0.22f), size.height * 0.32f)
+                        )
+                    }
+                }
+                WallpaperPatternMode.ABSTRACT -> {
+                    repeat(3) { index ->
+                        drawLine(
+                            color = tint.copy(alpha = 0.12f + index * 0.06f),
+                            start = Offset(0f, size.height * (0.24f + index * 0.22f)),
+                            end = Offset(size.width, size.height * (0.42f + index * 0.18f)),
+                            strokeWidth = 8f
+                        )
+                    }
+                }
+                WallpaperPatternMode.MINIMAL -> {
+                    repeat(10) { index ->
+                        drawCircle(
+                            color = tint.copy(alpha = 0.08f + (index % 3) * 0.03f),
+                            radius = 3f + (index % 4) * 1.6f,
+                            center = Offset(
+                                (index * 31f) % size.width,
+                                (index * 19f) % size.height
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(10.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                PillBadge(
+                    text = "Built-in",
+                    tint = if (selected) theme.accentPrimary else theme.panelBorder
+                )
+            }
+            Text(
+                text = preset.name,
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun ColorPickerDialog(
+    initialHex: String,
+    onDismiss: () -> Unit,
+    onPick: (String) -> Unit
+) {
+    val theme = LocalVoltTheme.current
+    var hue by remember { mutableStateOf(0f) }
+    var saturation by remember { mutableStateOf(0.5f) }
+    var value by remember { mutableStateOf(0.5f) }
+
+    LaunchedEffect(initialHex) {
+        val hsv = hexToHsv(initialHex)
+        hue = hsv[0]
+        saturation = hsv[1]
+        value = hsv[2]
+    }
+
+    val previewColor = remember(hue, saturation, value) {
+        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, value)))
+    }
+    val previewHex = remember(hue, saturation, value) {
+        colorIntToHex(android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, value)))
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .width(360.dp)
+                .wrapContentHeight()
+                .clip(RoundedCornerShape(22.dp))
+                .background(theme.bgPanel.copy(alpha = 0.98f))
+                .border(1.dp, theme.panelBorder, RoundedCornerShape(22.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Pick wallpaper color",
+                color = theme.textPrimary,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SaturationValuePad(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(220.dp),
+                    hue = hue,
+                    saturation = saturation,
+                    value = value,
+                    onChanged = { newSaturation, newValue ->
+                        saturation = newSaturation
+                        value = newValue
+                    },
+                    onMeasured = { }
+                )
+                HueRail(
+                    modifier = Modifier
+                        .width(30.dp)
+                        .height(220.dp),
+                    hue = hue,
+                    onHueChanged = { hue = it },
+                    onMeasured = { }
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(previewColor)
+                        .border(1.dp, theme.panelBorder, RoundedCornerShape(14.dp))
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Selected color",
+                        color = theme.textSecondary,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        text = previewHex,
+                        color = theme.textPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            Text(
+                text = "Drag inside the square and rail to fine-tune the wallpaper tint.",
+                color = theme.textSecondary,
+                fontSize = 11.sp,
+                lineHeight = 15.sp
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = { onPick(previewHex) },
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.accentPrimary)
+                ) {
+                    Text("Apply", color = theme.bgVoid)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SaturationValuePad(
+    modifier: Modifier = Modifier,
+    hue: Float,
+    saturation: Float,
+    value: Float,
+    onChanged: (Float, Float) -> Unit,
+    onMeasured: (IntSize) -> Unit
+) {
+    val theme = LocalVoltTheme.current
+    val hueColor = remember(hue) {
+        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, 1f)))
+    }
+    var boxSize by remember { mutableStateOf(IntSize.Zero) }
+    Box(
+        modifier = modifier
+            .onSizeChanged {
+                boxSize = it
+                onMeasured(it)
+            }
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xFFF3F0F6))
+            .border(1.dp, theme.panelBorder, RoundedCornerShape(18.dp))
+            .pointerInput(hue) {
+                detectDragGestures(
+                    onDragStart = { position ->
+                        updateSaturationValue(position, boxSize, onChanged)
+                    },
+                    onDrag = { change, _ ->
+                        updateSaturationValue(change.position, boxSize, onChanged)
+                    }
+                )
+            }
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawRect(brush = Brush.horizontalGradient(listOf(Color.White, hueColor)))
+            drawRect(
+                brush = Brush.verticalGradient(
+                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f))
+                )
+            )
+            drawCircle(
+                color = Color.White,
+                radius = 12f,
+                center = Offset(saturation * size.width, (1f - value) * size.height)
+            )
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.2f),
+                radius = 15f,
+                center = Offset(saturation * size.width, (1f - value) * size.height),
+                style = Stroke(width = 2.5f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun HueRail(
+    modifier: Modifier = Modifier,
+    hue: Float,
+    onHueChanged: (Float) -> Unit,
+    onMeasured: (IntSize) -> Unit
+) {
+    val theme = LocalVoltTheme.current
+    val markerColor = remember(hue) {
+        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, 1f)))
+    }
+    var railSize by remember { mutableStateOf(IntSize.Zero) }
+    Box(
+        modifier = modifier
+            .onSizeChanged {
+                railSize = it
+                onMeasured(it)
+            }
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color(0xFFEFEAF2))
+            .border(1.dp, theme.panelBorder, RoundedCornerShape(999.dp))
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { position ->
+                        updateHue(position, railSize, onHueChanged)
+                    },
+                    onDrag = { change, _ ->
+                        updateHue(change.position, railSize, onHueChanged)
+                    }
+                )
+            }
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    listOf(
+                        Color(0xFFFF3E8D),
+                        Color(0xFFFFB84D),
+                        Color(0xFFF8F54A),
+                        Color(0xFF4EE6A8),
+                        Color(0xFF3AB2FF),
+                        Color(0xFF8F5BFF),
+                        Color(0xFFFF3E8D)
+                    )
+                )
+            )
+            val y = (1f - hue / 360f).coerceIn(0f, 1f) * size.height
+            drawCircle(
+                color = markerColor,
+                radius = 11f,
+                center = Offset(size.width / 2f, y.coerceIn(11f, size.height - 11f)),
+                style = Stroke(width = 3f)
+            )
+        }
+    }
+}
+
+private fun updateSaturationValue(
+    position: Offset,
+    size: IntSize,
+    onChanged: (Float, Float) -> Unit
+) {
+    if (size.width == 0 || size.height == 0) return
+    onChanged(
+        (position.x / size.width.toFloat()).coerceIn(0f, 1f),
+        (1f - (position.y / size.height.toFloat())).coerceIn(0f, 1f)
+    )
+}
+
+private fun updateHue(
+    position: Offset,
+    size: IntSize,
+    onHueChanged: (Float) -> Unit
+) {
+    if (size.height == 0) return
+    val normalized = (1f - (position.y / size.height.toFloat())).coerceIn(0f, 1f)
+    onHueChanged(normalized * 360f)
 }
 
 @Composable
@@ -908,9 +1674,59 @@ private val dockBackgroundPalette = listOf(
     "#0F766E"
 )
 
+private val wallpaperPalette = listOf(
+    "#120A20",
+    "#1A1030",
+    "#2A1456",
+    "#6B1E7C",
+    "#B12B84",
+    "#FF4D8D"
+)
+
+private val wallpaperPresets = listOf(
+    WallpaperPreset("Rose Glow", "#FF4D8D", WallpaperPatternMode.ABSTRACT),
+    WallpaperPreset("Pink Pulse", "#E11D74", WallpaperPatternMode.GEOMETRIC),
+    WallpaperPreset("Violet Bloom", "#7C3AED", WallpaperPatternMode.MINIMAL),
+    WallpaperPreset("Midnight Neon", "#1E1B4B", WallpaperPatternMode.ABSTRACT),
+    WallpaperPreset("Aurora Blush", "#C026D3", WallpaperPatternMode.GEOMETRIC),
+    WallpaperPreset("Soft Ember", "#FB7185", WallpaperPatternMode.MINIMAL)
+)
+
 private fun colorFromHex(hex: String): Color {
     return runCatching { Color(android.graphics.Color.parseColor(hex)) }
         .getOrElse { Color(0xFF12161E) }
+}
+
+private fun persistWallpaperUri(context: android.content.Context, uri: Uri) {
+    runCatching {
+        context.contentResolver.takePersistableUriPermission(
+            uri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION
+        )
+    }
+}
+
+private fun normalizeHexColor(input: String): String {
+    val trimmed = input.trim()
+    return when {
+        trimmed.isBlank() -> "#0B1020"
+        trimmed.startsWith("#") -> trimmed.uppercase()
+        else -> "#${trimmed.uppercase()}"
+    }
+}
+
+private fun hexToHsv(hex: String): FloatArray {
+    return runCatching {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(android.graphics.Color.parseColor(normalizeHexColor(hex)), hsv)
+        hsv
+    }.getOrElse {
+        floatArrayOf(220f, 0.5f, 0.5f)
+    }
+}
+
+private fun colorIntToHex(colorInt: Int): String {
+    return String.format("#%06X", 0xFFFFFF and colorInt)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
