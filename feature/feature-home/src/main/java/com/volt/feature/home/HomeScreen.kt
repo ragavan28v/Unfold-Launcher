@@ -1368,10 +1368,6 @@ private fun resolveDropTarget(
             }
         }
 
-    val emptyDockSlotBounds = slotBounds.filterKeys { slot ->
-        slot >= 100 && allApps.none { it.gridPosition == slot }
-    }
-
     val dropCenter = Offset(
         x = (dropBounds.left + dropBounds.right) / 2f,
         y = (dropBounds.top + dropBounds.bottom) / 2f
@@ -1390,36 +1386,51 @@ private fun resolveDropTarget(
         }?.key
     }
 
-    if (sourcePosition != null && sourcePosition < 100) {
-        nearestSlot(emptyDockSlotBounds)?.let { return it }
-    }
-
-    val emptySlotOverlapTarget = overlaps
-        .filter { (slot, _) -> slot >= 100 && allApps.none { it.gridPosition == slot } }
-        .maxByOrNull { it.second }
-        ?.first
-
-    if (emptySlotOverlapTarget != null) return emptySlotOverlapTarget
-
-    val overlapTarget = overlaps
-        .maxByOrNull { it.second }
-        ?.first
-
-    if (overlapTarget != null) return overlapTarget
-
     val homeSlots = slotBounds.filterKeys { it < 100 }
     val dockSlots = slotBounds.filterKeys { it >= 100 }
     val dockTop = dockSlots.values.minOfOrNull { it.top } ?: Float.MAX_VALUE
     val homeBottom = homeSlots.values.maxOfOrNull { it.bottom } ?: Float.MIN_VALUE
+    val homeDockBoundary = if (dockSlots.isNotEmpty() && homeSlots.isNotEmpty()) {
+        (homeBottom + dockTop) / 2f
+    } else {
+        Float.MAX_VALUE
+    }
 
-    if (sourcePosition != null && sourcePosition < 100 && dropCenter.y > dockTop - 48f) {
+    val droppingInDock = dropCenter.y >= homeDockBoundary
+    val emptyDockSlotBounds = dockSlots.filter { (slot, _) ->
+        allApps.none { it.gridPosition == slot }
+    }
+
+    if (sourcePosition != null && sourcePosition < 100 && droppingInDock) {
+        nearestSlot(emptyDockSlotBounds)?.let { return it }
+
+        overlaps
+            .filter { (slot, _) -> slot >= 100 }
+            .maxByOrNull { it.second }
+            ?.first
+            ?.let { return it }
+    }
+
+    if (sourcePosition != null && sourcePosition >= 100 && !droppingInDock) {
+        overlaps
+            .filter { (slot, _) -> slot < 100 }
+            .maxByOrNull { it.second }
+            ?.first
+            ?.let { return it }
+    }
+
+    val targetSlots = if (droppingInDock) dockSlots else homeSlots
+    overlaps
+        .filter { (slot, _) -> targetSlots.containsKey(slot) }
+        .maxByOrNull { it.second }
+        ?.first
+        ?.let { return it }
+
+    if (droppingInDock) {
         nearestSlot(dockSlots)?.let { return it }
     }
-    if (sourcePosition != null && sourcePosition >= 100 && dropCenter.y < homeBottom + 48f) {
-        nearestSlot(homeSlots)?.let { return it }
-    }
 
-    return nearestSlot(slotBounds)
+    return nearestSlot(homeSlots)
 }
 
 private fun drawableToImageBitmap(drawable: android.graphics.drawable.Drawable): ImageBitmap? {
