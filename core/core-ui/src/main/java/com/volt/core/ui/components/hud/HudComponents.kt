@@ -311,7 +311,8 @@ fun HudHome(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)
+            .offset(y = (-48).dp),
         verticalArrangement = Arrangement.Center
     ) {
         // Time & Date Header
@@ -421,7 +422,8 @@ fun HudMusic(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)
+            .offset(y = (-48).dp),
         verticalArrangement = Arrangement.Center
     ) {
         // Track Card
@@ -583,7 +585,8 @@ fun HudSystem(
     Row(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
+            .offset(y = (-48).dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -776,7 +779,8 @@ fun HudGoogleFeed(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)
+            .offset(y = (-48).dp),
         verticalArrangement = Arrangement.Center
     ) {
         Text(
@@ -831,7 +835,8 @@ fun HudWidgets(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)
+            .offset(y = (-48).dp),
         verticalArrangement = Arrangement.Center
     ) {
         Text(
@@ -905,7 +910,8 @@ fun HudCategories(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)
+            .offset(y = (-48).dp),
         verticalArrangement = Arrangement.Center
     ) {
         Text(

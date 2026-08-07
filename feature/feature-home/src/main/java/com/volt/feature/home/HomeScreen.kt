@@ -320,9 +320,16 @@ fun HomeScreen(
                             state = pagerState,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
+                            val hudRowOffset = when (state.gridRows) {
+                                1 -> 16.dp
+                                2 -> 10.dp
+                                else -> 0.dp
+                            }
+                            val hudPageModifier = Modifier.offset(y = hudRowOffset)
+
                             when (page) {
-                                0 -> HudHome()
-                                1 -> HudMusic()
+                                0 -> HudHome(modifier = hudPageModifier)
+                                1 -> HudMusic(modifier = hudPageModifier)
                                 2 -> HudSystem(
                                     batteryPercent = state.systemStats?.batteryPercent ?: 0.5f,
                                     batteryText = state.systemStats?.batteryText ?: "50%",
@@ -331,11 +338,12 @@ fun HomeScreen(
                                     storageUsedText = state.systemStats?.storageUsedText ?: "64 GB / 128 GB",
                                     storageUsedPercent = state.systemStats?.storageUsedPercent ?: 0.5f,
                                     cpuTempText = state.systemStats?.cpuTempText ?: "36°C",
-                                    cpuTemp = state.systemStats?.cpuTemp ?: 36f
+                                    cpuTemp = state.systemStats?.cpuTemp ?: 36f,
+                                    modifier = hudPageModifier
                                 )
-                                3 -> HudGoogleFeed()
-                                4 -> HudWidgets()
-                                5 -> HudCategories(apps = state.gridApps)
+                                3 -> HudGoogleFeed(modifier = hudPageModifier)
+                                4 -> HudWidgets(modifier = hudPageModifier)
+                                5 -> HudCategories(apps = state.gridApps, modifier = hudPageModifier)
                             }
                         }
                     }
