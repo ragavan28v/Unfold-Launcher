@@ -1,6 +1,8 @@
 package com.volt.core.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,62 +40,84 @@ fun NodeRail(
 
     Box(
         modifier = modifier
-            .width(72.dp)
+            .width(80.dp)
             .fillMaxHeight(),
-        contentAlignment = Alignment.TopCenter
+        contentAlignment = Alignment.Center
     ) {
-        // Draw the vertical connector line in background
         Canvas(modifier = Modifier.fillMaxHeight()) {
             val startY = 24.dp.toPx()
             val endY = size.height - 24.dp.toPx()
             val x = size.width / 2f
+
             drawLine(
-                color = theme.panelBorder,
+                color = theme.panelBorder.copy(alpha = 0.38f),
                 start = Offset(x, startY),
                 end = Offset(x, endY),
                 strokeWidth = 2.dp.toPx()
             )
+
+            nodes.forEachIndexed { index, _ ->
+                val nodeY = startY + (endY - startY) * index / maxOf(1, nodes.size - 1)
+                drawCircle(
+                    color = theme.panelBorder.copy(alpha = 0.3f),
+                    radius = 3.dp.toPx(),
+                    center = Offset(x, nodeY)
+                )
+            }
         }
 
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(top = 8.dp, bottom = 8.dp),
-            verticalArrangement = Arrangement.Top,
+                .padding(vertical = 16.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             nodes.forEach { node ->
                 val isActive = node.id == activeNodeId
                 val nodeColor = if (isActive) theme.accentPrimary else theme.textSecondary
+                val outerSize = if (isActive) 68.dp else 54.dp
+                val innerSize = if (isActive) 52.dp else 42.dp
+                val iconSize = if (isActive) 24.dp else 18.dp
 
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                Box(
                     modifier = Modifier
-                        .clickable { onNodeSelected(node.id) }
-                        .padding(vertical = 12.dp)
+                        .size(outerSize)
+                        .clickable { onNodeSelected(node.id) },
+                    contentAlignment = Alignment.Center
                 ) {
-                    CarvedIcon(
-                        size = 48.dp,
-                        accentTint = if (isActive) theme.accentPrimary else theme.panelBorder,
-                        contentDescription = node.label,
-                        isPressed = isActive,
-                        icon = {
-                            Icon(
-                                imageVector = node.icon,
-                                contentDescription = null,
-                                tint = nodeColor,
-                                modifier = Modifier.size(20.dp)
+                    if (isActive) {
+                        Box(
+                            modifier = Modifier
+                                .size(outerSize)
+                                .background(
+                                    color = theme.accentPrimary.copy(alpha = 0.14f),
+                                    shape = CircleShape
+                                )
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(innerSize)
+                            .background(
+                                color = if (isActive) theme.accentPrimary.copy(alpha = 0.18f) else theme.bgPanel,
+                                shape = CircleShape
                             )
-                        }
-                    )
-                    Text(
-                        text = node.label.uppercase(),
-                        color = nodeColor,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
-                    )
+                            .border(
+                                width = 2.dp,
+                                color = if (isActive) theme.accentPrimary else theme.panelBorder,
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = node.icon,
+                            contentDescription = node.label,
+                            tint = nodeColor,
+                            modifier = Modifier.size(iconSize)
+                        )
+                    }
                 }
             }
         }

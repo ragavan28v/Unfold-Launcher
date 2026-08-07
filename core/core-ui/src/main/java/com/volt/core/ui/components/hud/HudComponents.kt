@@ -1,0 +1,771 @@
+package com.volt.core.ui.components.hud
+
+import android.content.Context
+import android.content.Intent
+import android.provider.AlarmClock
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.volt.core.ui.theme.LocalVoltTheme
+import java.text.SimpleDateFormat
+import java.util.*
+
+@Composable
+fun HudBackgroundGrid(modifier: Modifier = Modifier) {
+    val theme = LocalVoltTheme.current
+    val gridColor = theme.accentPrimary.copy(alpha = 0.05f)
+    val highlightColor = theme.accentPrimary.copy(alpha = 0.12f)
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val step = 48.dp.toPx()
+        val width = size.width
+        val height = size.height
+
+        // Draw horizontal lines
+        var y = 0f
+        while (y < height) {
+            drawLine(
+                color = gridColor,
+                start = Offset(0f, y),
+                end = Offset(width, y),
+                strokeWidth = 1.dp.toPx()
+            )
+            y += step
+        }
+
+        // Draw vertical lines
+        var x = 0f
+        while (x < width) {
+            drawLine(
+                color = gridColor,
+                start = Offset(x, 0f),
+                end = Offset(x, height),
+                strokeWidth = 1.dp.toPx()
+            )
+            x += step
+        }
+
+        // Draw PCB junction points
+        val dotRadius = 2.dp.toPx()
+        for (i in 1..12) {
+            for (j in 1..15) {
+                if ((i * 3 + j * 7) % 11 == 0) {
+                    drawCircle(
+                        color = highlightColor,
+                        radius = dotRadius,
+                        center = Offset(i * step, j * step)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HudRailItem(
+    icon: ImageVector,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val theme = LocalVoltTheme.current
+    val infiniteTransition = rememberInfiniteTransition(label = "glow")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    val sizeCoerced by animateDpAsState(
+        targetValue = if (isSelected) 46.dp else 42.dp,
+        animationSpec = tween(200, easing = FastOutSlowInEasing),
+        label = "size"
+    )
+
+    val borderAlpha by animateFloatAsState(
+        targetValue = if (isSelected) 1.0f else 0.3f,
+        animationSpec = tween(200),
+        label = "border"
+    )
+
+    val containerColor = if (isSelected) {
+        theme.accentPrimary.copy(alpha = 0.12f)
+    } else {
+        theme.bgPanel.copy(alpha = 0.6f)
+    }
+
+    Box(
+        modifier = modifier
+            .size(sizeCoerced)
+            .clip(RoundedCornerShape(14.dp))
+            .background(containerColor)
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = theme.accentPrimary.copy(alpha = borderAlpha),
+                shape = RoundedCornerShape(14.dp)
+            )
+            .clickable { onClick() }
+            .drawBehind {
+                if (isSelected) {
+                    // Draw outer soft glow
+                    drawRoundRect(
+                        color = theme.accentPrimary.copy(alpha = 0.2f * pulseAlpha),
+                        size = size,
+                        cornerRadius = CornerRadius(14.dp.toPx()),
+                        style = Stroke(width = 3.dp.toPx())
+                    )
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (isSelected) theme.accentPrimary else theme.textSecondary,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
+fun HudTrace(
+    modifier: Modifier = Modifier,
+    horizontal: Boolean = true,
+    length: Dp = 40.dp
+) {
+    val theme = LocalVoltTheme.current
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow"
+    )
+
+    Canvas(
+        modifier = modifier
+            .then(
+                if (horizontal) Modifier.width(length).height(8.dp)
+                else Modifier.width(8.dp).height(length)
+            )
+    ) {
+        val stroke = 1.5.dp.toPx()
+        val cX = size.width / 2f
+        val cY = size.height / 2f
+
+        if (horizontal) {
+            drawLine(
+                color = theme.accentPrimary.copy(alpha = 0.4f * pulseAlpha),
+                start = Offset(0f, cY),
+                end = Offset(size.width, cY),
+                strokeWidth = stroke
+            )
+        } else {
+            drawLine(
+                color = theme.accentPrimary.copy(alpha = 0.4f * pulseAlpha),
+                start = Offset(cX, 0f),
+                end = Offset(cX, size.height),
+                strokeWidth = stroke
+            )
+        }
+    }
+}
+
+@Composable
+fun HudConnectorNode(modifier: Modifier = Modifier) {
+    val theme = LocalVoltTheme.current
+    Canvas(modifier = modifier.size(16.dp)) {
+        drawCircle(
+            color = theme.accentPrimary.copy(alpha = 0.2f),
+            radius = 6.dp.toPx()
+        )
+        drawCircle(
+            color = theme.accentPrimary,
+            radius = 3.dp.toPx()
+        )
+    }
+}
+
+@Composable
+fun StatusChip(
+    text: String,
+    isActive: Boolean = true,
+    modifier: Modifier = Modifier
+) {
+    val theme = LocalVoltTheme.current
+    val infiniteTransition = rememberInfiniteTransition(label = "blink")
+    val dotAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dotAlpha"
+    )
+
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(theme.bgPanel.copy(alpha = 0.4f))
+            .border(1.dp, theme.panelBorder.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .background(
+                    if (isActive) Color(0xFF00FFCC).copy(alpha = dotAlpha) else theme.textMuted,
+                    shape = RoundedCornerShape(50)
+                )
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = text,
+            color = theme.textSecondary,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 1.sp
+        )
+    }
+}
+
+@Composable
+fun TelemetryLabel(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    val theme = LocalVoltTheme.current
+    Column(modifier = modifier) {
+        Text(
+            text = label.uppercase(),
+            color = theme.textMuted,
+            fontSize = 8.sp,
+            letterSpacing = 1.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = value,
+            color = theme.textPrimary,
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace
+        )
+    }
+}
+
+@Composable
+fun HudHome(
+    modifier: Modifier = Modifier
+) {
+    val theme = LocalVoltTheme.current
+    var timeText by remember { mutableStateOf("") }
+    var dateText by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            val now = Calendar.getInstance().time
+            timeText = SimpleDateFormat("h:mm a", Locale.getDefault()).format(now)
+            dateText = SimpleDateFormat("EEEE · d MMMM yyyy", Locale.getDefault()).format(now).uppercase()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Time & Date Header
+        Column {
+            Text(
+                text = timeText,
+                color = theme.textPrimary,
+                fontSize = 54.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = (-1).sp
+            )
+            Text(
+                text = dateText,
+                color = theme.textSecondary,
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            StatusChip(text = "OPUS OS // SYSTEM ACTIVE", isActive = true)
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Weather Details block
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "28°",
+                    color = theme.textPrimary,
+                    fontSize = 42.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = theme.accentPrimary,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+            Text(
+                text = "Partly Cloudy",
+                color = theme.accentPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Text(
+                text = "COIMBATORE, TAMIL NADU, INDIA",
+                color = theme.textSecondary.copy(alpha = 0.7f),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.sp
+            )
+        }
+
+        // High / Low temp bar
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Canvas(modifier = Modifier.size(width = 8.dp, height = 36.dp)) {
+                drawLine(
+                    color = theme.accentPrimary.copy(alpha = 0.3f),
+                    start = Offset(size.width / 2, 0f),
+                    end = Offset(size.width / 2, size.height),
+                    strokeWidth = 2.dp.toPx()
+                )
+                drawCircle(
+                    color = theme.accentPrimary,
+                    radius = 3.dp.toPx(),
+                    center = Offset(size.width / 2, size.height / 2)
+                )
+            }
+            Column {
+                Text(
+                    text = "TODAY",
+                    color = theme.textMuted,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "32° / 24°",
+                    color = theme.textPrimary,
+                    fontSize = 18.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun HudMusic(
+    modifier: Modifier = Modifier
+) {
+    val theme = LocalVoltTheme.current
+    var isPlaying by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Track Card
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(theme.bgPanel.copy(alpha = 0.6f))
+                    .border(1.dp, theme.panelBorder.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = theme.accentPrimary,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Column {
+                Text(
+                    text = "Nothing Playing",
+                    color = theme.textPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "NO SOURCE ACTIVE",
+                    color = theme.textSecondary.copy(alpha = 0.6f),
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.sp
+                )
+            }
+        }
+
+        // Timeline Slider
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("0:00", color = theme.textMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                Text("0:00", color = theme.textMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(12.dp)
+            ) {
+                drawLine(
+                    color = theme.panelBorder.copy(alpha = 0.3f),
+                    start = Offset(0f, size.height / 2),
+                    end = Offset(size.width, size.height / 2),
+                    strokeWidth = 2.dp.toPx()
+                )
+                drawCircle(
+                    color = theme.accentPrimary,
+                    radius = 4.dp.toPx(),
+                    center = Offset(24.dp.toPx(), size.height / 2)
+                )
+            }
+        }
+
+        // Controls Area with surrounding traces
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Background interactive traces
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val cX = size.width / 2f
+                val cY = size.height / 2f
+                // Draw horizontal trace line
+                drawLine(
+                    color = theme.accentPrimary.copy(alpha = 0.15f),
+                    start = Offset(0f, cY),
+                    end = Offset(size.width, cY),
+                    strokeWidth = 1.dp.toPx()
+                )
+                // Junction lines
+                drawLine(
+                    color = theme.accentPrimary.copy(alpha = 0.15f),
+                    start = Offset(cX - 60.dp.toPx(), cY),
+                    end = Offset(cX - 60.dp.toPx(), cY + 30.dp.toPx()),
+                    strokeWidth = 1.dp.toPx()
+                )
+                drawLine(
+                    color = theme.accentPrimary.copy(alpha = 0.15f),
+                    start = Offset(cX + 60.dp.toPx(), cY),
+                    end = Offset(cX + 60.dp.toPx(), cY - 30.dp.toPx()),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = theme.textSecondary,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clickable { }
+                )
+
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .background(theme.accentPrimary.copy(alpha = 0.12f), RoundedCornerShape(50))
+                        .border(2.dp, theme.accentPrimary, RoundedCornerShape(50))
+                        .clickable { isPlaying = !isPlaying },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.PlayArrow else Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = theme.accentPrimary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = theme.textSecondary,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clickable { }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun HudSystem(
+    batteryPercent: Float,
+    batteryText: String,
+    ramUsedText: String,
+    ramUsedPercent: Float,
+    storageUsedText: String,
+    storageUsedPercent: Float,
+    cpuTempText: String,
+    cpuTemp: Float,
+    modifier: Modifier = Modifier
+) {
+    val theme = LocalVoltTheme.current
+
+    Row(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        // Battery Gauge on Left
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.weight(1f)
+        ) {
+            HudBatteryGauge(
+                percent = batteryPercent,
+                text = batteryText
+            )
+        }
+
+        // Stat Cards stacked on Right
+        Column(
+            modifier = Modifier
+                .weight(1.2f)
+                .padding(start = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            HudInfoCard(
+                title = "RAM",
+                value = ramUsedText.split("/").firstOrNull()?.trim() ?: "4.2 GB",
+                subtitle = "of " + (ramUsedText.split("/").lastOrNull()?.trim() ?: "8 GB"),
+                progress = ramUsedPercent
+            )
+
+            HudInfoCard(
+                title = "STORAGE",
+                value = storageUsedText.split("/").firstOrNull()?.trim() ?: "64 GB",
+                subtitle = "of " + (storageUsedText.split("/").lastOrNull()?.trim() ?: "128 GB"),
+                progress = storageUsedPercent
+            )
+
+            HudInfoCard(
+                title = "TEMP",
+                value = cpuTempText,
+                subtitle = "battery status ok",
+                progress = cpuTemp / 100f
+            )
+        }
+    }
+}
+
+@Composable
+fun HudBatteryGauge(
+    percent: Float,
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    val theme = LocalVoltTheme.current
+    val infiniteTransition = rememberInfiniteTransition(label = "gauge")
+    val rotateAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotate"
+    )
+
+    Box(
+        modifier = modifier.size(130.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(110.dp)) {
+            val strokeWidth = 5.dp.toPx()
+            // Track
+            drawCircle(
+                color = theme.panelBorder.copy(alpha = 0.2f),
+                style = Stroke(width = strokeWidth)
+            )
+
+            // Progress Arc
+            drawArc(
+                color = theme.accentPrimary,
+                startAngle = rotateAngle - 90f,
+                sweepAngle = 360f * percent,
+                useCenter = false,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+
+            // Decorative inner ticks
+            val tickCount = 20
+            val tickRadius = 45.dp.toPx()
+            for (i in 0 until tickCount) {
+                val angle = (360f / tickCount) * i
+                val x = size.width / 2 + tickRadius * kotlin.math.cos(Math.toRadians(angle.toDouble())).toFloat()
+                val y = size.height / 2 + tickRadius * kotlin.math.sin(Math.toRadians(angle.toDouble())).toFloat()
+                drawCircle(
+                    color = theme.accentPrimary.copy(alpha = if (angle / 360f < percent) 0.6f else 0.15f),
+                    radius = 1.5.dp.toPx(),
+                    center = Offset(x, y)
+                )
+            }
+        }
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = text,
+                color = theme.textPrimary,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = "ON BATTERY",
+                color = theme.textSecondary.copy(alpha = 0.6f),
+                fontSize = 8.sp,
+                letterSpacing = 1.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+fun HudInfoCard(
+    title: String,
+    value: String,
+    subtitle: String,
+    progress: Float,
+    modifier: Modifier = Modifier
+) {
+    val theme = LocalVoltTheme.current
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(theme.bgPanel.copy(alpha = 0.4f))
+            .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                color = theme.textSecondary.copy(alpha = 0.8f),
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+        }
+
+        Text(
+            text = value,
+            color = theme.textPrimary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
+
+        Text(
+            text = subtitle.lowercase(),
+            color = theme.textMuted,
+            fontSize = 9.sp,
+            fontFamily = FontFamily.Monospace
+        )
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        // Small Progress Bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(theme.panelBorder.copy(alpha = 0.3f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(progress.coerceIn(0f, 1f))
+                    .background(theme.accentPrimary)
+            )
+        }
+    }
+}

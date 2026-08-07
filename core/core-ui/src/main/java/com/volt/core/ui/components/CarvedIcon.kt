@@ -63,7 +63,7 @@ fun CarvedIcon(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val radius = size.toPx() / 2f
             // 1. Draw flat base
-            drawCircle(color = theme.surfaceIconBase, radius = radius)
+            drawCircle(color = Color.Transparent, radius = radius)
             // 2 & 3. Inner shadow and highlight & 4. 1px rim stroke
             drawCarvedBevel(
                 radius = radius,

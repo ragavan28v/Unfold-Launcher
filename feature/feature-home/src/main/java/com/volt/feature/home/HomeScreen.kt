@@ -44,6 +44,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
+import android.provider.AlarmClock
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -64,6 +66,7 @@ import com.volt.core.domain.model.DockRowsMode
 import com.volt.core.domain.model.WallpaperMode
 import com.volt.core.domain.model.WallpaperPatternMode
 import com.volt.core.ui.components.*
+import com.volt.core.ui.components.hud.*
 import com.volt.core.ui.theme.LocalVoltTheme
 import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.launch
@@ -138,83 +141,226 @@ fun HomeScreen(
         ) {
         Spacer(modifier = Modifier.height(2.dp))
         // 1. Top HUD Area (HUD panels nested inside NodeRail horizontally, stretches dynamically)
-        Row(
+        var flashlightEnabled by remember { mutableStateOf(false) }
+        var isSilentEnabled by remember { mutableStateOf(true) }
+
+        Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(top = 2.dp, start = 8.dp, end = 16.dp),
-            verticalAlignment = Alignment.Top
+                .padding(top = 16.dp, start = 16.dp, end = 16.dp)
         ) {
-            // Navigation Rail on the left
-            NodeRail(
-                nodes = railNodes,
-                activeNodeId = when (pagerState.currentPage) {
-                    0 -> "home"
-                    1 -> "system"
-                    else -> "media"
-                },
-                onNodeSelected = { id ->
-                    coroutineScope.launch {
-                        val targetPage = when (id) {
-                            "home" -> 0
-                            "system" -> 1
-                            else -> 2
-                        }
-                        pagerState.animateScrollToPage(targetPage)
-                    }
-                },
-                modifier = Modifier.fillMaxHeight()
-            )
+            // Background PCB grid
+            HudBackgroundGrid()
 
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .padding(top = 2.dp)
-            ) {
-                // Active HUD panel on the right
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                ) { page ->
-                    when (page) {
-                        0 -> ClockWeatherPanel()
-                        1 -> SystemHUDPanel(state = state)
-                        2 -> MediaPanel()
-                    }
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Top Horizontal Rail
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(64.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HudRailItem(
+                        icon = Icons.Default.Home,
+                        isSelected = pagerState.currentPage == 0,
+                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
+                    )
+                    HudTrace(horizontal = true, length = 16.dp)
+                    HudRailItem(
+                        icon = Icons.Default.PlayArrow,
+                        isSelected = pagerState.currentPage == 1,
+                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } }
+                    )
+                    HudTrace(horizontal = true, length = 16.dp)
+                    HudRailItem(
+                        icon = Icons.Default.Build,
+                        isSelected = pagerState.currentPage == 2,
+                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } }
+                    )
+                    HudTrace(horizontal = true, length = 16.dp)
+                    
+                    // Flashlight Rail Item
+                    val context = LocalContext.current
+                    HudRailItem(
+                        icon = Icons.Default.Info, // Flashlight representation
+                        isSelected = flashlightEnabled,
+                        onClick = {
+                            flashlightEnabled = !flashlightEnabled
+                            try {
+                                val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? android.hardware.camera2.CameraManager
+                                val cameraId = cameraManager?.cameraIdList?.firstOrNull()
+                                if (cameraId != null) {
+                                    cameraManager.setTorchMode(cameraId, flashlightEnabled)
+                                }
+                            } catch (e: Exception) {
+                                Log.e("Flashlight", "Error toggling flashlight: ${e.message}")
+                            }
+                        }
+                    )
+                    
+                    HudTrace(horizontal = true, length = 12.dp)
+                    HudConnectorNode()
+                    
+                    Spacer(modifier = Modifier.weight(1f))
+                    
+                    // SILENT Chip
+                    StatusChip(
+                        text = if (isSilentEnabled) "SILENT" else "GENERAL",
+                        isActive = isSilentEnabled,
+                        modifier = Modifier.clickable { isSilentEnabled = !isSilentEnabled }
+                    )
                 }
 
-                // Pager indicator dots (under the HUD panel)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Bottom Content + Left Rail
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.Center
+                        .weight(1f),
+                    verticalAlignment = Alignment.Top
                 ) {
-                    repeat(3) { index ->
-                        val active = pagerState.currentPage == index
+                    // Left Vertical Rail
+                    Column(
+                        modifier = Modifier
+                            .width(46.dp)
+                            .fillMaxHeight(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val context = LocalContext.current
+                        
+                        HudTrace(horizontal = false, length = 8.dp)
+                        
+                        // Calendar
+                        HudRailItem(
+                            icon = Icons.Default.Info, // Calendar
+                            isSelected = false,
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_MAIN).apply {
+                                    addCategory(Intent.CATEGORY_APP_CALENDAR)
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                runCatching { context.startActivity(intent) }
+                            }
+                        )
+                        HudTrace(horizontal = false, length = 8.dp)
+                        
+                        // Clock
+                        HudRailItem(
+                            icon = Icons.Default.Build, // Clock
+                            isSelected = false,
+                            onClick = {
+                                val intent = Intent(AlarmClock.ACTION_SHOW_ALARMS).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                runCatching { context.startActivity(intent) }
+                            }
+                        )
+                        HudTrace(horizontal = false, length = 8.dp)
+                        
+                        // Gallery
+                        HudRailItem(
+                            icon = Icons.Default.Home, // Gallery
+                            isSelected = false,
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_MAIN).apply {
+                                    addCategory(Intent.CATEGORY_APP_GALLERY)
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                runCatching { context.startActivity(intent) }
+                            }
+                        )
+                        HudTrace(horizontal = false, length = 8.dp)
+                        
+                        HudConnectorNode()
+                        
+                        // Battery display (text rotated)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = (state.systemStats?.batteryText ?: "100%").uppercase(),
+                            color = theme.accentPrimary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        HudConnectorNode()
+                        
+                        // Flexible vertical trace that expands and shrinks with the screen
                         Box(
                             modifier = Modifier
-                                .padding(horizontal = 4.dp)
-                                .size(if (active) 8.dp else 6.dp)
-                                .background(
-                                    color = if (active) theme.accentPrimary else theme.textSecondary.copy(alpha = 0.4f),
-                                    shape = androidx.compose.foundation.shape.CircleShape
+                                .width(46.dp)
+                                .weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val traceColor = theme.accentPrimary.copy(alpha = 0.4f)
+                            Canvas(modifier = Modifier.fillMaxHeight().width(8.dp)) {
+                                drawLine(
+                                    color = traceColor,
+                                    start = Offset(size.width / 2f, 0f),
+                                    end = Offset(size.width / 2f, size.height),
+                                    strokeWidth = 1.5.dp.toPx()
                                 )
-                        )
+                            }
+                        }
+                        
+                        // Settings Row with horizontal trace extending to the right
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.wrapContentWidth(align = Alignment.Start, unbounded = true)
+                        ) {
+                            HudRailItem(
+                                icon = Icons.Default.Settings,
+                                isSelected = false,
+                                onClick = onNavigateToSettings
+                            )
+                            HudTrace(horizontal = true, length = 36.dp)
+                            HudConnectorNode()
+                        }
+                    }
+
+                    // Main HUD content page
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize()
+                        ) { page ->
+                            when (page) {
+                                0 -> HudHome()
+                                1 -> HudMusic()
+                                2 -> HudSystem(
+                                    batteryPercent = state.systemStats?.batteryPercent ?: 0.5f,
+                                    batteryText = state.systemStats?.batteryText ?: "50%",
+                                    ramUsedText = state.systemStats?.ramUsedText ?: "4.2 GB / 8.0 GB",
+                                    ramUsedPercent = state.systemStats?.ramUsedPercent ?: 0.5f,
+                                    storageUsedText = state.systemStats?.storageUsedText ?: "64 GB / 128 GB",
+                                    storageUsedPercent = state.systemStats?.storageUsedPercent ?: 0.5f,
+                                    cpuTempText = state.systemStats?.cpuTempText ?: "36°C",
+                                    cpuTemp = state.systemStats?.cpuTemp ?: 36f
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(20.dp))
 
         // 2. Home App Grid Area (placed at the bottom, just above the dock!)
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .background(theme.bgPanel.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
+                .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(24.dp))
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             for (r in 0 until rows) {
