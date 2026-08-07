@@ -374,24 +374,39 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     repeat(dockRows) { rowIndex ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            repeat(dockColumns) { colIndex ->
-                                val slotIndex = rowIndex * dockColumns + colIndex
-                                val dockIdx = 100 + slotIndex
-                                val app = dockApps.firstOrNull { it.gridPosition == dockIdx }
-                                Box(
+                        if (dockRows == 1) {
+                            val sortedDockApps = dockApps.sortedBy { it.gridPosition }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(calculatedSize)
+                            ) {
+                                Row(
                                     modifier = Modifier
-                                        .size(calculatedSize)
-                                        .onGloballyPositioned { coords ->
-                                            slotBounds[dockIdx] = coords.boundsInRoot()
-                                        },
-                                    contentAlignment = Alignment.Center
+                                        .matchParentSize(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    if (app != null) {
+                                    repeat(dockColumns) { colIndex ->
+                                        val dockIdx = 100 + colIndex
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight()
+                                                .onGloballyPositioned { coords ->
+                                                    slotBounds[dockIdx] = coords.boundsInRoot()
+                                                }
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier
+                                        .matchParentSize(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    sortedDockApps.forEach { app ->
                                         val isDraggingThisApp = draggedApp?.packageName == app.packageName
                                         val iconDrawable = androidx.compose.runtime.remember(app.packageName) {
                                             try {
@@ -408,8 +423,8 @@ fun HomeScreen(
                                         var showDockMenu by remember(app.packageName) { mutableStateOf(false) }
                                         var dragDistance by remember(app.packageName) { mutableStateOf(0f) }
                                         Box(
+                                            contentAlignment = Alignment.Center,
                                             modifier = Modifier
-                                                .alpha(if (isDraggingThisApp) 0.3f else 1.0f)
                                                 .onGloballyPositioned { coords ->
                                                     itemBounds[app.packageName] = coords.boundsInRoot()
                                                 }
@@ -521,8 +536,176 @@ fun HomeScreen(
                                                 }
                                             }
                                         }
+                                    }
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                repeat(dockColumns) { colIndex ->
+                                    val slotIndex = rowIndex * dockColumns + colIndex
+                                    val dockIdx = 100 + slotIndex
+                                    val app = dockApps.firstOrNull { it.gridPosition == dockIdx }
+
+                                    // For a single-row dock we want slots to expand evenly across
+                                    // the available width. For two-row mode we keep fixed sized
+                                    // slots to preserve the grid-like appearance.
+                                    val slotModifier = if (dockRows == 1) {
+                                        Modifier
+                                            .weight(1f)
+                                            .height(calculatedSize)
+                                            .onGloballyPositioned { coords ->
+                                                slotBounds[dockIdx] = coords.boundsInRoot()
+                                            }
                                     } else {
-                                        Spacer(modifier = Modifier.size(calculatedSize - 12.dp))
+                                        Modifier
+                                            .size(calculatedSize)
+                                            .onGloballyPositioned { coords ->
+                                                slotBounds[dockIdx] = coords.boundsInRoot()
+                                            }
+                                    }
+
+                                    Box(
+                                        modifier = slotModifier,
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (app != null) {
+                                            val isDraggingThisApp = draggedApp?.packageName == app.packageName
+                                            val iconDrawable = androidx.compose.runtime.remember(app.packageName) {
+                                                try {
+                                                    context.packageManager.getApplicationIcon(app.packageName)
+                                                } catch (e: Exception) {
+                                                    null
+                                                }
+                                            }
+                                            val dockIconDiameter = if (calculatedSize < state.dockIconSize.dp) {
+                                                calculatedSize
+                                            } else {
+                                                state.dockIconSize.dp
+                                            }
+                                            var showDockMenu by remember(app.packageName) { mutableStateOf(false) }
+                                            var dragDistance by remember(app.packageName) { mutableStateOf(0f) }
+                                            Box(
+                                                modifier = Modifier
+                                                    .alpha(if (isDraggingThisApp) 0.3f else 1.0f)
+                                                    .onGloballyPositioned { coords ->
+                                                        itemBounds[app.packageName] = coords.boundsInRoot()
+                                                    }
+                                                    .pointerInput(app.packageName) {
+                                                        awaitEachGesture {
+                                                            val down = awaitFirstDown(requireUnconsumed = false)
+                                                            val longPress = awaitLongPressOrCancellation(down.id)
+                                                            if (longPress != null) {
+                                                                draggedApp = app
+                                                                dragPosition = itemBounds[app.packageName]?.topLeft ?: Offset.Zero
+                                                                dragDistance = 0f
+                                                                val currentDownId = down.id
+                                                                while (true) {
+                                                                    val event = awaitPointerEvent()
+                                                                    val change = event.changes.firstOrNull { it.id == currentDownId } ?: break
+                                                                    if (!change.pressed) {
+                                                                        val itemWidth = itemBounds[app.packageName]?.width ?: 0f
+                                                                        val itemHeight = itemBounds[app.packageName]?.height ?: 0f
+                                                                        val dropBounds = Rect(
+                                                                            left = dragPosition.x,
+                                                                            top = dragPosition.y,
+                                                                            right = dragPosition.x + itemWidth,
+                                                                            bottom = dragPosition.y + itemHeight
+                                                                        )
+                                                                        if (dragDistance < 15f) {
+                                                                            showDockMenu = true
+                                                                        } else {
+                                                                            handleAppDrop(
+                                                                                app = app,
+                                                                                dropBounds = dropBounds,
+                                                                                slotBounds = slotBounds,
+                                                                                allApps = state.gridApps,
+                                                                                dockCapacity = dockVisibleCount * dockRows,
+                                                                                sourcePosition = app.gridPosition,
+                                                                                viewModel = viewModel
+                                                                            )
+                                                                        }
+                                                                        draggedApp = null
+                                                                        break
+                                                                    }
+                                                                    val dragAmount = change.position - change.previousPosition
+                                                                    change.consume()
+                                                                    dragPosition += dragAmount
+                                                                    dragDistance += dragAmount.getDistance()
+                                                                }
+                                                            } else {
+                                                                try {
+                                                                    val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
+                                                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                                    }
+                                                                    intent?.let { context.startActivity(it) }
+                                                                } catch (e: Exception) {
+                                                                    // ignored
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                            ) {
+                                                CarvedIcon(
+                                                    size = dockIconDiameter,
+                                                    icon = {
+                                                        val imageBitmap = remember(app.packageName) {
+                                                            iconDrawable?.let { drawableToImageBitmap(it) }
+                                                        }
+                                                        if (imageBitmap != null) {
+                                                            Image(
+                                                                bitmap = imageBitmap,
+                                                                contentDescription = null,
+                                                                modifier = Modifier.fillMaxSize()
+                                                            )
+                                                        } else {
+                                                            Text(
+                                                                text = app.label.take(2).uppercase(),
+                                                                color = theme.accentPrimary,
+                                                                fontSize = 12.sp,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                        }
+                                                    },
+                                                    contentDescription = app.label,
+                                                    onClick = {}
+                                                )
+
+                                                if (showDockMenu) {
+                                                    DropdownMenu(
+                                                        expanded = showDockMenu,
+                                                        onDismissRequest = { showDockMenu = false },
+                                                        modifier = Modifier
+                                                            .border(1.dp, theme.panelBorder, RoundedCornerShape(18.dp)),
+                                                        shape = RoundedCornerShape(18.dp),
+                                                        containerColor = theme.bgPanel.copy(alpha = 0.96f),
+                                                        tonalElevation = 0.dp,
+                                                        shadowElevation = 14.dp,
+                                                        properties = PopupProperties(focusable = true)
+                                                    ) {
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(
+                                                                    text = "REMOVE FROM DOCK",
+                                                                    color = theme.textPrimary,
+                                                                    fontWeight = FontWeight.SemiBold
+                                                                )
+                                                            },
+                                                            onClick = {
+                                                                viewModel.onIntent(HomeUiIntent.UnpinApp(app.packageName))
+                                                                showDockMenu = false
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            // Empty slot: keep inner spacing similar to icon size
+                                            Spacer(modifier = Modifier.size(calculatedSize - 12.dp))
+                                        }
                                     }
                                 }
                             }
@@ -986,7 +1169,7 @@ private fun handleAppDrop(
     sourcePosition: Int?,
     viewModel: HomeViewModel
 ) {
-    val targetSlot = resolveDropTarget(dropBounds, slotBounds, sourcePosition)
+    val targetSlot = resolveDropTarget(dropBounds, slotBounds, sourcePosition, allApps)
     if (targetSlot != null) {
         val sourcePos = app.gridPosition ?: -1
         val appAtTarget = allApps.firstOrNull { it.gridPosition == targetSlot }
@@ -1012,7 +1195,8 @@ private fun handleAppDrop(
 private fun resolveDropTarget(
     dropBounds: Rect,
     slotBounds: Map<Int, androidx.compose.ui.geometry.Rect>,
-    sourcePosition: Int?
+    sourcePosition: Int?,
+    allApps: List<AppInfo>
 ): Int? {
     if (slotBounds.isEmpty()) return null
 
@@ -1023,7 +1207,7 @@ private fun resolveDropTarget(
         bottom = dropBounds.bottom + 24f
     )
 
-    val overlapTarget = slotBounds.entries
+    val overlaps = slotBounds.entries
         .mapNotNull { (slot, bounds) ->
             val overlapLeft = maxOf(expandedDropBounds.left, bounds.left)
             val overlapTop = maxOf(expandedDropBounds.top, bounds.top)
@@ -1036,10 +1220,10 @@ private fun resolveDropTarget(
                 null
             }
         }
-        .maxByOrNull { it.second }
-        ?.first
 
-    if (overlapTarget != null) return overlapTarget
+    val emptyDockSlotBounds = slotBounds.filterKeys { slot ->
+        slot >= 100 && allApps.none { it.gridPosition == slot }
+    }
 
     val dropCenter = Offset(
         x = (dropBounds.left + dropBounds.right) / 2f,
@@ -1058,6 +1242,23 @@ private fun resolveDropTarget(
             dx * dx + dy * dy
         }?.key
     }
+
+    if (sourcePosition != null && sourcePosition < 100) {
+        nearestSlot(emptyDockSlotBounds)?.let { return it }
+    }
+
+    val emptySlotOverlapTarget = overlaps
+        .filter { (slot, _) -> slot >= 100 && allApps.none { it.gridPosition == slot } }
+        .maxByOrNull { it.second }
+        ?.first
+
+    if (emptySlotOverlapTarget != null) return emptySlotOverlapTarget
+
+    val overlapTarget = overlaps
+        .maxByOrNull { it.second }
+        ?.first
+
+    if (overlapTarget != null) return overlapTarget
 
     val homeSlots = slotBounds.filterKeys { it < 100 }
     val dockSlots = slotBounds.filterKeys { it >= 100 }

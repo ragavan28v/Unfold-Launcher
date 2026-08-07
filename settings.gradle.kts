@@ -11,9 +11,9 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
-}
+// Toolchain resolver plugin removed to avoid platform-specific jlink/toolchain
+// resolution issues on developer machines. Builds will use the system JDK
+// or the JDK configured by the developer's Gradle/IDE settings.
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
