@@ -10,6 +10,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -293,11 +296,39 @@ fun TelemetryLabel(
 
 @Composable
 fun HudHome(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    gridRows: Int = 3
 ) {
     val theme = LocalVoltTheme.current
     var timeText by remember { mutableStateOf("") }
     var dateText by remember { mutableStateOf("") }
+    val verticalPadding = when (gridRows) {
+        1 -> 22.dp
+        2 -> 18.dp
+        else -> 14.dp
+    }
+    val sectionSpacing = when (gridRows) {
+        1 -> 18.dp
+        2 -> 14.dp
+        else -> 12.dp
+    }
+
+    // responsive font sizes driven by the home grid rows
+    val timeFontSize = when (gridRows) {
+        1 -> 54.sp
+        2 -> 48.sp
+        else -> 42.sp
+    }
+    val labelFontSize = when (gridRows) {
+        1 -> 12.sp
+        2 -> 11.sp
+        else -> 10.sp
+    }
+    val degreeFontSize = when (gridRows) {
+        1 -> 42.sp
+        2 -> 36.sp
+        else -> 32.sp
+    }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -311,16 +342,16 @@ fun HudHome(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)
-            .offset(y = (-48).dp),
-        verticalArrangement = Arrangement.Center
+            .padding(horizontal = 16.dp, vertical = verticalPadding)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(sectionSpacing)
     ) {
         // Time & Date Header
         Column {
             Text(
                 text = timeText,
                 color = theme.textPrimary,
-                fontSize = 54.sp,
+                fontSize = timeFontSize,
                 fontWeight = FontWeight.SemiBold,
                 fontFamily = FontFamily.Monospace,
                 letterSpacing = (-1).sp
@@ -328,7 +359,7 @@ fun HudHome(
             Text(
                 text = dateText,
                 color = theme.textSecondary,
-                fontSize = 12.sp,
+                fontSize = labelFontSize,
                 fontFamily = FontFamily.Monospace,
                 letterSpacing = 1.sp
             )
@@ -347,7 +378,7 @@ fun HudHome(
                 Text(
                     text = "28°",
                     color = theme.textPrimary,
-                    fontSize = 42.sp,
+                    fontSize = degreeFontSize,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace
                 )
@@ -414,17 +445,28 @@ fun HudHome(
 
 @Composable
 fun HudMusic(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    gridRows: Int = 3
 ) {
     val theme = LocalVoltTheme.current
     var isPlaying by remember { mutableStateOf(false) }
+    val contentPadding = when (gridRows) {
+        1 -> 18.dp
+        2 -> 14.dp
+        else -> 12.dp
+    }
+    val sectionSpacing = when (gridRows) {
+        1 -> 18.dp
+        2 -> 14.dp
+        else -> 12.dp
+    }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)
-            .offset(y = (-48).dp),
-        verticalArrangement = Arrangement.Center
+            .padding(horizontal = 16.dp, vertical = contentPadding)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(sectionSpacing)
     ) {
         // Track Card
         Row(
@@ -578,15 +620,25 @@ fun HudSystem(
     storageUsedPercent: Float,
     cpuTempText: String,
     cpuTemp: Float,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    gridRows: Int = 3
 ) {
     val theme = LocalVoltTheme.current
+    val contentPadding = when (gridRows) {
+        1 -> 18.dp
+        2 -> 14.dp
+        else -> 12.dp
+    }
+    val gaugeSize = when (gridRows) {
+        1 -> 150.dp
+        2 -> 130.dp
+        else -> 110.dp
+    }
 
     Row(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-            .offset(y = (-48).dp),
+            .padding(horizontal = 12.dp, vertical = contentPadding),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -597,7 +649,8 @@ fun HudSystem(
         ) {
             HudBatteryGauge(
                 percent = batteryPercent,
-                text = batteryText
+                text = batteryText,
+                modifier = Modifier.size(gaugeSize)
             )
         }
 
@@ -636,7 +689,7 @@ fun HudSystem(
 fun HudBatteryGauge(
     percent: Float,
     text: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier.size(130.dp)
 ) {
     val theme = LocalVoltTheme.current
     val infiniteTransition = rememberInfiniteTransition(label = "gauge")
@@ -651,7 +704,7 @@ fun HudBatteryGauge(
     )
 
     Box(
-        modifier = modifier.size(130.dp),
+        modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(110.dp)) {
@@ -774,14 +827,21 @@ fun HudInfoCard(
 }
 
 @Composable
-fun HudGoogleFeed(modifier: Modifier = Modifier) {
+fun HudGoogleFeed(
+    modifier: Modifier = Modifier,
+    gridRows: Int = 3
+) {
     val theme = LocalVoltTheme.current
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)
-            .offset(y = (-48).dp),
-        verticalArrangement = Arrangement.Center
+            .padding(horizontal = 16.dp, vertical = when (gridRows) {
+                1 -> 18.dp
+                2 -> 14.dp
+                else -> 12.dp
+            })
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
             text = "FEED / INTEL",
@@ -830,14 +890,21 @@ fun HudGoogleFeed(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun HudWidgets(modifier: Modifier = Modifier) {
+fun HudWidgets(
+    modifier: Modifier = Modifier,
+    gridRows: Int = 3
+) {
     val theme = LocalVoltTheme.current
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)
-            .offset(y = (-48).dp),
-        verticalArrangement = Arrangement.Center
+            .padding(horizontal = 16.dp, vertical = when (gridRows) {
+                1 -> 18.dp
+                2 -> 14.dp
+                else -> 12.dp
+            })
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
             text = "WIDGET CONTROL",
@@ -887,7 +954,8 @@ fun HudWidgets(modifier: Modifier = Modifier) {
 @Composable
 fun HudCategories(
     apps: List<com.volt.core.domain.model.AppInfo>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    gridRows: Int = 3
 ) {
     val theme = LocalVoltTheme.current
     
@@ -907,12 +975,17 @@ fun HudCategories(
         groups
     }
 
+    val contentPadding = when (gridRows) {
+        1 -> 18.dp
+        2 -> 14.dp
+        else -> 12.dp
+    }
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)
-            .offset(y = (-48).dp),
-        verticalArrangement = Arrangement.Center
+            .padding(horizontal = 16.dp, vertical = contentPadding)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
             text = "CATEGORY ORG",

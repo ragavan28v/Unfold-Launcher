@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -320,16 +321,26 @@ fun HomeScreen(
                             state = pagerState,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
-                            val hudRowOffset = when (state.gridRows) {
-                                1 -> 16.dp
-                                2 -> 10.dp
-                                else -> 0.dp
-                            }
-                            val hudPageModifier = Modifier.offset(y = hudRowOffset)
+                            val hudPageModifier = Modifier
+                                .fillMaxSize()
+                                .padding(
+                                    top = when (rows) {
+                                        1 -> 14.dp
+                                        2 -> 12.dp
+                                        else -> 10.dp
+                                    },
+                                    bottom = when (rows) {
+                                        1 -> 16.dp
+                                        2 -> 14.dp
+                                        else -> 12.dp
+                                    },
+                                    start = 12.dp,
+                                    end = 12.dp
+                                )
 
                             when (page) {
-                                0 -> HudHome(modifier = hudPageModifier)
-                                1 -> HudMusic(modifier = hudPageModifier)
+                                0 -> HudHome(modifier = hudPageModifier, gridRows = rows)
+                                1 -> HudMusic(modifier = hudPageModifier, gridRows = rows)
                                 2 -> HudSystem(
                                     batteryPercent = state.systemStats?.batteryPercent ?: 0.5f,
                                     batteryText = state.systemStats?.batteryText ?: "50%",
@@ -339,11 +350,12 @@ fun HomeScreen(
                                     storageUsedPercent = state.systemStats?.storageUsedPercent ?: 0.5f,
                                     cpuTempText = state.systemStats?.cpuTempText ?: "36°C",
                                     cpuTemp = state.systemStats?.cpuTemp ?: 36f,
-                                    modifier = hudPageModifier
+                                    modifier = hudPageModifier,
+                                    gridRows = rows
                                 )
-                                3 -> HudGoogleFeed(modifier = hudPageModifier)
-                                4 -> HudWidgets(modifier = hudPageModifier)
-                                5 -> HudCategories(apps = state.gridApps, modifier = hudPageModifier)
+                                3 -> HudGoogleFeed(modifier = hudPageModifier, gridRows = rows)
+                                4 -> HudWidgets(modifier = hudPageModifier, gridRows = rows)
+                                5 -> HudCategories(apps = state.gridApps, modifier = hudPageModifier, gridRows = rows)
                             }
                         }
                     }
