@@ -25,8 +25,10 @@ android {
 
 dependencies {
     implementation(platform(libs.compose.bom))
+    implementation(project(":core:core-domain"))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
+    api("androidx.compose.material:material-icons-extended")
     implementation(libs.compose.foundation)
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)

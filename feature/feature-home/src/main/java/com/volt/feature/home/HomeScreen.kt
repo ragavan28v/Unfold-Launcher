@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -85,7 +86,7 @@ fun HomeScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    val pagerState = rememberPagerState(pageCount = { 6 })
     val railNodes = listOf(
         RailNode("home", Icons.Default.Home, "Home"),
         RailNode("system", Icons.Default.Build, "System"),
@@ -231,43 +232,32 @@ fun HomeScreen(
                         
                         HudTrace(horizontal = false, length = 8.dp)
                         
-                        // Calendar
+                        // Google Feed / Intel
                         HudRailItem(
-                            icon = Icons.Default.Info, // Calendar
-                            isSelected = false,
+                            icon = Icons.Default.Search,
+                            isSelected = pagerState.currentPage == 3,
                             onClick = {
-                                val intent = Intent(Intent.ACTION_MAIN).apply {
-                                    addCategory(Intent.CATEGORY_APP_CALENDAR)
-                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                }
-                                runCatching { context.startActivity(intent) }
+                                coroutineScope.launch { pagerState.animateScrollToPage(3) }
                             }
                         )
                         HudTrace(horizontal = false, length = 8.dp)
                         
-                        // Clock
+                        // Widgets
                         HudRailItem(
-                            icon = Icons.Default.Build, // Clock
-                            isSelected = false,
+                            icon = Icons.Default.Info,
+                            isSelected = pagerState.currentPage == 4,
                             onClick = {
-                                val intent = Intent(AlarmClock.ACTION_SHOW_ALARMS).apply {
-                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                }
-                                runCatching { context.startActivity(intent) }
+                                coroutineScope.launch { pagerState.animateScrollToPage(4) }
                             }
                         )
                         HudTrace(horizontal = false, length = 8.dp)
                         
-                        // Gallery
+                        // Folders / Category Org
                         HudRailItem(
-                            icon = Icons.Default.Home, // Gallery
-                            isSelected = false,
+                            icon = Icons.Default.Menu,
+                            isSelected = pagerState.currentPage == 5,
                             onClick = {
-                                val intent = Intent(Intent.ACTION_MAIN).apply {
-                                    addCategory(Intent.CATEGORY_APP_GALLERY)
-                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                }
-                                runCatching { context.startActivity(intent) }
+                                coroutineScope.launch { pagerState.animateScrollToPage(5) }
                             }
                         )
                         HudTrace(horizontal = false, length = 8.dp)
@@ -343,6 +333,9 @@ fun HomeScreen(
                                     cpuTempText = state.systemStats?.cpuTempText ?: "36°C",
                                     cpuTemp = state.systemStats?.cpuTemp ?: 36f
                                 )
+                                3 -> HudGoogleFeed()
+                                4 -> HudWidgets()
+                                5 -> HudCategories(apps = state.gridApps)
                             }
                         }
                     }

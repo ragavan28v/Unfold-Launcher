@@ -312,7 +312,7 @@ fun HudHome(
         modifier = modifier
             .fillMaxSize()
             .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.Center
     ) {
         // Time & Date Header
         Column {
@@ -422,7 +422,7 @@ fun HudMusic(
         modifier = modifier
             .fillMaxSize()
             .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.Center
     ) {
         // Track Card
         Row(
@@ -585,7 +585,7 @@ fun HudSystem(
             .fillMaxSize()
             .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.CenterVertically
     ) {
         // Battery Gauge on Left
         Column(
@@ -766,6 +766,184 @@ fun HudInfoCard(
                     .fillMaxWidth(progress.coerceIn(0f, 1f))
                     .background(theme.accentPrimary)
             )
+        }
+    }
+}
+
+@Composable
+fun HudGoogleFeed(modifier: Modifier = Modifier) {
+    val theme = LocalVoltTheme.current
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "FEED / INTEL",
+            color = theme.accentPrimary,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 2.sp
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        // Simulating futuristic feeds
+        listOf(
+            "CRITICAL: CPU thermal throttling active (36°C)" to "15m ago",
+            "INTEL: Unfold Launcher v3.5 compiled successfully" to "1h ago",
+            "NEWS: Android SDK 35 targets runtime enhancements" to "3h ago"
+        ).forEach { (title, time) ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .background(theme.bgPanel.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                    .border(1.5.dp, theme.panelBorder.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                    .padding(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = title,
+                        color = theme.textPrimary,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = time,
+                        color = theme.textMuted,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HudWidgets(modifier: Modifier = Modifier) {
+    val theme = LocalVoltTheme.current
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "WIDGET CONTROL",
+            color = theme.accentPrimary,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 2.sp
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Simulated memory widget
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(theme.bgPanel.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                    .border(1.dp, theme.panelBorder.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("PING", color = theme.textSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                Text("24 ms", color = theme.accentPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                Text("loss: 0.0%", color = theme.textMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+            }
+            
+            // Simulated clock widget
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(theme.bgPanel.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                    .border(1.dp, theme.panelBorder.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("UPTIME", color = theme.textSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                Text("124h", color = theme.accentPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                Text("status: normal", color = theme.textMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+            }
+        }
+    }
+}
+
+@Composable
+fun HudCategories(
+    apps: List<com.volt.core.domain.model.AppInfo>,
+    modifier: Modifier = Modifier
+) {
+    val theme = LocalVoltTheme.current
+    
+    // Simple category mapping based on package names
+    val categorized = remember(apps) {
+        val groups = mutableMapOf<String, MutableList<String>>()
+        apps.forEach { app ->
+            val pkg = app.packageName
+            val cat = when {
+                pkg.contains("android") || pkg.contains("system") || pkg.contains("settings") -> "System"
+                pkg.contains("chrome") || pkg.contains("gmail") || pkg.contains("chat") || pkg.contains("whatsapp") || pkg.contains("messenger") -> "Social/Comm"
+                pkg.contains("youtube") || pkg.contains("media") || pkg.contains("music") || pkg.contains("player") || pkg.contains("spotify") || pkg.contains("photos") -> "Media"
+                else -> "Applications"
+            }
+            groups.getOrPut(cat) { mutableListOf() }.add(app.label)
+        }
+        groups
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "CATEGORY ORG",
+            color = theme.accentPrimary,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 2.sp
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            categorized.forEach { (categoryName, appLabels) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(theme.bgPanel.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        .border(1.dp, theme.panelBorder.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = categoryName.uppercase(),
+                        color = theme.textPrimary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "${appLabels.size} Apps",
+                        color = theme.accentPrimary,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
         }
     }
 }
