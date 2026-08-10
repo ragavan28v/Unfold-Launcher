@@ -1,5 +1,5 @@
 # Custom Android Launcher — Complete R&D & Build Specification
-### Working title: **VOLT** (placeholder — swap for whatever fits your brand; structure below doesn't change)
+### Working title: **UNFOLD** (placeholder — swap for whatever fits your brand; structure below doesn't change)
 
 Design language target: dark control-board / HUD aesthetic, circular icons with a **carved (concave-into-convex) neumorphic** finish like the "Top up Data" reference button, connected node-style navigation rail, accent-on-glass rather than glossy skeuomorphism. Not a clone of the reference — same *feeling*, different visual vocabulary (your own iconography, spacing, motion).
 
@@ -95,7 +95,7 @@ Three rules that separate this from a generic icon-pack launcher:
 Recommended as a **multi-module Gradle project** (not one giant `app` module) — makes the gesture engine and icon renderer independently testable/reusable, and keeps build times sane as it grows.
 
 ```
-volt-launcher/
+unfold-launcher/
 ├── build.gradle.kts                        (root)
 ├── settings.gradle.kts                     (module includes)
 ├── gradle.properties
@@ -105,8 +105,8 @@ volt-launcher/
 │   ├── build.gradle.kts
 │   └── src/main/
 │       ├── AndroidManifest.xml             (HOME intent-filter, all permissions, services)
-│       ├── java/com/volt/launcher/
-│       │   ├── VoltApp.kt                  (Application class, @HiltAndroidApp)
+│       ├── java/com/unfold/launcher/
+│       │   ├── UnfoldApp.kt                  (Application class, @HiltAndroidApp)
 │       │   ├── MainActivity.kt             (single host Activity for the whole launcher)
 │       │   └── di/
 │       │       └── AppModule.kt
@@ -118,13 +118,13 @@ volt-launcher/
 │
 ├── core/
 │   ├── core-ui/                            (design system module)
-│   │   └── src/main/java/com/volt/core/ui/
+│   │   └── src/main/java/com/unfold/core/ui/
 │   │       ├── theme/
 │   │       │   ├── Color.kt                (token definitions — see Section 3)
 │   │       │   ├── Typography.kt
 │   │       │   ├── Shape.kt                (carved-circle shape definitions)
 │   │       │   ├── Elevation.kt            (glass/glow elevation tokens)
-│   │       │   └── VoltTheme.kt            (CompositionLocal-based theme provider)
+│   │       │   └── UnfoldTheme.kt            (CompositionLocal-based theme provider)
 │   │       ├── components/
 │   │       │   ├── CarvedIcon.kt           (the neumorphic circular icon composable — core reusable piece)
 │   │       │   ├── GlassPanel.kt           (blurred glass surface container)
@@ -138,7 +138,7 @@ volt-launcher/
 │   │           └── HapticUtil.kt
 │   │
 │   ├── core-domain/
-│   │   └── src/main/java/com/volt/core/domain/
+│   │   └── src/main/java/com/unfold/core/domain/
 │   │       ├── model/
 │   │       │   ├── AppInfo.kt
 │   │       │   ├── FolderInfo.kt
@@ -160,7 +160,7 @@ volt-launcher/
 │   │           └── GetSystemStatsUseCase.kt
 │   │
 │   └── core-data/
-│       └── src/main/java/com/volt/core/data/
+│       └── src/main/java/com/unfold/core/data/
 │           ├── local/
 │           │   ├── AppDatabase.kt          (Room)
 │           │   ├── dao/
@@ -186,7 +186,7 @@ volt-launcher/
 │
 ├── feature/
 │   ├── feature-home/
-│   │   └── src/main/java/com/volt/feature/home/
+│   │   └── src/main/java/com/unfold/feature/home/
 │   │       ├── HomeScreen.kt                (root Compose screen — pager of panels, like your reference's 3-dot pager)
 │   │       ├── HomeViewModel.kt
 │   │       ├── panels/
@@ -204,7 +204,7 @@ volt-launcher/
 │   │   └── AppDrawerScreen.kt, AppDrawerViewModel.kt, AlphabetFastScroll.kt, SearchBar.kt
 │   │
 │   ├── feature-gestures/
-│   │   └── src/main/java/com/volt/feature/gestures/
+│   │   └── src/main/java/com/unfold/feature/gestures/
 │   │       ├── GestureDetectorOverlay.kt    (transparent full-screen pointerInput layer)
 │   │       ├── GestureEngine.kt             (interprets raw MotionEvents → GestureType)
 │   │       ├── GestureActionResolver.kt     (GestureType + binding → executes Intent/action)
@@ -215,10 +215,10 @@ volt-launcher/
 │   │   └── HiddenAppsScreen.kt, HiddenFilesScreen.kt, BiometricGate.kt
 │   │
 │   ├── feature-widgets/
-│   │   └── WidgetHostScreen.kt, WidgetPickerSheet.kt, VoltAppWidgetHost.kt
+│   │   └── WidgetHostScreen.kt, WidgetPickerSheet.kt, UnfoldAppWidgetHost.kt
 │   │
 │   ├── feature-notifications/
-│   │   └── VoltNotificationListenerService.kt, BadgeRepositoryBridge.kt
+│   │   └── UnfoldNotificationListenerService.kt, BadgeRepositoryBridge.kt
 │   │
 │   ├── feature-settings/
 │   │   └── SettingsScreen.kt, ThemeEditorScreen.kt, GestureSettingsScreen.kt,

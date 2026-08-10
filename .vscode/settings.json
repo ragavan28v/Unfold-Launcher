@@ -1,3 +1,15 @@
 {
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.home": "C:\\Program Files\\Java\\jdk-24",
+    "java.jdt.ls.java.home": "C:\\Program Files\\Java\\jdk-24",
+    "java.import.gradle.java.home": "C:\\Program Files\\Java\\jdk-24",
+    "java.import.maven.java.home": "C:\\Program Files\\Java\\jdk-24",
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-24",
+            "path": "C:\\Program Files\\Java\\jdk-24",
+            "sources": "C:\\Program Files\\Java\\jdk-24\\lib",
+            "javadoc": "C:\\Program Files\\Java\\jdk-24\\docs"
+        }
+    ]
 }

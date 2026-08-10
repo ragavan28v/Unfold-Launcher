@@ -12,15 +12,16 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.volt.core.domain.navigation.VoltRoute
-import com.volt.core.ui.theme.VoltTheme
-import com.volt.feature.drawer.AppDrawerScreen
-import com.volt.feature.drawer.AppDrawerViewModel
-import com.volt.feature.home.HomeScreen
-import com.volt.feature.home.HomeViewModel
-import com.volt.feature.search.UniversalSearchScreen
-import com.volt.feature.search.UniversalSearchViewModel
-import com.volt.feature.settings.LauncherSettingsScreen
+import com.unfold.core.domain.navigation.UnfoldRoute
+import com.unfold.core.ui.theme.UnfoldTheme
+import com.unfold.feature.drawer.AppDrawerScreen
+import com.unfold.feature.drawer.AppDrawerViewModel
+import com.unfold.feature.home.HomeScreen
+import com.unfold.feature.home.HomeViewModel
+import com.unfold.feature.hiddenspace.HiddenAppsScreen
+import com.unfold.feature.search.UniversalSearchScreen
+import com.unfold.feature.search.UniversalSearchViewModel
+import com.unfold.feature.settings.LauncherSettingsScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -28,15 +29,15 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     @javax.inject.Inject
-    lateinit var gestureActionResolver: com.volt.feature.gestures.GestureActionResolver
+    lateinit var gestureActionResolver: com.unfold.feature.gestures.GestureActionResolver
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            VoltTheme {
+            UnfoldTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = VoltTheme.current.bgVoid
+                    color = UnfoldTheme.current.bgVoid
                 ) {
                     val navController = rememberNavController()
                     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -45,25 +46,25 @@ class MainActivity : ComponentActivity() {
                     val launcherContent: @Composable () -> Unit = {
                         NavHost(
                             navController = navController,
-                            startDestination = VoltRoute.Home.route
+                            startDestination = UnfoldRoute.Home.route
                         ) {
-                            composable(VoltRoute.Home.route) {
+                            composable(UnfoldRoute.Home.route) {
                                 val homeViewModel: HomeViewModel = hiltViewModel()
                                 HomeScreen(
                                     viewModel = homeViewModel,
                                     onNavigateToSearch = {
-                                        navController.navigate(VoltRoute.UniversalSearch.route)
+                                        navController.navigate(UnfoldRoute.UniversalSearch.route)
                                     },
                                     onNavigateToDrawer = {
-                                        navController.navigate(VoltRoute.AppDrawer.route)
+                                        navController.navigate(UnfoldRoute.AppDrawer.route)
                                     },
                                     onNavigateToSettings = {
-                                        navController.navigate(VoltRoute.Settings.route)
+                                        navController.navigate(UnfoldRoute.Settings.route)
                                     }
                                 )
                             }
 
-                            composable(VoltRoute.UniversalSearch.route) {
+                            composable(UnfoldRoute.UniversalSearch.route) {
                                 val searchViewModel: UniversalSearchViewModel = hiltViewModel()
                                 UniversalSearchScreen(
                                     viewModel = searchViewModel,
@@ -71,7 +72,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            composable(VoltRoute.AppDrawer.route) {
+                            composable(UnfoldRoute.AppDrawer.route) {
                                 val drawerViewModel: AppDrawerViewModel = hiltViewModel()
                                 AppDrawerScreen(
                                     viewModel = drawerViewModel,
@@ -79,25 +80,31 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            composable(VoltRoute.Settings.route) {
+                            composable(UnfoldRoute.Settings.route) {
                                 LauncherSettingsScreen(
                                     onBack = { navController.popBackStack() },
                                     onOpenGestureControl = {
-                                        navController.navigate(VoltRoute.GestureSettings.route)
+                                        navController.navigate(UnfoldRoute.GestureSettings.route)
                                     }
                                 )
                             }
 
-                            composable(VoltRoute.GestureSettings.route) {
-                                com.volt.feature.settings.GestureControlSettingsScreen(
+                            composable(UnfoldRoute.GestureSettings.route) {
+                                com.unfold.feature.settings.GestureControlSettingsScreen(
+                                    onBack = { navController.popBackStack() }
+                                )
+                            }
+
+                            composable(UnfoldRoute.HiddenSpace.route) {
+                                HiddenAppsScreen(
                                     onBack = { navController.popBackStack() }
                                 )
                             }
                         }
                     }
 
-                    if (currentRoute == VoltRoute.Home.route) {
-                        com.volt.feature.gestures.GestureDetectorOverlay(
+                    if (currentRoute == UnfoldRoute.Home.route) {
+                        com.unfold.feature.gestures.GestureDetectorOverlay(
                             onGestureDetected = { gestureType ->
                                 scope.launch {
                                     gestureActionResolver.execute(gestureType, navController)
@@ -114,3 +121,5 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+

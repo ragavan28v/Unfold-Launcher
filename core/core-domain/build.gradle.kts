@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.volt.core.domain"
+    namespace = "com.unfold.core.domain"
     compileSdk = 35
 
     defaultConfig {
@@ -24,3 +24,4 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation("javax.inject:javax.inject:1")
 }
+

@@ -1,0 +1,566 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:clean
+> Task :core:core-data:clean
+> Task :core:core-domain:clean
+> Task :core:core-ui:clean
+> Task :feature:feature-drawer:clean
+> Task :feature:feature-gestures:clean
+> Task :feature:feature-hidden-space:clean
+> Task :feature:feature-home:clean
+> Task :feature:feature-notifications:clean
+> Task :feature:feature-search:clean
+> Task :feature:feature-settings:clean
+> Task :feature:feature-widgets:clean
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:core-data:preBuild UP-TO-DATE
+> Task :core:core-data:preDebugBuild UP-TO-DATE
+> Task :core:core-domain:preBuild UP-TO-DATE
+> Task :core:core-domain:preDebugBuild UP-TO-DATE
+> Task :core:core-ui:preBuild UP-TO-DATE
+> Task :core:core-ui:preDebugBuild UP-TO-DATE
+> Task :feature:feature-drawer:preBuild UP-TO-DATE
+> Task :feature:feature-drawer:preDebugBuild UP-TO-DATE
+> Task :feature:feature-gestures:preBuild UP-TO-DATE
+> Task :feature:feature-gestures:preDebugBuild UP-TO-DATE
+> Task :feature:feature-hidden-space:preBuild UP-TO-DATE
+> Task :feature:feature-hidden-space:preDebugBuild UP-TO-DATE
+> Task :core:core-domain:writeDebugAarMetadata
+> Task :core:core-ui:writeDebugAarMetadata
+> Task :core:core-data:writeDebugAarMetadata
+> Task :feature:feature-drawer:writeDebugAarMetadata
+> Task :feature:feature-gestures:writeDebugAarMetadata
+> Task :feature:feature-hidden-space:writeDebugAarMetadata
+> Task :feature:feature-home:preBuild UP-TO-DATE
+> Task :feature:feature-home:preDebugBuild UP-TO-DATE
+> Task :feature:feature-notifications:preBuild UP-TO-DATE
+> Task :feature:feature-notifications:preDebugBuild UP-TO-DATE
+> Task :feature:feature-home:writeDebugAarMetadata
+> Task :feature:feature-search:preBuild UP-TO-DATE
+> Task :feature:feature-search:preDebugBuild UP-TO-DATE
+> Task :feature:feature-notifications:writeDebugAarMetadata
+> Task :feature:feature-settings:preBuild UP-TO-DATE
+> Task :feature:feature-settings:preDebugBuild UP-TO-DATE
+> Task :feature:feature-search:writeDebugAarMetadata
+> Task :feature:feature-widgets:preBuild UP-TO-DATE
+> Task :feature:feature-widgets:preDebugBuild UP-TO-DATE
+> Task :feature:feature-settings:writeDebugAarMetadata
+> Task :feature:feature-widgets:writeDebugAarMetadata
+> Task :app:generateDebugResValues
+> Task :core:core-data:generateDebugResValues
+> Task :core:core-data:generateDebugResources
+> Task :app:checkDebugAarMetadata
+> Task :core:core-data:packageDebugResources
+> Task :core:core-domain:generateDebugResValues
+> Task :core:core-domain:generateDebugResources
+> Task :core:core-domain:packageDebugResources
+> Task :core:core-ui:generateDebugResValues
+> Task :core:core-ui:generateDebugResources
+> Task :core:core-ui:packageDebugResources
+> Task :feature:feature-drawer:generateDebugResValues
+> Task :feature:feature-drawer:generateDebugResources
+> Task :feature:feature-drawer:packageDebugResources
+> Task :feature:feature-gestures:generateDebugResValues
+> Task :feature:feature-gestures:generateDebugResources
+> Task :feature:feature-gestures:packageDebugResources
+> Task :feature:feature-hidden-space:generateDebugResValues
+> Task :feature:feature-hidden-space:generateDebugResources
+> Task :feature:feature-hidden-space:packageDebugResources
+> Task :feature:feature-home:generateDebugResValues
+> Task :feature:feature-home:generateDebugResources
+> Task :feature:feature-home:packageDebugResources
+> Task :feature:feature-notifications:generateDebugResValues
+> Task :feature:feature-notifications:generateDebugResources
+> Task :feature:feature-notifications:packageDebugResources
+> Task :feature:feature-search:generateDebugResValues
+> Task :feature:feature-search:generateDebugResources
+> Task :feature:feature-search:packageDebugResources
+> Task :feature:feature-settings:generateDebugResValues
+> Task :feature:feature-settings:generateDebugResources
+> Task :feature:feature-settings:packageDebugResources
+> Task :feature:feature-widgets:generateDebugResValues
+> Task :feature:feature-widgets:generateDebugResources
+> Task :feature:feature-widgets:packageDebugResources
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :core:core-data:extractDeepLinksDebug
+> Task :core:core-domain:extractDeepLinksDebug
+> Task :core:core-ui:extractDeepLinksDebug
+> Task :feature:feature-drawer:extractDeepLinksDebug
+> Task :core:core-ui:processDebugManifest
+> Task :feature:feature-gestures:extractDeepLinksDebug
+> Task :feature:feature-drawer:processDebugManifest
+> Task :core:core-data:processDebugManifest
+> Task :feature:feature-hidden-space:extractDeepLinksDebug
+> Task :core:core-domain:processDebugManifest
+> Task :app:parseDebugLocalResources
+> Task :feature:feature-home:extractDeepLinksDebug
+> Task :feature:feature-gestures:processDebugManifest
+> Task :feature:feature-hidden-space:processDebugManifest
+> Task :feature:feature-notifications:extractDeepLinksDebug
+> Task :feature:feature-search:extractDeepLinksDebug
+> Task :feature:feature-home:processDebugManifest
+> Task :feature:feature-settings:extractDeepLinksDebug
+> Task :feature:feature-notifications:processDebugManifest
+> Task :feature:feature-search:processDebugManifest
+> Task :feature:feature-settings:processDebugManifest
+> Task :feature:feature-widgets:extractDeepLinksDebug
+> Task :feature:feature-widgets:processDebugManifest
+> Task :core:core-data:compileDebugLibraryResources
+> Task :app:mergeDebugResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :core:core-domain:compileDebugLibraryResources
+> Task :core:core-data:parseDebugLocalResources
+> Task :app:processDebugManifestForPackage
+> Task :core:core-domain:parseDebugLocalResources
+> Task :core:core-ui:compileDebugLibraryResources
+> Task :core:core-ui:parseDebugLocalResources
+> Task :feature:feature-drawer:compileDebugLibraryResources
+> Task :core:core-data:generateDebugRFile
+> Task :feature:feature-drawer:parseDebugLocalResources
+> Task :feature:feature-gestures:compileDebugLibraryResources
+> Task :core:core-ui:generateDebugRFile
+> Task :core:core-domain:generateDebugRFile
+> Task :feature:feature-gestures:parseDebugLocalResources
+> Task :feature:feature-hidden-space:compileDebugLibraryResources
+> Task :feature:feature-hidden-space:parseDebugLocalResources
+> Task :feature:feature-drawer:generateDebugRFile
+> Task :feature:feature-home:compileDebugLibraryResources
+> Task :feature:feature-gestures:generateDebugRFile
+> Task :feature:feature-home:parseDebugLocalResources
+> Task :feature:feature-notifications:compileDebugLibraryResources
+> Task :feature:feature-hidden-space:generateDebugRFile
+> Task :feature:feature-notifications:parseDebugLocalResources
+> Task :feature:feature-search:compileDebugLibraryResources
+> Task :feature:feature-home:generateDebugRFile
+> Task :feature:feature-search:parseDebugLocalResources
+> Task :feature:feature-settings:compileDebugLibraryResources
+> Task :feature:feature-settings:parseDebugLocalResources
+> Task :feature:feature-widgets:compileDebugLibraryResources
+> Task :feature:feature-notifications:generateDebugRFile
+> Task :feature:feature-search:generateDebugRFile
+> Task :core:core-data:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:core-domain:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:feature-widgets:parseDebugLocalResources
+> Task :feature:feature-settings:generateDebugRFile
+> Task :core:core-domain:javaPreCompileDebug
+> Task :feature:feature-widgets:generateDebugRFile
+> Task :core:core-data:javaPreCompileDebug
+> Task :core:core-ui:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:feature-drawer:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:core-ui:javaPreCompileDebug
+> Task :feature:feature-gestures:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:feature-hidden-space:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:feature-drawer:javaPreCompileDebug
+> Task :feature:feature-gestures:javaPreCompileDebug
+> Task :feature:feature-home:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:feature-notifications:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:feature-home:javaPreCompileDebug
+> Task :feature:feature-hidden-space:javaPreCompileDebug
+> Task :feature:feature-search:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:feature-notifications:javaPreCompileDebug
+> Task :feature:feature-settings:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:feature-search:javaPreCompileDebug
+> Task :feature:feature-widgets:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:feature-settings:javaPreCompileDebug
+> Task :feature:feature-widgets:javaPreCompileDebug
+> Task :app:javaPreCompileDebug
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :core:core-data:mergeDebugShaders
+> Task :core:core-data:compileDebugShaders NO-SOURCE
+> Task :core:core-data:generateDebugAssets UP-TO-DATE
+> Task :core:core-data:packageDebugAssets
+> Task :core:core-domain:mergeDebugShaders
+> Task :core:core-domain:compileDebugShaders NO-SOURCE
+> Task :core:core-domain:generateDebugAssets UP-TO-DATE
+> Task :core:core-domain:packageDebugAssets
+> Task :core:core-ui:mergeDebugShaders
+> Task :core:core-ui:compileDebugShaders NO-SOURCE
+> Task :core:core-ui:generateDebugAssets UP-TO-DATE
+> Task :core:core-ui:packageDebugAssets
+> Task :feature:feature-drawer:mergeDebugShaders
+> Task :feature:feature-drawer:compileDebugShaders NO-SOURCE
+> Task :feature:feature-drawer:generateDebugAssets UP-TO-DATE
+> Task :feature:feature-drawer:packageDebugAssets
+> Task :feature:feature-gestures:mergeDebugShaders
+> Task :feature:feature-gestures:compileDebugShaders NO-SOURCE
+> Task :feature:feature-gestures:generateDebugAssets UP-TO-DATE
+> Task :feature:feature-gestures:packageDebugAssets
+> Task :feature:feature-hidden-space:mergeDebugShaders
+> Task :feature:feature-hidden-space:compileDebugShaders NO-SOURCE
+> Task :feature:feature-hidden-space:generateDebugAssets UP-TO-DATE
+> Task :feature:feature-hidden-space:packageDebugAssets
+> Task :feature:feature-home:mergeDebugShaders
+> Task :feature:feature-home:compileDebugShaders NO-SOURCE
+> Task :feature:feature-home:generateDebugAssets UP-TO-DATE
+> Task :feature:feature-home:packageDebugAssets
+> Task :feature:feature-notifications:mergeDebugShaders
+> Task :feature:feature-notifications:compileDebugShaders NO-SOURCE
+> Task :feature:feature-notifications:generateDebugAssets UP-TO-DATE
+> Task :feature:feature-notifications:packageDebugAssets
+> Task :feature:feature-search:mergeDebugShaders
+> Task :feature:feature-search:compileDebugShaders NO-SOURCE
+> Task :feature:feature-search:generateDebugAssets UP-TO-DATE
+> Task :feature:feature-search:packageDebugAssets
+> Task :feature:feature-settings:mergeDebugShaders
+> Task :feature:feature-settings:compileDebugShaders NO-SOURCE
+> Task :feature:feature-settings:generateDebugAssets UP-TO-DATE
+> Task :feature:feature-settings:packageDebugAssets
+> Task :feature:feature-widgets:mergeDebugShaders
+> Task :feature:feature-widgets:compileDebugShaders NO-SOURCE
+> Task :feature:feature-widgets:generateDebugAssets UP-TO-DATE
+> Task :feature:feature-widgets:packageDebugAssets
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets
+> Task :app:desugarDebugFileDependencies
+> Task :app:mergeDebugJniLibFolders
+> Task :core:core-data:mergeDebugJniLibFolders
+> Task :core:core-data:mergeDebugNativeLibs NO-SOURCE
+> Task :core:core-data:copyDebugJniLibsProjectOnly
+> Task :core:core-domain:mergeDebugJniLibFolders
+> Task :core:core-domain:mergeDebugNativeLibs NO-SOURCE
+> Task :core:core-domain:copyDebugJniLibsProjectOnly
+> Task :core:core-ui:mergeDebugJniLibFolders
+> Task :core:core-ui:mergeDebugNativeLibs NO-SOURCE
+> Task :core:core-ui:copyDebugJniLibsProjectOnly
+> Task :feature:feature-drawer:mergeDebugJniLibFolders
+> Task :feature:feature-drawer:mergeDebugNativeLibs NO-SOURCE
+> Task :feature:feature-drawer:copyDebugJniLibsProjectOnly
+> Task :feature:feature-gestures:mergeDebugJniLibFolders
+> Task :feature:feature-gestures:mergeDebugNativeLibs NO-SOURCE
+> Task :feature:feature-gestures:copyDebugJniLibsProjectOnly
+> Task :feature:feature-hidden-space:mergeDebugJniLibFolders
+> Task :feature:feature-hidden-space:mergeDebugNativeLibs NO-SOURCE
+> Task :feature:feature-hidden-space:copyDebugJniLibsProjectOnly
+> Task :feature:feature-home:mergeDebugJniLibFolders
+> Task :app:checkDebugDuplicateClasses
+> Task :feature:feature-home:mergeDebugNativeLibs NO-SOURCE
+> Task :feature:feature-home:copyDebugJniLibsProjectOnly
+> Task :feature:feature-notifications:mergeDebugJniLibFolders
+> Task :feature:feature-notifications:mergeDebugNativeLibs NO-SOURCE
+> Task :feature:feature-notifications:copyDebugJniLibsProjectOnly
+> Task :feature:feature-search:mergeDebugJniLibFolders
+> Task :feature:feature-search:mergeDebugNativeLibs NO-SOURCE
+> Task :feature:feature-search:copyDebugJniLibsProjectOnly
+> Task :feature:feature-settings:mergeDebugJniLibFolders
+> Task :feature:feature-settings:mergeDebugNativeLibs NO-SOURCE
+> Task :feature:feature-settings:copyDebugJniLibsProjectOnly
+> Task :feature:feature-widgets:mergeDebugJniLibFolders
+> Task :feature:feature-widgets:mergeDebugNativeLibs NO-SOURCE
+> Task :feature:feature-widgets:copyDebugJniLibsProjectOnly
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :core:core-data:stripDebugDebugSymbols NO-SOURCE
+> Task :core:core-data:copyDebugJniLibsProjectAndLocalJars
+> Task :core:core-data:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :core:core-data:prepareDebugArtProfile UP-TO-DATE
+> Task :core:core-data:prepareLintJarForPublish UP-TO-DATE
+> Task :core:core-domain:stripDebugDebugSymbols NO-SOURCE
+> Task :core:core-domain:copyDebugJniLibsProjectAndLocalJars
+> Task :core:core-domain:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :core:core-domain:prepareDebugArtProfile UP-TO-DATE
+> Task :core:core-domain:prepareLintJarForPublish UP-TO-DATE
+> Task :core:core-ui:stripDebugDebugSymbols NO-SOURCE
+> Task :app:mergeDebugNativeLibs
+> Task :core:core-ui:copyDebugJniLibsProjectAndLocalJars
+> Task :core:core-ui:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :core:core-ui:prepareDebugArtProfile UP-TO-DATE
+> Task :core:core-ui:prepareLintJarForPublish UP-TO-DATE
+> Task :feature:feature-drawer:stripDebugDebugSymbols NO-SOURCE
+> Task :feature:feature-drawer:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :feature:feature-drawer:prepareDebugArtProfile UP-TO-DATE
+> Task :feature:feature-drawer:prepareLintJarForPublish UP-TO-DATE
+> Task :feature:feature-gestures:stripDebugDebugSymbols NO-SOURCE
+> Task :feature:feature-gestures:copyDebugJniLibsProjectAndLocalJars
+> Task :feature:feature-drawer:copyDebugJniLibsProjectAndLocalJars
+> Task :feature:feature-gestures:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :feature:feature-gestures:prepareDebugArtProfile UP-TO-DATE
+> Task :feature:feature-gestures:prepareLintJarForPublish UP-TO-DATE
+> Task :feature:feature-hidden-space:stripDebugDebugSymbols NO-SOURCE
+> Task :feature:feature-hidden-space:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :feature:feature-hidden-space:copyDebugJniLibsProjectAndLocalJars
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libdatastore_shared_counter.so.
+
+> Task :feature:feature-hidden-space:prepareDebugArtProfile UP-TO-DATE
+> Task :feature:feature-hidden-space:prepareLintJarForPublish UP-TO-DATE
+> Task :feature:feature-home:stripDebugDebugSymbols NO-SOURCE
+> Task :feature:feature-home:copyDebugJniLibsProjectAndLocalJars
+> Task :feature:feature-home:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :feature:feature-home:prepareDebugArtProfile UP-TO-DATE
+> Task :feature:feature-home:prepareLintJarForPublish UP-TO-DATE
+> Task :feature:feature-notifications:stripDebugDebugSymbols NO-SOURCE
+> Task :feature:feature-notifications:copyDebugJniLibsProjectAndLocalJars
+> Task :feature:feature-notifications:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :feature:feature-notifications:prepareDebugArtProfile UP-TO-DATE
+> Task :feature:feature-notifications:prepareLintJarForPublish UP-TO-DATE
+> Task :feature:feature-search:stripDebugDebugSymbols NO-SOURCE
+> Task :feature:feature-search:copyDebugJniLibsProjectAndLocalJars
+> Task :feature:feature-search:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :feature:feature-search:prepareDebugArtProfile UP-TO-DATE
+> Task :feature:feature-search:prepareLintJarForPublish UP-TO-DATE
+> Task :feature:feature-settings:stripDebugDebugSymbols NO-SOURCE
+> Task :feature:feature-settings:copyDebugJniLibsProjectAndLocalJars
+> Task :feature:feature-settings:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :feature:feature-settings:prepareDebugArtProfile UP-TO-DATE
+> Task :feature:feature-settings:prepareLintJarForPublish UP-TO-DATE
+> Task :feature:feature-widgets:stripDebugDebugSymbols NO-SOURCE
+> Task :feature:feature-widgets:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :feature:feature-widgets:copyDebugJniLibsProjectAndLocalJars
+> Task :feature:feature-widgets:prepareDebugArtProfile UP-TO-DATE
+> Task :feature:feature-widgets:prepareLintJarForPublish UP-TO-DATE
+> Task :core:core-domain:compileDebugKotlin
+> Task :core:core-domain:compileDebugJavaWithJavac NO-SOURCE
+> Task :app:processDebugResources
+> Task :core:core-domain:processDebugJavaRes
+> Task :core:core-domain:bundleLibRuntimeToJarDebug
+> Task :core:core-domain:bundleLibCompileToJarDebug
+> Task :core:core-domain:extractDebugAnnotations
+> Task :core:core-domain:bundleLibRuntimeToDirDebug
+> Task :core:core-domain:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :core:core-domain:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :core:core-domain:mergeDebugJavaResource
+> Task :core:core-domain:syncDebugLibJars
+> Task :core:core-domain:bundleDebugAar
+> Task :core:core-domain:assembleDebug
+> Task :app:mergeExtDexDebug
+> Task :core:core-data:kaptGenerateStubsDebugKotlin
+w: Kapt currently doesn't support language version 2.0+. Falling back to 1.9.
+
+> Task :core:core-ui:compileDebugKotlin
+> Task :core:core-ui:compileDebugJavaWithJavac NO-SOURCE
+> Task :core:core-ui:bundleLibCompileToJarDebug
+> Task :core:core-ui:bundleLibRuntimeToJarDebug
+> Task :core:core-ui:processDebugJavaRes
+
+> Task :feature:feature-hidden-space:kaptGenerateStubsDebugKotlin
+w: Kapt currently doesn't support language version 2.0+. Falling back to 1.9.
+
+> Task :feature:feature-notifications:kaptGenerateStubsDebugKotlin
+
+> Task :feature:feature-gestures:kaptGenerateStubsDebugKotlin
+w: Kapt currently doesn't support language version 2.0+. Falling back to 1.9.
+
+> Task :feature:feature-notifications:kaptDebugKotlin
+
+> Task :core:core-data:kaptDebugKotlin
+[WARN] Incremental annotation processing requested, but support is disabled because the following processors are not incremental: androidx.room.RoomProcessor (DYNAMIC).
+
+> Task :feature:feature-notifications:compileDebugKotlin NO-SOURCE
+> Task :feature:feature-notifications:compileDebugJavaWithJavac NO-SOURCE
+
+> Task :feature:feature-hidden-space:kaptDebugKotlin
+warning: The following options were not recognized by any processor: '[dagger.fastInit, dagger.hilt.android.internal.disableAndroidSuperclassValidation, dagger.hilt.android.internal.projectType, dagger.hilt.internal.useAggregatingRootProcessor, kapt.kotlin.generated]'
+
+> Task :feature:feature-notifications:transformDebugClassesWithAsm
+
+> Task :feature:feature-drawer:kaptGenerateStubsDebugKotlin
+w: Kapt currently doesn't support language version 2.0+. Falling back to 1.9.
+
+> Task :feature:feature-notifications:bundleLibCompileToJarDebug
+
+> Task :feature:feature-home:kaptGenerateStubsDebugKotlin
+w: Kapt currently doesn't support language version 2.0+. Falling back to 1.9.
+
+> Task :feature:feature-widgets:kaptGenerateStubsDebugKotlin
+
+> Task :feature:feature-gestures:kaptDebugKotlin
+warning: The following options were not recognized by any processor: '[dagger.hilt.android.internal.disableAndroidSuperclassValidation, dagger.hilt.android.internal.projectType, dagger.hilt.internal.useAggregatingRootProcessor, kapt.kotlin.generated]'
+
+> Task :feature:feature-widgets:kaptDebugKotlin
+> Task :feature:feature-widgets:compileDebugKotlin NO-SOURCE
+> Task :feature:feature-widgets:compileDebugJavaWithJavac NO-SOURCE
+> Task :feature:feature-widgets:transformDebugClassesWithAsm
+> Task :feature:feature-widgets:bundleLibCompileToJarDebug
+> Task :feature:feature-widgets:bundleLibRuntimeToJarDebug
+> Task :feature:feature-notifications:bundleLibRuntimeToJarDebug
+> Task :feature:feature-notifications:processDebugJavaRes NO-SOURCE
+> Task :feature:feature-widgets:processDebugJavaRes NO-SOURCE
+> Task :feature:feature-widgets:bundleLibRuntimeToDirDebug
+> Task :feature:feature-notifications:bundleLibRuntimeToDirDebug
+
+> Task :feature:feature-search:kaptGenerateStubsDebugKotlin
+w: Kapt currently doesn't support language version 2.0+. Falling back to 1.9.
+
+> Task :feature:feature-home:kaptDebugKotlin
+
+> Task :feature:feature-settings:kaptGenerateStubsDebugKotlin
+w: Kapt currently doesn't support language version 2.0+. Falling back to 1.9.
+
+> Task :feature:feature-hidden-space:compileDebugKotlin
+> Task :feature:feature-hidden-space:compileDebugJavaWithJavac NO-SOURCE
+> Task :feature:feature-hidden-space:processDebugJavaRes
+> Task :feature:feature-hidden-space:transformDebugClassesWithAsm
+> Task :feature:feature-hidden-space:bundleLibCompileToJarDebug
+> Task :feature:feature-hidden-space:bundleLibRuntimeToJarDebug
+> Task :core:core-ui:bundleLibRuntimeToDirDebug
+> Task :feature:feature-hidden-space:bundleLibRuntimeToDirDebug
+> Task :core:core-ui:extractDebugAnnotations
+> Task :core:core-ui:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :core:core-ui:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :core:core-ui:mergeDebugJavaResource
+> Task :core:core-ui:syncDebugLibJars
+> Task :core:core-ui:bundleDebugAar
+> Task :core:core-ui:assembleDebug
+> Task :feature:feature-hidden-space:extractDebugAnnotations
+> Task :feature:feature-hidden-space:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :feature:feature-hidden-space:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :feature:feature-hidden-space:mergeDebugJavaResource
+> Task :feature:feature-hidden-space:syncDebugLibJars
+> Task :feature:feature-hidden-space:bundleDebugAar
+> Task :feature:feature-hidden-space:assembleDebug
+> Task :feature:feature-notifications:extractDebugAnnotations
+> Task :feature:feature-notifications:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :feature:feature-notifications:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :feature:feature-notifications:mergeDebugJavaResource
+> Task :feature:feature-notifications:syncDebugLibJars
+> Task :feature:feature-notifications:bundleDebugAar
+> Task :feature:feature-notifications:assembleDebug
+> Task :core:core-data:compileDebugKotlin
+> Task :feature:feature-widgets:extractDebugAnnotations
+> Task :feature:feature-widgets:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :feature:feature-widgets:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :feature:feature-widgets:mergeDebugJavaResource
+> Task :feature:feature-widgets:syncDebugLibJars
+> Task :feature:feature-widgets:bundleDebugAar
+> Task :feature:feature-widgets:assembleDebug
+> Task :feature:feature-gestures:compileDebugKotlin
+> Task :feature:feature-gestures:compileDebugJavaWithJavac
+> Task :feature:feature-gestures:processDebugJavaRes
+> Task :feature:feature-drawer:kaptDebugKotlin
+> Task :feature:feature-search:kaptDebugKotlin
+> Task :feature:feature-settings:kaptDebugKotlin
+> Task :feature:feature-gestures:transformDebugClassesWithAsm
+> Task :feature:feature-gestures:extractDebugAnnotations
+> Task :feature:feature-home:compileDebugKotlin
+> Task :core:core-data:compileDebugJavaWithJavac
+> Task :feature:feature-gestures:bundleLibCompileToJarDebug
+> Task :core:core-data:processDebugJavaRes
+> Task :feature:feature-gestures:bundleLibRuntimeToJarDebug
+> Task :core:core-data:transformDebugClassesWithAsm
+> Task :feature:feature-gestures:bundleLibRuntimeToDirDebug
+> Task :core:core-data:bundleLibRuntimeToJarDebug
+> Task :core:core-data:bundleLibCompileToJarDebug
+> Task :core:core-data:extractDebugAnnotations
+> Task :core:core-data:bundleLibRuntimeToDirDebug
+> Task :core:core-data:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :core:core-data:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :feature:feature-gestures:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :feature:feature-gestures:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :feature:feature-gestures:mergeDebugJavaResource
+> Task :core:core-data:mergeDebugJavaResource
+> Task :feature:feature-gestures:syncDebugLibJars
+> Task :core:core-data:syncDebugLibJars
+> Task :core:core-data:bundleDebugAar
+> Task :core:core-data:assembleDebug
+> Task :feature:feature-gestures:bundleDebugAar
+> Task :feature:feature-gestures:assembleDebug
+> Task :feature:feature-drawer:compileDebugKotlin
+> Task :feature:feature-search:compileDebugKotlin
+> Task :feature:feature-settings:compileDebugKotlin
+> Task :feature:feature-home:compileDebugJavaWithJavac
+> Task :feature:feature-home:processDebugJavaRes
+> Task :feature:feature-home:extractDebugAnnotations
+> Task :feature:feature-home:mergeDebugJavaResource
+> Task :feature:feature-home:transformDebugClassesWithAsm
+> Task :feature:feature-home:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :feature:feature-home:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :feature:feature-home:bundleLibRuntimeToJarDebug
+> Task :feature:feature-home:bundleLibCompileToJarDebug
+
+> Task :feature:feature-search:compileDebugKotlin
+w: file:///D:/PROJECTS/AndroidStudioProjects/unfold/feature/feature-search/src/main/java/com/unfold/feature/search/UniversalSearchScreen.kt:142:53 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+
+> Task :feature:feature-home:syncDebugLibJars
+> Task :feature:feature-home:bundleDebugAar
+> Task :feature:feature-home:assembleDebug
+> Task :feature:feature-home:bundleLibRuntimeToDirDebug
+> Task :feature:feature-search:compileDebugJavaWithJavac
+> Task :feature:feature-search:processDebugJavaRes
+> Task :feature:feature-search:extractDebugAnnotations
+> Task :feature:feature-search:mergeDebugJavaResource
+> Task :feature:feature-search:transformDebugClassesWithAsm
+> Task :feature:feature-search:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :feature:feature-search:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :feature:feature-search:bundleLibCompileToJarDebug
+> Task :feature:feature-search:bundleLibRuntimeToJarDebug
+> Task :feature:feature-search:syncDebugLibJars
+> Task :feature:feature-search:bundleDebugAar
+> Task :feature:feature-search:bundleLibRuntimeToDirDebug
+> Task :feature:feature-drawer:compileDebugJavaWithJavac
+> Task :feature:feature-drawer:processDebugJavaRes
+> Task :feature:feature-drawer:extractDebugAnnotations
+> Task :feature:feature-search:assembleDebug
+> Task :feature:feature-drawer:mergeDebugJavaResource
+
+> Task :feature:feature-settings:compileDebugKotlin
+w: file:///D:/PROJECTS/AndroidStudioProjects/unfold/feature/feature-settings/src/main/java/com/unfold/feature/settings/LauncherSettingsScreen.kt:210:38 'val Icons.Filled.KeyboardArrowRight: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.KeyboardArrowRight.
+w: file:///D:/PROJECTS/AndroidStudioProjects/unfold/feature/feature-settings/src/main/java/com/unfold/feature/settings/LauncherSettingsScreen.kt:223:38 'val Icons.Filled.KeyboardArrowLeft: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.KeyboardArrowLeft.
+w: file:///D:/PROJECTS/AndroidStudioProjects/unfold/feature/feature-settings/src/main/java/com/unfold/feature/settings/LauncherSettingsScreen.kt:408:45 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/PROJECTS/AndroidStudioProjects/unfold/feature/feature-settings/src/main/java/com/unfold/feature/settings/LauncherSettingsScreen.kt:1787:53 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/PROJECTS/AndroidStudioProjects/unfold/feature/feature-settings/src/main/java/com/unfold/feature/settings/LauncherSettingsScreen.kt:1854:46 'val Icons.Filled.KeyboardArrowLeft: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.KeyboardArrowLeft.
+w: file:///D:/PROJECTS/AndroidStudioProjects/unfold/feature/feature-settings/src/main/java/com/unfold/feature/settings/LauncherSettingsScreen.kt:1865:46 'val Icons.Filled.KeyboardArrowRight: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.KeyboardArrowRight.
+
+> Task :feature:feature-drawer:transformDebugClassesWithAsm
+> Task :feature:feature-drawer:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :feature:feature-drawer:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :feature:feature-drawer:bundleLibRuntimeToJarDebug
+> Task :feature:feature-drawer:bundleLibCompileToJarDebug
+> Task :feature:feature-drawer:syncDebugLibJars
+> Task :feature:feature-drawer:bundleDebugAar
+> Task :feature:feature-drawer:assembleDebug
+> Task :feature:feature-drawer:bundleLibRuntimeToDirDebug
+> Task :feature:feature-settings:compileDebugJavaWithJavac
+> Task :feature:feature-settings:processDebugJavaRes
+> Task :feature:feature-settings:extractDebugAnnotations
+> Task :feature:feature-settings:mergeDebugJavaResource
+> Task :feature:feature-settings:transformDebugClassesWithAsm
+> Task :feature:feature-settings:bundleLibCompileToJarDebug
+> Task :feature:feature-settings:bundleLibRuntimeToJarDebug
+> Task :feature:feature-settings:bundleLibRuntimeToDirDebug
+> Task :feature:feature-settings:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :feature:feature-settings:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :feature:feature-settings:syncDebugLibJars
+> Task :feature:feature-settings:bundleDebugAar
+> Task :feature:feature-settings:assembleDebug
+> Task :app:kaptGenerateStubsDebugKotlin
+w: Kapt currently doesn't support language version 2.0+. Falling back to 1.9.
+
+> Task :app:mergeLibDexDebug
+> Task :app:kaptDebugKotlin
+> Task :app:compileDebugKotlin
+> Task :app:compileDebugJavaWithJavac
+> Task :app:hiltAggregateDepsDebug
+> Task :app:hiltJavaCompileDebug
+> Task :app:processDebugJavaRes
+> Task :app:transformDebugClassesWithAsm
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJavaResource
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+[Incubating] Problems report is available at: file:///D:/PROJECTS/AndroidStudioProjects/unfold/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 8m 13s
+401 actionable tasks: 346 executed, 55 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.4.1/userguide/configuration_cache_enabling.html

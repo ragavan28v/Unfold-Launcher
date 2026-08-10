@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.volt.feature.gestures"
+    namespace = "com.unfold.feature.gestures"
     compileSdk = 35
 
     defaultConfig {
@@ -41,3 +41,4 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.coroutines.android)
 }
+

@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.volt.core.ui"
+    namespace = "com.unfold.core.ui"
     compileSdk = 35
 
     defaultConfig {
@@ -34,3 +34,4 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
 }
+

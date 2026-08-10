@@ -1,4 +1,4 @@
-# VOLT Launcher — Implementation Blueprint (Addendum)
+# UNFOLD Launcher — Implementation Blueprint (Addendum)
 ### Pairs with `launcher-RnD-spec.md`. This document is the one to paste into Antigravity alongside the R&D doc — it removes ambiguity so the agent builds *your* design instead of its own defaults.
 
 ---
@@ -60,25 +60,25 @@ hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 Single `NavHost` inside `MainActivity`, routes as sealed destinations (not raw strings, so Antigravity can't typo a route):
 
 ```kotlin
-sealed class VoltRoute(val route: String) {
-    data object Home : VoltRoute("home")
-    data object AppDrawer : VoltRoute("drawer")
-    data class Folder(val folderId: String) : VoltRoute("folder/{folderId}") {
+sealed class UnfoldRoute(val route: String) {
+    data object Home : UnfoldRoute("home")
+    data object AppDrawer : UnfoldRoute("drawer")
+    data class Folder(val folderId: String) : UnfoldRoute("folder/{folderId}") {
         companion object { const val PATTERN = "folder/{folderId}" }
     }
-    data object HiddenSpace : VoltRoute("hidden_space")
-    data object HiddenFiles : VoltRoute("hidden_files")
-    data object WidgetPicker : VoltRoute("widget_picker")
-    data object Settings : VoltRoute("settings")
-    data object ThemeEditor : VoltRoute("settings/theme")
-    data object GestureSettings : VoltRoute("settings/gestures")
-    data object GestureTrainer : VoltRoute("settings/gestures/train/{gestureType}") {
+    data object HiddenSpace : UnfoldRoute("hidden_space")
+    data object HiddenFiles : UnfoldRoute("hidden_files")
+    data object WidgetPicker : UnfoldRoute("widget_picker")
+    data object Settings : UnfoldRoute("settings")
+    data object ThemeEditor : UnfoldRoute("settings/theme")
+    data object GestureSettings : UnfoldRoute("settings/gestures")
+    data object GestureTrainer : UnfoldRoute("settings/gestures/train/{gestureType}") {
         companion object { const val PATTERN = "settings/gestures/train/{gestureType}" }
     }
-    data object IconPackPicker : VoltRoute("settings/icon_pack")
-    data object BackupRestore : VoltRoute("settings/backup")
-    data object UniversalSearch : VoltRoute("search")
-    data object FocusMode : VoltRoute("focus")
+    data object IconPackPicker : UnfoldRoute("settings/icon_pack")
+    data object BackupRestore : UnfoldRoute("settings/backup")
+    data object UniversalSearch : UnfoldRoute("search")
+    data object FocusMode : UnfoldRoute("focus")
 }
 ```
 
@@ -162,7 +162,7 @@ Seed the 4 default gesture rows on first DB creation via a `RoomDatabase.Callbac
 val DEFAULT_GESTURES = listOf(
     GestureEntity("SWIPE_LEFT_1F", "OPEN_INTENT", targetIntentUri = "tel:"),
     GestureEntity("SWIPE_RIGHT_1F", "LAUNCH_APP", targetPackage = "com.whatsapp"),
-    GestureEntity("SWIPE_LEFT_2F", "OPEN_SCREEN", targetScreenRoute = VoltRoute.HiddenSpace.route),
+    GestureEntity("SWIPE_LEFT_2F", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.HiddenSpace.route),
     GestureEntity("SWIPE_RIGHT_2F", "OPEN_INTENT", targetIntentUri = "market://details?id=")
 )
 ```
@@ -174,7 +174,7 @@ val DEFAULT_GESTURES = listOf(
 `theme_config.proto`:
 ```proto
 syntax = "proto3";
-option java_package = "com.volt.core.data.datastore";
+option java_package = "com.unfold.core.data.datastore";
 option java_multiple_classes = true;
 
 message ThemeConfig {
@@ -203,8 +203,8 @@ fun CarvedIcon(
     size: Dp = 56.dp,
     icon: @Composable () -> Unit,        // slot: Image/Text/glyph content, inset ~14%
     isPressed: Boolean = false,           // drives the shadow-inversion animation
-    accentTint: Color = LocalVoltTheme.current.accentPrimary,
-    bevelIntensity: Float = LocalVoltTheme.current.bevelIntensity,
+    accentTint: Color = LocalUnfoldTheme.current.accentPrimary,
+    bevelIntensity: Float = LocalUnfoldTheme.current.bevelIntensity,
     badgeCount: Int? = null,              // notification badge, null = no badge
     onClick: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
@@ -215,9 +215,9 @@ fun CarvedIcon(
 fun GlassPanel(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 24.dp,
-    blurRadius: Dp = LocalVoltTheme.current.blurRadius,
-    opacity: Float = LocalVoltTheme.current.panelOpacity,
-    borderColor: Color = LocalVoltTheme.current.panelBorder,
+    blurRadius: Dp = LocalUnfoldTheme.current.blurRadius,
+    opacity: Float = LocalUnfoldTheme.current.panelOpacity,
+    borderColor: Color = LocalUnfoldTheme.current.panelBorder,
     content: @Composable BoxScope.() -> Unit
 )
 
@@ -236,7 +236,7 @@ fun HUDGauge(
     value: Float,                         // 0f..1f
     label: String,                        // e.g. "BATTERY"
     valueText: String,                    // e.g. "12%"
-    ringColor: Color = LocalVoltTheme.current.accentPrimary,
+    ringColor: Color = LocalUnfoldTheme.current.accentPrimary,
     warningThreshold: Float? = 0.15f      // renders ringColor as accent.warn below this
 )
 
@@ -244,14 +244,14 @@ fun HUDGauge(
 fun SignalBar(
     modifier: Modifier = Modifier,
     level: Int,                           // 0..4
-    activeColor: Color = LocalVoltTheme.current.accentPrimary
+    activeColor: Color = LocalUnfoldTheme.current.accentPrimary
 )
 
 @Composable
 fun PillBadge(
     modifier: Modifier = Modifier,
     text: String,
-    tint: Color = LocalVoltTheme.current.accentSecondary
+    tint: Color = LocalUnfoldTheme.current.accentSecondary
 )
 ```
 

@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.volt.core.data"
+    namespace = "com.unfold.core.data"
     compileSdk = 35
 
     defaultConfig {
@@ -49,3 +49,4 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.androidx.core.ktx)
 }
+

@@ -17,7 +17,7 @@ class PinnedAppsRepository(
         return prefs.getStringSet(
             "pinned_apps",
             emptySet()
-        )!!.toList()
+        )?.toList() ?: emptyList()
 
     }
 

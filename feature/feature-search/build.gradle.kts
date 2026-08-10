@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.volt.feature.search"
+    namespace = "com.unfold.feature.search"
     compileSdk = 35
 
     defaultConfig {
@@ -42,3 +42,4 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.coil.compose)
 }
+

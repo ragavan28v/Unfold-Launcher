@@ -18,10 +18,11 @@ class AppRepository(private val context: Context) {
 
         return apps.map {
 
+            // Avoid loading icons synchronously on the main thread
             AppInfo(
                 name = it.loadLabel(packageManager).toString(),
                 packageName = it.activityInfo.packageName,
-                icon = it.loadIcon(packageManager)
+                icon = packageManager.getDefaultActivityIcon()
             )
 
         }.sortedBy { app ->

@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.volt.feature.hiddenspace"
+    namespace = "com.unfold.feature.hiddenspace"
     compileSdk = 35
 
     defaultConfig {
@@ -43,3 +43,4 @@ dependencies {
     
     implementation(libs.biometric.ktx)
 }
+

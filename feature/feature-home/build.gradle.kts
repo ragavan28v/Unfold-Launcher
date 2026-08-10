@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.volt.feature.home"
+    namespace = "com.unfold.feature.home"
     compileSdk = 35
 
     defaultConfig {
@@ -44,3 +44,4 @@ dependencies {
     // Coil
     implementation(libs.coil.compose)
 }
+

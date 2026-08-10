@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.volt.feature.settings"
+    namespace = "com.unfold.feature.settings"
     compileSdk = 35
 
     defaultConfig {
@@ -43,3 +43,4 @@ dependencies {
     
     implementation(libs.biometric.ktx)
 }
+
