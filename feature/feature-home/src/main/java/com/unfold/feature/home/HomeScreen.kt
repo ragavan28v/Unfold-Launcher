@@ -27,6 +27,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.Composable
@@ -149,39 +151,46 @@ fun HomeScreen(
         var flashlightEnabled by remember { mutableStateOf(false) }
         var isSilentEnabled by remember { mutableStateOf(true) }
 
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(top = 16.dp, start = 16.dp, end = 16.dp)
         ) {
+            val totalHudHeight = maxHeight
+            val standardHudHeight = 360.dp
+            val scale = (totalHudHeight / standardHudHeight).coerceIn(0.5f, 1.1f)
+
             // Background PCB grid
             HudBackgroundGrid()
 
             Column(modifier = Modifier.fillMaxSize()) {
                 // Top Horizontal Rail
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(64.dp),
+                    modifier = Modifier.fillMaxWidth().height((64 * scale).dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     HudRailItem(
                         icon = Icons.Default.Home,
                         isSelected = pagerState.currentPage == 0,
-                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
+                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } },
+                        sizeMultiplier = scale
                     )
-                    HudTrace(horizontal = true, length = 16.dp)
+                    HudTrace(horizontal = true, length = (16 * scale).dp)
                     HudRailItem(
                         icon = Icons.Default.PlayArrow,
                         isSelected = pagerState.currentPage == 1,
-                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } }
+                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } },
+                        sizeMultiplier = scale
                     )
-                    HudTrace(horizontal = true, length = 16.dp)
+                    HudTrace(horizontal = true, length = (16 * scale).dp)
                     HudRailItem(
                         icon = Icons.Default.Build,
                         isSelected = pagerState.currentPage == 2,
-                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } }
+                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } },
+                        sizeMultiplier = scale
                     )
-                    HudTrace(horizontal = true, length = 16.dp)
+                    HudTrace(horizontal = true, length = (16 * scale).dp)
                     
                     // Flashlight Rail Item
                     val context = LocalContext.current
@@ -199,11 +208,12 @@ fun HomeScreen(
                             } catch (e: Exception) {
                                 Log.e("Flashlight", "Error toggling flashlight: ${e.message}")
                             }
-                        }
+                        },
+                        sizeMultiplier = scale
                     )
                     
-                    HudTrace(horizontal = true, length = 12.dp)
-                    HudConnectorNode()
+                    HudTrace(horizontal = true, length = (12 * scale).dp)
+                    HudConnectorNode(modifier = Modifier.size((16 * scale).dp))
                     
                     Spacer(modifier = Modifier.weight(1f))
                     
@@ -211,11 +221,12 @@ fun HomeScreen(
                     StatusChip(
                         text = if (isSilentEnabled) "SILENT" else "GENERAL",
                         isActive = isSilentEnabled,
-                        modifier = Modifier.clickable { isSilentEnabled = !isSilentEnabled }
+                        modifier = Modifier.clickable { isSilentEnabled = !isSilentEnabled },
+                        scale = scale
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height((6 * scale).dp))
 
                 // Bottom Content + Left Rail
                 Row(
@@ -227,14 +238,14 @@ fun HomeScreen(
                     // Left Vertical Rail
                     Column(
                         modifier = Modifier
-                            .width(46.dp)
+                            .width((46 * scale).dp)
                             .fillMaxHeight(),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy((4 * scale).dp)
                     ) {
                         val context = LocalContext.current
                         
-                        HudTrace(horizontal = false, length = 8.dp)
+                        HudTrace(horizontal = false, length = (8 * scale).dp)
                         
                         // Google Feed / Intel
                         HudRailItem(
@@ -242,9 +253,10 @@ fun HomeScreen(
                             isSelected = pagerState.currentPage == 3,
                             onClick = {
                                 coroutineScope.launch { pagerState.animateScrollToPage(3) }
-                            }
+                            },
+                            sizeMultiplier = scale
                         )
-                        HudTrace(horizontal = false, length = 8.dp)
+                        HudTrace(horizontal = false, length = (8 * scale).dp)
                         
                         // Widgets
                         HudRailItem(
@@ -252,9 +264,10 @@ fun HomeScreen(
                             isSelected = pagerState.currentPage == 4,
                             onClick = {
                                 coroutineScope.launch { pagerState.animateScrollToPage(4) }
-                            }
+                            },
+                            sizeMultiplier = scale
                         )
-                        HudTrace(horizontal = false, length = 8.dp)
+                        HudTrace(horizontal = false, length = (8 * scale).dp)
                         
                         // Folders / Category Org
                         HudRailItem(
@@ -262,39 +275,40 @@ fun HomeScreen(
                             isSelected = pagerState.currentPage == 5,
                             onClick = {
                                 coroutineScope.launch { pagerState.animateScrollToPage(5) }
-                            }
+                            },
+                            sizeMultiplier = scale
                         )
-                        HudTrace(horizontal = false, length = 8.dp)
+                        HudTrace(horizontal = false, length = (8 * scale).dp)
                         
-                        HudConnectorNode()
+                        HudConnectorNode(modifier = Modifier.size((16 * scale).dp))
                         
                         // Battery display (text rotated)
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height((8 * scale).dp))
                         Text(
                             text = (state.systemStats?.batteryText ?: "100%").uppercase(),
                             color = theme.accentPrimary,
-                            fontSize = 10.sp,
+                            fontSize = (10 * scale).sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height((8 * scale).dp))
                         
-                        HudConnectorNode()
+                        HudConnectorNode(modifier = Modifier.size((16 * scale).dp))
                         
                         // Flexible vertical trace that expands and shrinks with the screen
                         Box(
                             modifier = Modifier
-                                .width(46.dp)
+                                .width((46 * scale).dp)
                                 .weight(1f),
                             contentAlignment = Alignment.Center
                         ) {
                             val traceColor = theme.accentPrimary.copy(alpha = 0.4f)
-                            Canvas(modifier = Modifier.fillMaxHeight().width(8.dp)) {
+                            Canvas(modifier = Modifier.fillMaxHeight().width((8 * scale).dp)) {
                                 drawLine(
                                     color = traceColor,
                                     start = Offset(size.width / 2f, 0f),
                                     end = Offset(size.width / 2f, size.height),
-                                    strokeWidth = 1.5.dp.toPx()
+                                    strokeWidth = 1.5.dp.toPx() * scale
                                 )
                             }
                         }
@@ -307,10 +321,11 @@ fun HomeScreen(
                             HudRailItem(
                                 icon = Icons.Default.Settings,
                                 isSelected = false,
-                                onClick = onNavigateToSettings
+                                onClick = onNavigateToSettings,
+                                sizeMultiplier = scale
                             )
-                            HudTrace(horizontal = true, length = 36.dp)
-                            HudConnectorNode()
+                            HudTrace(horizontal = true, length = (36 * scale).dp)
+                            HudConnectorNode(modifier = Modifier.size((16 * scale).dp))
                         }
                     }
 
@@ -327,23 +342,15 @@ fun HomeScreen(
                             val hudPageModifier = Modifier
                                 .fillMaxSize()
                                 .padding(
-                                    top = when (rows) {
-                                        1 -> 14.dp
-                                        2 -> 12.dp
-                                        else -> 10.dp
-                                    },
-                                    bottom = when (rows) {
-                                        1 -> 16.dp
-                                        2 -> 14.dp
-                                        else -> 12.dp
-                                    },
+                                    top = (4 * scale).dp,
+                                    bottom = (10 * scale).dp,
                                     start = 12.dp,
                                     end = 12.dp
                                 )
 
                             when (page) {
-                                0 -> HudHome(modifier = hudPageModifier, gridRows = rows)
-                                1 -> HudMusic(modifier = hudPageModifier, gridRows = rows)
+                                0 -> HudHome(modifier = hudPageModifier, gridRows = rows, scale = scale)
+                                1 -> HudMusic(modifier = hudPageModifier, gridRows = rows, scale = scale)
                                 2 -> HudSystem(
                                     batteryPercent = state.systemStats?.batteryPercent ?: 0.5f,
                                     batteryText = state.systemStats?.batteryText ?: "50%",
@@ -354,11 +361,12 @@ fun HomeScreen(
                                     cpuTempText = state.systemStats?.cpuTempText ?: "36°C",
                                     cpuTemp = state.systemStats?.cpuTemp ?: 36f,
                                     modifier = hudPageModifier,
-                                    gridRows = rows
+                                    gridRows = rows,
+                                    scale = scale
                                 )
-                                3 -> HudGoogleFeed(modifier = hudPageModifier, gridRows = rows)
-                                4 -> HudWidgets(modifier = hudPageModifier, gridRows = rows)
-                                5 -> HudCategories(apps = state.gridApps, modifier = hudPageModifier, gridRows = rows)
+                                3 -> HudGoogleFeed(modifier = hudPageModifier, gridRows = rows, scale = scale)
+                                4 -> HudWidgets(modifier = hudPageModifier, gridRows = rows, scale = scale)
+                                5 -> HudCategories(apps = state.gridApps, modifier = hudPageModifier, gridRows = rows, scale = scale)
                             }
                         }
                     }
@@ -373,11 +381,11 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = 16.dp, vertical = 4.dp)
                 .background(theme.bgPanel.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
                 .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(24.dp))
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             for (r in 0 until rows) {
                 Row(
@@ -533,7 +541,7 @@ fun HomeScreen(
         }
 
         if (dockVisible) {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             val dockHeight = when (dockRows) {
                 2 -> 140.dp
@@ -1131,7 +1139,7 @@ fun HomeAppGridItem(
                     Image(
                         bitmap = iconBitmap,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize().clip(CircleShape)
                     )
                 } else {
                     Text(
@@ -1459,16 +1467,68 @@ private fun resolveDropTarget(
 
 private fun drawableToImageBitmap(drawable: android.graphics.drawable.Drawable): ImageBitmap? {
     return try {
-        if (drawable is android.graphics.drawable.BitmapDrawable) {
-            drawable.bitmap.asImageBitmap()
+        val width = drawable.intrinsicWidth.coerceAtLeast(1)
+        val height = drawable.intrinsicHeight.coerceAtLeast(1)
+        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && 
+            drawable is android.graphics.drawable.AdaptiveIconDrawable) {
+            
+            val bg = drawable.background
+            val fg = drawable.foreground
+            
+            bg.setBounds(0, 0, width, height)
+            bg.draw(canvas)
+            
+            val size = Math.min(width, height)
+            val circularBitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+            val circularCanvas = android.graphics.Canvas(circularBitmap)
+            val paint = android.graphics.Paint().apply {
+                isAntiAlias = true
+            }
+            circularCanvas.drawARGB(0, 0, 0, 0)
+            circularCanvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+            paint.setXfermode(android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN))
+            
+            val srcRect = android.graphics.Rect(
+                (width - size) / 2,
+                (height - size) / 2,
+                (width + size) / 2,
+                (height + size) / 2
+            )
+            val destRect = android.graphics.Rect(0, 0, size, size)
+            circularCanvas.drawBitmap(bitmap, srcRect, destRect, paint)
+            
+            paint.setXfermode(null)
+            fg.setBounds(0, 0, size, size)
+            fg.draw(circularCanvas)
+            
+            circularBitmap.asImageBitmap()
         } else {
-            val width = drawable.intrinsicWidth.coerceAtLeast(1)
-            val height = drawable.intrinsicHeight.coerceAtLeast(1)
-            val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
-            val canvas = android.graphics.Canvas(bitmap)
             drawable.setBounds(0, 0, width, height)
             drawable.draw(canvas)
-            bitmap.asImageBitmap()
+            
+            val size = Math.min(width, height)
+            val circularBitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+            val circularCanvas = android.graphics.Canvas(circularBitmap)
+            val paint = android.graphics.Paint().apply {
+                isAntiAlias = true
+            }
+            circularCanvas.drawARGB(0, 0, 0, 0)
+            circularCanvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+            paint.setXfermode(android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN))
+            
+            val srcRect = android.graphics.Rect(
+                (width - size) / 2,
+                (height - size) / 2,
+                (width + size) / 2,
+                (height + size) / 2
+            )
+            val destRect = android.graphics.Rect(0, 0, size, size)
+            circularCanvas.drawBitmap(bitmap, srcRect, destRect, paint)
+            
+            circularBitmap.asImageBitmap()
         }
     } catch (e: Exception) {
         null

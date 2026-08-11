@@ -75,6 +75,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -1098,11 +1103,14 @@ private fun AppGridItem(
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
-    val iconDrawable = remember(app.packageName) {
-        try {
-            context.packageManager.getApplicationIcon(app.packageName)
-        } catch (_: Exception) {
-            null
+    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.packageName) {
+        value = withContext(Dispatchers.IO) {
+            try {
+                val drawable = context.packageManager.getApplicationIcon(app.packageName)
+                drawableToImageBitmap(drawable)
+            } catch (e: Exception) {
+                null
+            }
         }
     }
 
@@ -1122,11 +1130,11 @@ private fun AppGridItem(
             onClick = onClick,
             onLongPress = onLongPress,
             icon = {
-                if (iconDrawable != null) {
+                if (iconBitmap != null) {
                     androidx.compose.foundation.Image(
-                        painter = rememberAsyncImagePainter(iconDrawable),
+                        bitmap = iconBitmap!!,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize().clip(CircleShape)
                     )
                 } else {
                     Text(
@@ -1160,11 +1168,14 @@ private fun AppListItem(
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
-    val iconDrawable = remember(app.packageName) {
-        try {
-            context.packageManager.getApplicationIcon(app.packageName)
-        } catch (_: Exception) {
-            null
+    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.packageName) {
+        value = withContext(Dispatchers.IO) {
+            try {
+                val drawable = context.packageManager.getApplicationIcon(app.packageName)
+                drawableToImageBitmap(drawable)
+            } catch (e: Exception) {
+                null
+            }
         }
     }
 
@@ -1190,11 +1201,11 @@ private fun AppListItem(
                 onClick = onClick,
                 onLongPress = onLongPress,
                 icon = {
-                    if (iconDrawable != null) {
+                    if (iconBitmap != null) {
                         androidx.compose.foundation.Image(
-                            painter = rememberAsyncImagePainter(iconDrawable),
+                            bitmap = iconBitmap!!,
                             contentDescription = null,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize().clip(CircleShape)
                         )
                     } else {
                         Text(
@@ -1549,6 +1560,76 @@ private fun drawerIconSize(
         }
     }
     return snappedSize.coerceIn(minForLayout, maxForLayout).dp
+}
+
+private fun drawableToImageBitmap(drawable: android.graphics.drawable.Drawable): ImageBitmap? {
+    return try {
+        val width = drawable.intrinsicWidth.coerceAtLeast(1)
+        val height = drawable.intrinsicHeight.coerceAtLeast(1)
+        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && 
+            drawable is android.graphics.drawable.AdaptiveIconDrawable) {
+            
+            val bg = drawable.background
+            val fg = drawable.foreground
+            
+            bg.setBounds(0, 0, width, height)
+            bg.draw(canvas)
+            
+            val size = Math.min(width, height)
+            val circularBitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+            val circularCanvas = android.graphics.Canvas(circularBitmap)
+            val paint = android.graphics.Paint().apply {
+                isAntiAlias = true
+            }
+            circularCanvas.drawARGB(0, 0, 0, 0)
+            circularCanvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+            paint.setXfermode(android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN))
+            
+            val srcRect = android.graphics.Rect(
+                (width - size) / 2,
+                (height - size) / 2,
+                (width + size) / 2,
+                (height + size) / 2
+            )
+            val destRect = android.graphics.Rect(0, 0, size, size)
+            circularCanvas.drawBitmap(bitmap, srcRect, destRect, paint)
+            
+            paint.setXfermode(null)
+            fg.setBounds(0, 0, size, size)
+            fg.draw(circularCanvas)
+            
+            circularBitmap.asImageBitmap()
+        } else {
+            drawable.setBounds(0, 0, width, height)
+            drawable.draw(canvas)
+            
+            val size = Math.min(width, height)
+            val circularBitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+            val circularCanvas = android.graphics.Canvas(circularBitmap)
+            val paint = android.graphics.Paint().apply {
+                isAntiAlias = true
+            }
+            circularCanvas.drawARGB(0, 0, 0, 0)
+            circularCanvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+            paint.setXfermode(android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN))
+            
+            val srcRect = android.graphics.Rect(
+                (width - size) / 2,
+                (height - size) / 2,
+                (width + size) / 2,
+                (height + size) / 2
+            )
+            val destRect = android.graphics.Rect(0, 0, size, size)
+            circularCanvas.drawBitmap(bitmap, srcRect, destRect, paint)
+            
+            circularBitmap.asImageBitmap()
+        }
+    } catch (e: Exception) {
+        null
+    }
 }
 
 

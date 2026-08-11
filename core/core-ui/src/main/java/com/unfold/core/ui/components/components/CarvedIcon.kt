@@ -77,7 +77,8 @@ fun CarvedIcon(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding((size.value * 0.14f).dp),
+                .padding((size.value * 0.14f).dp)
+                .clip(CircleShape),
             contentAlignment = Alignment.Center
         ) {
             icon()

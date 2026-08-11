@@ -2393,20 +2393,70 @@ private fun ActionPill(
 
 private fun drawableToImageBitmap(drawable: android.graphics.drawable.Drawable): androidx.compose.ui.graphics.ImageBitmap? {
     return try {
-        if (drawable is android.graphics.drawable.BitmapDrawable) {
-            drawable.bitmap.asImageBitmap()
+        val width = drawable.intrinsicWidth.coerceAtLeast(1)
+        val height = drawable.intrinsicHeight.coerceAtLeast(1)
+        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && 
+            drawable is android.graphics.drawable.AdaptiveIconDrawable) {
+            
+            val bg = drawable.background
+            val fg = drawable.foreground
+            
+            bg.setBounds(0, 0, width, height)
+            bg.draw(canvas)
+            
+            val size = Math.min(width, height)
+            val circularBitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+            val circularCanvas = android.graphics.Canvas(circularBitmap)
+            val paint = android.graphics.Paint().apply {
+                isAntiAlias = true
+            }
+            circularCanvas.drawARGB(0, 0, 0, 0)
+            circularCanvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+            paint.setXfermode(android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN))
+            
+            val srcRect = android.graphics.Rect(
+                (width - size) / 2,
+                (height - size) / 2,
+                (width + size) / 2,
+                (height + size) / 2
+            )
+            val destRect = android.graphics.Rect(0, 0, size, size)
+            circularCanvas.drawBitmap(bitmap, srcRect, destRect, paint)
+            
+            paint.setXfermode(null)
+            fg.setBounds(0, 0, size, size)
+            fg.draw(circularCanvas)
+            
+            circularBitmap.asImageBitmap()
         } else {
-            val width = drawable.intrinsicWidth.coerceAtLeast(1)
-            val height = drawable.intrinsicHeight.coerceAtLeast(1)
-            val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
-            val canvas = android.graphics.Canvas(bitmap)
             drawable.setBounds(0, 0, width, height)
             drawable.draw(canvas)
-            bitmap.asImageBitmap()
+            
+            val size = Math.min(width, height)
+            val circularBitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+            val circularCanvas = android.graphics.Canvas(circularBitmap)
+            val paint = android.graphics.Paint().apply {
+                isAntiAlias = true
+            }
+            circularCanvas.drawARGB(0, 0, 0, 0)
+            circularCanvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+            paint.setXfermode(android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN))
+            
+            val srcRect = android.graphics.Rect(
+                (width - size) / 2,
+                (height - size) / 2,
+                (width + size) / 2,
+                (height + size) / 2
+            )
+            val destRect = android.graphics.Rect(0, 0, size, size)
+            circularCanvas.drawBitmap(bitmap, srcRect, destRect, paint)
+            
+            circularBitmap.asImageBitmap()
         }
     } catch (_: Exception) {
         null
     }
 }
-
-
