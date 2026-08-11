@@ -2273,9 +2273,9 @@ private fun GestureEditorSheet(
             modifier = Modifier.height(280.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(apps, key = { it.packageName }) { app ->
+            items(apps, key = { it.appId }) { app ->
                 val selected = app.packageName == targetPackage
-                val appIcon = remember(app.packageName) {
+                val appIcon = remember(app.appId) {
                     runCatching {
                         drawableToImageBitmap(context.packageManager.getApplicationIcon(app.packageName))
                     }.getOrNull()

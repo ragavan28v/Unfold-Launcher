@@ -1,6 +1,7 @@
 package com.unfold.feature.home
 
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -65,6 +66,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.runtime.produceState
+import android.content.pm.LauncherApps
+import android.os.UserManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.unfold.core.domain.model.AppInfo
@@ -405,11 +408,11 @@ fun HomeScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             if (app != null) {
-                                val isDraggingThisApp = draggedApp?.packageName == app.packageName
-                                var showContextMenu by remember(app.packageName) { mutableStateOf(false) }
-                                var dragDistance by remember(app.packageName) { mutableStateOf(0f) }
+                                val isDraggingThisApp = draggedApp?.appId == app.appId
+                                var showContextMenu by remember(app.appId) { mutableStateOf(false) }
+                                var dragDistance by remember(app.appId) { mutableStateOf(0f) }
                                 
-                                val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.packageName) {
+                                val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
                                     value = withContext(Dispatchers.IO) {
                                         try {
                                             val drawable = context.packageManager.getApplicationIcon(app.packageName)
@@ -424,9 +427,9 @@ fun HomeScreen(
                                     modifier = Modifier
                                         .alpha(if (isDraggingThisApp) 0.3f else 1.0f)
                                         .onGloballyPositioned { coords ->
-                                            itemBounds[app.packageName] = coords.boundsInRoot()
+                                            itemBounds[app.appId] = coords.boundsInRoot()
                                         }
-                                        .pointerInput(app.packageName) {
+                                        .pointerInput(app.appId) {
                                             awaitEachGesture {
                                                 val down = awaitFirstDown(requireUnconsumed = false)
                                                 Log.d("UnfoldDrag", "Pointer down on app: ${app.label}")
@@ -435,7 +438,7 @@ fun HomeScreen(
                                                     Log.d("UnfoldDrag", "Long press triggered for: ${app.label}")
                                                     // Long press triggered: start drag!
                                                     draggedApp = app
-                                                    val bounds = itemBounds[app.packageName]
+                                                    val bounds = itemBounds[app.appId]
                                                     Log.d("UnfoldDrag", "Item bounds: $bounds")
                                                     dragPosition = bounds?.topLeft ?: Offset.Zero
                                                     Log.d("UnfoldDrag", "Initial dragPosition: $dragPosition")
@@ -484,10 +487,7 @@ fun HomeScreen(
                                                     Log.d("UnfoldDrag", "Long press returned null (cancelled/tapped)")
                                                     // Released before long press: click!
                                                     try {
-                                                        val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
-                                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                        }
-                                                        intent?.let { context.startActivity(it) }
+                                                        launchApp(context, app)
                                                     } catch (e: Exception) {
                                                         // ignored
                                                     }
@@ -524,7 +524,7 @@ fun HomeScreen(
                                                     )
                                                 },
                                                 onClick = {
-                                                    viewModel.onIntent(HomeUiIntent.UnpinApp(app.packageName))
+                                                    viewModel.onIntent(HomeUiIntent.UnpinApp(app.appId))
                                                     showContextMenu = false
                                                 }
                                             )
@@ -590,9 +590,9 @@ fun HomeScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     sortedDockApps.forEach { app ->
-                                        val isDraggingThisApp = draggedApp?.packageName == app.packageName
+                                        val isDraggingThisApp = draggedApp?.appId == app.appId
                                         
-                                        val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.packageName) {
+                                        val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
                                             value = withContext(Dispatchers.IO) {
                                                 try {
                                                     val drawable = context.packageManager.getApplicationIcon(app.packageName)
@@ -608,29 +608,29 @@ fun HomeScreen(
                                         } else {
                                             state.dockIconSize.dp
                                         }
-                                        var showDockMenu by remember(app.packageName) { mutableStateOf(false) }
-                                        var dragDistance by remember(app.packageName) { mutableStateOf(0f) }
+                                        var showDockMenu by remember(app.appId) { mutableStateOf(false) }
+                                        var dragDistance by remember(app.appId) { mutableStateOf(0f) }
                                         Box(
                                             contentAlignment = Alignment.Center,
                                             modifier = Modifier
                                                 .onGloballyPositioned { coords ->
-                                                    itemBounds[app.packageName] = coords.boundsInRoot()
+                                                    itemBounds[app.appId] = coords.boundsInRoot()
                                                 }
-                                                .pointerInput(app.packageName) {
+                                                .pointerInput(app.appId) {
                                                     awaitEachGesture {
                                                         val down = awaitFirstDown(requireUnconsumed = false)
                                                         val longPress = awaitLongPressOrCancellation(down.id)
                                                         if (longPress != null) {
                                                             draggedApp = app
-                                                            dragPosition = itemBounds[app.packageName]?.topLeft ?: Offset.Zero
+                                                            dragPosition = itemBounds[app.appId]?.topLeft ?: Offset.Zero
                                                             dragDistance = 0f
                                                             val currentDownId = down.id
                                                             while (true) {
                                                                 val event = awaitPointerEvent()
                                                                 val change = event.changes.firstOrNull { it.id == currentDownId } ?: break
                                                                 if (!change.pressed) {
-                                                                    val itemWidth = itemBounds[app.packageName]?.width ?: 0f
-                                                                    val itemHeight = itemBounds[app.packageName]?.height ?: 0f
+                                                                    val itemWidth = itemBounds[app.appId]?.width ?: 0f
+                                                                    val itemHeight = itemBounds[app.appId]?.height ?: 0f
                                                                     val dropBounds = Rect(
                                                                         left = dragPosition.x,
                                                                         top = dragPosition.y,
@@ -660,10 +660,7 @@ fun HomeScreen(
                                                             }
                                                         } else {
                                                             try {
-                                                                val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
-                                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                                }
-                                                                intent?.let { context.startActivity(it) }
+                                                                launchApp(context, app)
                                                             } catch (e: Exception) {
                                                                 // ignored
                                                             }
@@ -714,7 +711,7 @@ fun HomeScreen(
                                                             )
                                                         },
                                                         onClick = {
-                                                            viewModel.onIntent(HomeUiIntent.UnpinApp(app.packageName))
+                                                            viewModel.onIntent(HomeUiIntent.UnpinApp(app.appId))
                                                             showDockMenu = false
                                                         }
                                                     )
@@ -758,9 +755,9 @@ fun HomeScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (app != null) {
-                                            val isDraggingThisApp = draggedApp?.packageName == app.packageName
+                                            val isDraggingThisApp = draggedApp?.appId == app.appId
                                             
-                                            val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.packageName) {
+                                            val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
                                                 value = withContext(Dispatchers.IO) {
                                                     try {
                                                         val drawable = context.packageManager.getApplicationIcon(app.packageName)
@@ -776,29 +773,29 @@ fun HomeScreen(
                                             } else {
                                                 state.dockIconSize.dp
                                             }
-                                            var showDockMenu by remember(app.packageName) { mutableStateOf(false) }
-                                            var dragDistance by remember(app.packageName) { mutableStateOf(0f) }
+                                            var showDockMenu by remember(app.appId) { mutableStateOf(false) }
+                                            var dragDistance by remember(app.appId) { mutableStateOf(0f) }
                                             Box(
                                                 modifier = Modifier
                                                     .alpha(if (isDraggingThisApp) 0.3f else 1.0f)
                                                     .onGloballyPositioned { coords ->
-                                                        itemBounds[app.packageName] = coords.boundsInRoot()
+                                                        itemBounds[app.appId] = coords.boundsInRoot()
                                                     }
-                                                    .pointerInput(app.packageName) {
+                                                    .pointerInput(app.appId) {
                                                         awaitEachGesture {
                                                             val down = awaitFirstDown(requireUnconsumed = false)
                                                             val longPress = awaitLongPressOrCancellation(down.id)
                                                             if (longPress != null) {
                                                                 draggedApp = app
-                                                                dragPosition = itemBounds[app.packageName]?.topLeft ?: Offset.Zero
+                                                                dragPosition = itemBounds[app.appId]?.topLeft ?: Offset.Zero
                                                                 dragDistance = 0f
                                                                 val currentDownId = down.id
                                                                 while (true) {
                                                                     val event = awaitPointerEvent()
                                                                     val change = event.changes.firstOrNull { it.id == currentDownId } ?: break
                                                                     if (!change.pressed) {
-                                                                        val itemWidth = itemBounds[app.packageName]?.width ?: 0f
-                                                                        val itemHeight = itemBounds[app.packageName]?.height ?: 0f
+                                                                        val itemWidth = itemBounds[app.appId]?.width ?: 0f
+                                                                        val itemHeight = itemBounds[app.appId]?.height ?: 0f
                                                                         val dropBounds = Rect(
                                                                             left = dragPosition.x,
                                                                             top = dragPosition.y,
@@ -828,10 +825,7 @@ fun HomeScreen(
                                                                 }
                                                             } else {
                                                                 try {
-                                                                    val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
-                                                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                                    }
-                                                                    intent?.let { context.startActivity(it) }
+                                                                    launchApp(context, app)
                                                                 } catch (e: Exception) {
                                                                     // ignored
                                                                 }
@@ -882,7 +876,7 @@ fun HomeScreen(
                                                                 )
                                                             },
                                                             onClick = {
-                                                                viewModel.onIntent(HomeUiIntent.UnpinApp(app.packageName))
+                                                                viewModel.onIntent(HomeUiIntent.UnpinApp(app.appId))
                                                                 showDockMenu = false
                                                             }
                                                         )
@@ -960,7 +954,7 @@ fun HomeScreen(
             val density = androidx.compose.ui.platform.LocalDensity.current
             val statusBarHeight = WindowInsets.statusBars.getTop(density)
             
-            val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.packageName) {
+            val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
                 value = withContext(Dispatchers.IO) {
                     try {
                         val drawable = context.packageManager.getApplicationIcon(app.packageName)
@@ -1363,11 +1357,35 @@ private fun handleAppDrop(
         }
 
         // Move app to target
-        viewModel.onIntent(HomeUiIntent.MoveApp(app.packageName, targetSlot))
+        viewModel.onIntent(HomeUiIntent.MoveApp(app.appId, targetSlot))
         if (appAtTarget != null) {
             // Swap: move the other app to source slot
-            viewModel.onIntent(HomeUiIntent.MoveApp(appAtTarget.packageName, sourcePos))
+            viewModel.onIntent(HomeUiIntent.MoveApp(appAtTarget.appId, sourcePos))
         }
+    }
+}
+
+private fun launchApp(context: Context, app: AppInfo) {
+    try {
+        val launcherApps = context.getSystemService(LauncherApps::class.java)
+        val userManager = context.getSystemService(UserManager::class.java)
+        val userHandle = userManager?.getUserForSerialNumber(app.userSerial)
+        if (launcherApps != null && userHandle != null && app.activityName.isNotBlank()) {
+            launcherApps.startMainActivity(
+                ComponentName(app.packageName, app.activityName),
+                userHandle,
+                null,
+                null
+            )
+            return
+        }
+
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        launchIntent?.let { context.startActivity(it) }
+    } catch (_: Exception) {
+        // Ignored
     }
 }
 

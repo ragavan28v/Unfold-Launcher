@@ -18,16 +18,16 @@ interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertApps(apps: List<AppEntity>)
 
-    @Query("UPDATE apps SET isHidden = :hidden WHERE packageName = :packageName")
-    suspend fun setHidden(packageName: String, hidden: Boolean)
+    @Query("UPDATE apps SET isHidden = :hidden WHERE appId = :appId")
+    suspend fun setHidden(appId: String, hidden: Boolean)
 
-    @Query("UPDATE apps SET gridPosition = :position WHERE packageName = :packageName")
-    suspend fun setGridPosition(packageName: String, position: Int?)
+    @Query("UPDATE apps SET gridPosition = :position WHERE appId = :appId")
+    suspend fun setGridPosition(appId: String, position: Int?)
 
-    @Query("UPDATE apps SET launchCount = launchCount + 1, lastUsedTimestamp = :timestamp WHERE packageName = :packageName")
-    suspend fun recordLaunch(packageName: String, timestamp: Long)
+    @Query("UPDATE apps SET launchCount = launchCount + 1, lastUsedTimestamp = :timestamp WHERE appId = :appId")
+    suspend fun recordLaunch(appId: String, timestamp: Long)
 
-    @Query("SELECT * FROM apps WHERE packageName = :packageName")
-    suspend fun getApp(packageName: String): AppEntity?
+    @Query("SELECT * FROM apps WHERE appId = :appId")
+    suspend fun getApp(appId: String): AppEntity?
 }
 

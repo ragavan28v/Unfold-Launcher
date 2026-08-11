@@ -1,6 +1,7 @@
 package com.unfold.feature.drawer
 
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -77,6 +78,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.runtime.produceState
+import android.content.pm.LauncherApps
+import android.os.UserManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.asImageBitmap
@@ -326,15 +329,15 @@ fun AppDrawerScreen(
                             ) {
                                 items(
                                     items = state.filteredApps,
-                                    key = { it.packageName }
+                                    key = { it.appId }
                                 ) { app ->
                                     AppGridItem(
                                         app = app,
                                         iconSize = renderedIconSize,
                                         drawerItemAlpha = drawerItemAlpha,
                                         onClick = {
-                                            viewModel.onIntent(AppDrawerUiIntent.OpenApp(app.packageName))
-                                            launchApp(context, app.packageName)
+                                            viewModel.onIntent(AppDrawerUiIntent.OpenApp(app.appId))
+                                            launchApp(context, app)
                                         },
                                         onLongPress = {
                                             selectedAppForMenu = app
@@ -362,8 +365,8 @@ fun AppDrawerScreen(
                                         iconSize = renderedIconSize,
                                         drawerItemAlpha = drawerItemAlpha,
                                         onAppClick = { app ->
-                                            viewModel.onIntent(AppDrawerUiIntent.OpenApp(app.packageName))
-                                            launchApp(context, app.packageName)
+                                            viewModel.onIntent(AppDrawerUiIntent.OpenApp(app.appId))
+                                            launchApp(context, app)
                                         },
                                         onAppLongPress = { app -> selectedAppForMenu = app }
                                     )
@@ -389,8 +392,8 @@ fun AppDrawerScreen(
                                         iconSize = renderedIconSize,
                                         drawerItemAlpha = drawerItemAlpha,
                                         onAppClick = { app ->
-                                            viewModel.onIntent(AppDrawerUiIntent.OpenApp(app.packageName))
-                                            launchApp(context, app.packageName)
+                                            viewModel.onIntent(AppDrawerUiIntent.OpenApp(app.appId))
+                                            launchApp(context, app)
                                         },
                                         onAppLongPress = { app -> selectedAppForMenu = app }
                                     )
@@ -496,15 +499,15 @@ fun AppDrawerScreen(
                     app = app,
                     onDismiss = { selectedAppForMenu = null },
                     onPinToHome = {
-                        viewModel.onIntent(AppDrawerUiIntent.PinToHome(app.packageName))
+                        viewModel.onIntent(AppDrawerUiIntent.PinToHome(app.appId))
                         selectedAppForMenu = null
                     },
                     onPinToDock = {
-                        viewModel.onIntent(AppDrawerUiIntent.PinToDock(app.packageName))
+                        viewModel.onIntent(AppDrawerUiIntent.PinToDock(app.appId))
                         selectedAppForMenu = null
                     },
                     onHideSystem = {
-                        viewModel.onIntent(AppDrawerUiIntent.HideApp(app.packageName))
+                        viewModel.onIntent(AppDrawerUiIntent.HideApp(app.appId))
                         selectedAppForMenu = null
                     },
                     onSystemInfo = {
@@ -1103,7 +1106,7 @@ private fun AppGridItem(
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
-    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.packageName) {
+    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
         value = withContext(Dispatchers.IO) {
             try {
                 val drawable = context.packageManager.getApplicationIcon(app.packageName)
@@ -1168,7 +1171,7 @@ private fun AppListItem(
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
-    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.packageName) {
+    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
         value = withContext(Dispatchers.IO) {
             try {
                 val drawable = context.packageManager.getApplicationIcon(app.packageName)
@@ -1520,9 +1523,22 @@ private fun buildAlphabetSections(apps: List<AppInfo>): List<AppAlphabetSection>
         }
 }
 
-private fun launchApp(context: Context, packageName: String) {
+private fun launchApp(context: Context, app: com.unfold.core.domain.model.AppInfo) {
     try {
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)?.apply {
+        val launcherApps = context.getSystemService(LauncherApps::class.java)
+        val userManager = context.getSystemService(UserManager::class.java)
+        val userHandle = userManager?.getUserForSerialNumber(app.userSerial)
+        if (launcherApps != null && userHandle != null && app.activityName.isNotBlank()) {
+            launcherApps.startMainActivity(
+                ComponentName(app.packageName, app.activityName),
+                userHandle,
+                null,
+                null
+            )
+            return
+        }
+
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         if (launchIntent != null) {

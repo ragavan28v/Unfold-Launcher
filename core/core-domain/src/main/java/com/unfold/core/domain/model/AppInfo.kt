@@ -1,8 +1,10 @@
 package com.unfold.core.domain.model
 
 data class AppInfo(
+    val appId: String,
     val packageName: String,
     val activityName: String,
+    val userSerial: Long,
     val label: String,
     val isHidden: Boolean = false,
     val isLocked: Boolean = false,

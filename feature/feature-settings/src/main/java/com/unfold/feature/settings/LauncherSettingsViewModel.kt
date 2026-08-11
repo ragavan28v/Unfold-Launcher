@@ -159,7 +159,7 @@ class LauncherSettingsViewModel @Inject constructor(
         for ((index, item) in ordered.withIndex()) {
             val app = item.first
             val targetPosition = index
-            appRepository.setGridPosition(app.packageName, targetPosition)
+            appRepository.setGridPosition(app.appId, targetPosition)
         }
     }
 
@@ -176,7 +176,7 @@ class LauncherSettingsViewModel @Inject constructor(
         for ((index, item) in ordered.withIndex()) {
             val app = item.first
             val targetPosition = 100 + index
-            appRepository.setGridPosition(app.packageName, targetPosition)
+            appRepository.setGridPosition(app.appId, targetPosition)
         }
     }
 

@@ -6,8 +6,8 @@ import javax.inject.Inject
 class ToggleHiddenAppUseCase @Inject constructor(
     private val appRepo: AppRepository
 ) {
-    suspend operator fun invoke(packageName: String, hidden: Boolean) {
-        appRepo.setHidden(packageName, hidden)
+    suspend operator fun invoke(appId: String, hidden: Boolean) {
+        appRepo.setHidden(appId, hidden)
     }
 }
 

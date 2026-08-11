@@ -226,7 +226,7 @@ fun UniversalSearchScreen(
                                 app = app,
                                 onClick = {
                                     viewModel.onIntent(UniversalSearchUiIntent.QuerySubmitted(state.query))
-                                    launchApp(context, app.packageName)
+                                    launchApp(context, app)
                                 }
                             )
                         }
@@ -386,7 +386,7 @@ private fun itemResult(
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
-    val iconDrawable = remember(app.packageName) {
+    val iconDrawable = remember(app.appId) {
         try {
             context.packageManager.getApplicationIcon(app.packageName)
         } catch (_: Exception) {
@@ -506,9 +506,22 @@ private fun ResultSurface(
     }
 }
 
-private fun launchApp(context: Context, packageName: String) {
+private fun launchApp(context: Context, app: AppInfo) {
     try {
-        val intent = context.packageManager.getLaunchIntentForPackage(packageName)?.apply {
+        val launcherApps = context.getSystemService(android.content.pm.LauncherApps::class.java)
+        val userManager = context.getSystemService(android.os.UserManager::class.java)
+        val userHandle = userManager?.getUserForSerialNumber(app.userSerial)
+        if (launcherApps != null && userHandle != null && app.activityName.isNotBlank()) {
+            launcherApps.startMainActivity(
+                android.content.ComponentName(app.packageName, app.activityName),
+                userHandle,
+                null,
+                null
+            )
+            return
+        }
+
+        val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         if (intent != null) context.startActivity(intent)

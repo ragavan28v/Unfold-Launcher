@@ -6,8 +6,8 @@ import javax.inject.Inject
 class ReorderHomeGridUseCase @Inject constructor(
     private val appRepo: AppRepository
 ) {
-    suspend operator fun invoke(packageName: String, newPosition: Int) {
-        appRepo.setGridPosition(packageName, newPosition)
+    suspend operator fun invoke(appId: String, newPosition: Int) {
+        appRepo.setGridPosition(appId, newPosition)
     }
 }
 

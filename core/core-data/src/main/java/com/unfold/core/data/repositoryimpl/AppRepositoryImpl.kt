@@ -2,7 +2,10 @@ package com.unfold.core.data.repositoryimpl
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
+import android.os.Process
+import android.os.UserManager
 import com.unfold.core.data.local.dao.AppDao
 import com.unfold.core.data.local.entity.AppEntity
 import com.unfold.core.domain.model.AppInfo
@@ -48,23 +51,86 @@ class AppRepositoryImpl @Inject constructor(
         }
 
         val pm = context.packageManager
-        val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
+        val launcherApps = context.getSystemService(LauncherApps::class.java)
+        val userManager = context.getSystemService(UserManager::class.java)
+        val currentEntities = appDao.getAllApps().associateBy { it.appId }
+        val discoveredApps = linkedMapOf<String, DiscoveredApp>()
+
+        fun registerResolveInfo(
+            info: android.content.pm.ResolveInfo,
+            userSerial: Long
+        ) {
+            val activityInfo = info.activityInfo ?: return
+            val packageName = activityInfo.packageName
+            val activityName = activityInfo.name
+            val label = info.loadLabel(pm).toString()
+            val appId = buildAppId(packageName, activityName, userSerial)
+            discoveredApps[appId] = DiscoveredApp(
+                appId = appId,
+                packageName = packageName,
+                activityName = activityName,
+                userSerial = userSerial,
+                label = label
+            )
+        }
+
+        fun registerActivityInfo(
+            packageName: String,
+            activityName: String,
+            label: String,
+            userSerial: Long
+        ) {
+            val appId = buildAppId(packageName, activityName, userSerial)
+            discoveredApps[appId] = DiscoveredApp(
+                appId = appId,
+                packageName = packageName,
+                activityName = activityName,
+                userSerial = userSerial,
+                label = label
+            )
+        }
+
+        val profiles = launcherApps?.profiles?.ifEmpty { listOf(Process.myUserHandle()) }
+            ?: listOf(Process.myUserHandle())
+
+        if (launcherApps != null) {
+            profiles.forEach { userHandle ->
+                val userSerial = runCatching {
+                    userManager?.getSerialNumberForUser(userHandle) ?: 0L
+                }.getOrDefault(0L)
+
+                    launcherApps.getActivityList(null, userHandle).forEach { activityInfo ->
+                        val componentName = activityInfo.componentName
+                        registerActivityInfo(
+                            packageName = componentName.packageName,
+                            activityName = componentName.className,
+                            label = activityInfo.label?.toString().orEmpty(),
+                            userSerial = userSerial
+                        )
+                    }
+                }
+            }
+
+        val launcherIntent = Intent(Intent.ACTION_MAIN, null).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
         }
-        val resolveInfos = pm.queryIntentActivities(mainIntent, 0)
-        
-        val currentEntities = appDao.getAllApps().associateBy { it.packageName }
+        pm.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL).forEach { info ->
+            registerResolveInfo(info, 0L)
+        }
+
+        val contactsIntent = Intent(Intent.ACTION_MAIN, null).apply {
+            addCategory(Intent.CATEGORY_APP_CONTACTS)
+        }
+        pm.queryIntentActivities(contactsIntent, PackageManager.MATCH_ALL).forEach { info ->
+            registerResolveInfo(info, 0L)
+        }
+
+        val sortedApps = discoveredApps.values.sortedBy { it.label.lowercase() }
         var nextGridPosIndex = 0
 
-        val newEntities = resolveInfos.map { info ->
-            val packageName = info.activityInfo.packageName
-            val activityName = info.activityInfo.name
-            val label = info.loadLabel(pm).toString()
-            val existing = currentEntities[packageName]
-
-            val assignedPosition = if (existing != null) {
-                existing.gridPosition
-            } else {
+        val newEntities = sortedApps.map { app ->
+            val existing = currentEntities[app.appId]
+            val assignedPosition = existing?.gridPosition ?: run {
                 val pos = if (nextGridPosIndex < 6) {
                     100 + nextGridPosIndex
                 } else if (nextGridPosIndex < 12) {
@@ -77,9 +143,11 @@ class AppRepositoryImpl @Inject constructor(
             }
 
             AppEntity(
-                packageName = packageName,
-                activityName = activityName,
-                label = label,
+                appId = app.appId,
+                packageName = app.packageName,
+                activityName = app.activityName,
+                userSerial = app.userSerial,
+                label = app.label,
                 isHidden = existing?.isHidden ?: false,
                 isLocked = existing?.isLocked ?: false,
                 customLabel = existing?.customLabel,
@@ -92,7 +160,6 @@ class AppRepositoryImpl @Inject constructor(
             )
         }
 
-        // Defensive check: if database has old configuration without dock apps, force re-assign
         val hasDockApps = newEntities.any { it.gridPosition != null && it.gridPosition >= 100 }
         val allPositionedApps = newEntities.filter { it.gridPosition != null }
         val finalEntities = if (!hasDockApps && allPositionedApps.isNotEmpty()) {
@@ -111,17 +178,29 @@ class AppRepositoryImpl @Inject constructor(
         appDao.insertApps(finalEntities)
     }
 
-    override suspend fun setHidden(packageName: String, hidden: Boolean) {
-        appDao.setHidden(packageName, hidden)
+    override suspend fun setHidden(appId: String, hidden: Boolean) {
+        appDao.setHidden(appId, hidden)
     }
 
-    override suspend fun setGridPosition(packageName: String, position: Int?) {
-        appDao.setGridPosition(packageName, position)
+    override suspend fun setGridPosition(appId: String, position: Int?) {
+        appDao.setGridPosition(appId, position)
     }
 
-    override suspend fun recordLaunch(packageName: String) {
-        appDao.recordLaunch(packageName, System.currentTimeMillis())
+    override suspend fun recordLaunch(appId: String) {
+        appDao.recordLaunch(appId, System.currentTimeMillis())
     }
+
+    private fun buildAppId(packageName: String, activityName: String, userSerial: Long): String {
+        return "$packageName/$activityName@$userSerial"
+    }
+
+    private data class DiscoveredApp(
+        val appId: String,
+        val packageName: String,
+        val activityName: String,
+        val userSerial: Long,
+        val label: String
+    )
 }
 
 

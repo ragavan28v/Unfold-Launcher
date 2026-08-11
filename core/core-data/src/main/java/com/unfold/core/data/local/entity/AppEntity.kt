@@ -6,8 +6,10 @@ import com.unfold.core.domain.model.AppInfo
 
 @Entity(tableName = "apps")
 data class AppEntity(
-    @PrimaryKey val packageName: String,
+    @PrimaryKey val appId: String,
+    val packageName: String,
     val activityName: String,
+    val userSerial: Long,
     val label: String,
     val isHidden: Boolean = false,
     val isLocked: Boolean = false,
@@ -21,8 +23,10 @@ data class AppEntity(
 ) {
     fun toDomain(): AppInfo {
         return AppInfo(
+            appId = appId,
             packageName = packageName,
             activityName = activityName,
+            userSerial = userSerial,
             label = label,
             isHidden = isHidden,
             isLocked = isLocked,
@@ -39,8 +43,10 @@ data class AppEntity(
     companion object {
         fun fromDomain(app: AppInfo): AppEntity {
             return AppEntity(
+                appId = app.appId,
                 packageName = app.packageName,
                 activityName = app.activityName,
+                userSerial = app.userSerial,
                 label = app.label,
                 isHidden = app.isHidden,
                 isLocked = app.isLocked,

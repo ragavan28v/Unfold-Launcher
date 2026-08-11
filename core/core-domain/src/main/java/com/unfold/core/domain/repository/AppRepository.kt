@@ -6,8 +6,8 @@ import kotlinx.coroutines.flow.Flow
 interface AppRepository {
     fun observeApps(includeHidden: Boolean): Flow<List<AppInfo>>
     suspend fun refreshFromPackageManager()
-    suspend fun setHidden(packageName: String, hidden: Boolean)
-    suspend fun setGridPosition(packageName: String, position: Int?)
-    suspend fun recordLaunch(packageName: String)
+    suspend fun setHidden(appId: String, hidden: Boolean)
+    suspend fun setGridPosition(appId: String, position: Int?)
+    suspend fun recordLaunch(appId: String)
 }
 

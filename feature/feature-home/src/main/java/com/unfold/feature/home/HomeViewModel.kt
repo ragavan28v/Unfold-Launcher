@@ -151,7 +151,7 @@ class HomeViewModel @Inject constructor(
                         val item = list.removeAt(intent.fromIndex)
                         list.add(intent.toIndex, item)
                         list.forEachIndexed { index, app ->
-                            reorderGrid(app.packageName, index)
+                            reorderGrid(app.appId, index)
                         }
                     }
                 }
