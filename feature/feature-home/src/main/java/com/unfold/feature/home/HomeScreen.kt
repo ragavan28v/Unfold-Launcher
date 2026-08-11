@@ -144,7 +144,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .padding(top = 8.dp)
+                .padding(top = 4.dp)
         ) {
         Spacer(modifier = Modifier.height(2.dp))
         // 1. Top HUD Area (HUD panels nested inside NodeRail horizontally, stretches dynamically)
@@ -155,7 +155,7 @@ fun HomeScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+                .padding(top = 8.dp, start = 16.dp, end = 16.dp)
         ) {
             val totalHudHeight = maxHeight
             val standardHudHeight = 360.dp
@@ -226,7 +226,7 @@ fun HomeScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height((6 * scale).dp))
+                Spacer(modifier = Modifier.height((3 * scale).dp))
 
                 // Bottom Content + Left Rail
                 Row(
@@ -342,7 +342,7 @@ fun HomeScreen(
                             val hudPageModifier = Modifier
                                 .fillMaxSize()
                                 .padding(
-                                    top = (4 * scale).dp,
+                                    top = (2 * scale).dp,
                                     bottom = (10 * scale).dp,
                                     start = 12.dp,
                                     end = 12.dp
