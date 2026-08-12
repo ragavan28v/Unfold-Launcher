@@ -1,5 +1,6 @@
 package com.unfold.core.ui.components.hud
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.provider.AlarmClock
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import com.unfold.core.ui.theme.LocalUnfoldTheme
 import java.text.SimpleDateFormat
 import java.util.*
@@ -55,6 +57,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.style.TextOverflow
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -661,6 +664,7 @@ private fun formatTime(ms: Long): String {
     return String.format("%d:%02d", mins, secs)
 }
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun HudMusic(
     modifier: Modifier = Modifier,
@@ -829,17 +833,89 @@ fun HudMusic(
             }
 
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .horizontalScroll(rememberScrollState())
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy((4 * scale).dp)
             ) {
                 Text(
-                    text = "${musicState.title} - ${musicState.artist}",
+                    text = musicState.title,
                     color = theme.textPrimary,
                     fontSize = (16 * scale).sp,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 1
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
+                
+                val trimmedArtist = musicState.artist.trimEnd()
+                val offsetAnimatable = remember(trimmedArtist) { androidx.compose.animation.core.Animatable(0f) }
+                val fontSizeSp = 13 * scale
+                var artistTextLeftPx by remember(trimmedArtist) { mutableStateOf(0f) }
+                var artistTextRightPx by remember(trimmedArtist) { mutableStateOf(0f) }
+                
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val density = androidx.compose.ui.platform.LocalDensity.current
+                    val containerWidthPx = with(density) { maxWidth.toPx() }
+                    val startInsetPx = with(density) { 75.dp.toPx() }
+                    
+                    LaunchedEffect(trimmedArtist, artistTextLeftPx, artistTextRightPx, containerWidthPx) {
+                        if ((artistTextRightPx - artistTextLeftPx) > containerWidthPx && containerWidthPx > 0f) {
+                            val startOffsetPx = startInsetPx - artistTextLeftPx
+                            val endOffsetPx = -artistTextRightPx
+                            val scrollDistancePx = startOffsetPx - endOffsetPx
+                            val scrollDuration = (scrollDistancePx * 38f).roundToInt()
+
+                            while (true) {
+                                offsetAnimatable.snapTo(startOffsetPx)
+                                offsetAnimatable.animateTo(
+                                    targetValue = endOffsetPx,
+                                    animationSpec = tween(durationMillis = scrollDuration, easing = LinearEasing)
+                                )
+                                offsetAnimatable.snapTo(startOffsetPx)
+                            }
+                        } else {
+                            offsetAnimatable.snapTo(0f)
+                        }
+                    }
+                    
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape((4 * scale).dp))
+                    ) {
+                        Text(
+                            text = trimmedArtist,
+                            color = theme.textSecondary,
+                            fontSize = fontSizeSp.sp,
+                            fontWeight = FontWeight.Normal,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Clip,
+                            modifier = Modifier
+                                .wrapContentWidth(unbounded = true)
+                                .offset {
+                                    androidx.compose.ui.unit.IntOffset(
+                                        x = offsetAnimatable.value.roundToInt(),
+                                        y = 0
+                                    )
+                            },
+                            onTextLayout = { layoutResult ->
+                                artistTextLeftPx = layoutResult.getLineLeft(0)
+                                artistTextRightPx = layoutResult.getLineRight(0)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        var animatedPhase by remember { mutableStateOf(0f) }
+        val isPlaying = musicState.isPlaying
+        LaunchedEffect(isPlaying) {
+            if (isPlaying) {
+                val startTime = System.currentTimeMillis()
+                while (true) {
+                    val elapsed = System.currentTimeMillis() - startTime
+                    animatedPhase = (elapsed * 0.003f) % (2f * Math.PI.toFloat())
+                    kotlinx.coroutines.delay(16)
+                }
             }
         }
 
@@ -865,139 +941,242 @@ fun HudMusic(
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height((12 * scale).dp)
+                    .height((24 * scale).dp)
             ) {
                 val duration = if (musicState.duration > 0) musicState.duration else 1L
                 val progressFraction = (musicState.position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+                val playheadX = size.width * progressFraction
+                val centerY = size.height / 2f
+                val tint = theme.accentPrimary
 
-                drawLine(
-                    color = theme.panelBorder.copy(alpha = 0.3f),
-                    start = Offset(0f, size.height / 2),
-                    end = Offset(size.width, size.height / 2),
-                    strokeWidth = 2.dp.toPx() * scale
-                )
-                
-                val handleX = size.width * progressFraction
-                drawLine(
-                    color = theme.accentPrimary,
-                    start = Offset(0f, size.height / 2),
-                    end = Offset(handleX, size.height / 2),
-                    strokeWidth = 2.dp.toPx() * scale
+                if (playheadX > 0f) {
+                    val activePath = Path()
+                    val steps = (playheadX / 2.dp.toPx()).toInt().coerceAtLeast(1)
+                    for (i in 0..steps) {
+                        val x = (i * (playheadX / steps)).coerceAtMost(playheadX)
+                        val envelope = Math.sin(Math.PI * x / playheadX).toFloat()
+                        val frequency = 0.04f
+                        val waveY = centerY + Math.sin(x.toDouble() * frequency - animatedPhase.toDouble()).toFloat() * (8.dp.toPx() * scale) * envelope
+                        if (i == 0) {
+                            activePath.moveTo(x, waveY)
+                        } else {
+                            activePath.lineTo(x, waveY)
+                        }
+                    }
+                    drawPath(
+                        path = activePath,
+                        color = tint,
+                        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+
+                drawCircle(
+                    color = tint,
+                    radius = 5.dp.toPx() * scale,
+                    center = Offset(playheadX, centerY)
                 )
                 drawCircle(
-                    color = theme.accentPrimary,
-                    radius = 4.dp.toPx() * scale,
-                    center = Offset(handleX, size.height / 2)
+                    color = tint.copy(alpha = 0.4f),
+                    radius = 9.dp.toPx() * scale,
+                    center = Offset(playheadX, centerY)
                 )
+
+                if (playheadX < size.width) {
+                    val dotSpacing = 6.dp.toPx()
+                    val dotRadius = 2.dp.toPx()
+                    var startX = playheadX + dotSpacing
+                    while (startX < size.width) {
+                        drawCircle(
+                            color = tint.copy(alpha = 0.4f),
+                            radius = dotRadius,
+                            center = Offset(startX, centerY)
+                        )
+                        startX += dotSpacing
+                    }
+                }
             }
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height((100 * scale).dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val cX = size.width / 2f
-                val cY = size.height / 2f
-                drawLine(
-                    color = theme.accentPrimary.copy(alpha = 0.15f),
-                    start = Offset(0f, cY),
-                    end = Offset(size.width, cY),
-                    strokeWidth = 1.dp.toPx() * scale
-                )
-                drawLine(
-                    color = theme.accentPrimary.copy(alpha = 0.15f),
-                    start = Offset(cX - 60.dp.toPx() * scale, cY),
-                    end = Offset(cX - 60.dp.toPx() * scale, cY + 30.dp.toPx() * scale),
-                    strokeWidth = 1.dp.toPx() * scale
-                )
-                drawLine(
-                    color = theme.accentPrimary.copy(alpha = 0.15f),
-                    start = Offset(cX + 60.dp.toPx() * scale, cY),
-                    end = Offset(cX + 60.dp.toPx() * scale, cY - 30.dp.toPx() * scale),
-                    strokeWidth = 1.dp.toPx() * scale
-                )
-            }
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val compactControlThreshold = (260 * scale).dp
+            val useCompactControls = maxWidth < compactControlThreshold
+            val extraControlSize = (28 * scale).dp
+            val navControlSize = (38 * scale).dp
+            val primaryControlSize = (56 * scale).dp
+            val iconSize = (14 * scale).dp
+            val primaryIconSize = (28 * scale).dp
+            val controlSpacing = (12 * scale).dp
+            val controlBoxHeight = if (useCompactControls) (90 * scale).dp else (110 * scale).dp
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy((24 * scale).dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(controlBoxHeight),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size((36 * scale).dp)
-                        .clickable {
-                            HudMediaManager.sendControl(android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Canvas(modifier = Modifier.size((20 * scale).dp)) {
-                        val tint = theme.textSecondary
-                        val w = size.width
-                        val h = size.height
-                        val path = Path().apply {
-                            moveTo(w * 0.7f, 0f)
-                            lineTo(0f, h / 2f)
-                            lineTo(w * 0.7f, h)
-                            close()
-                        }
-                        drawPath(path, color = tint)
-                        drawRect(color = tint, topLeft = Offset(w * 0.8f, 0f), size = androidx.compose.ui.geometry.Size(w * 0.2f, h))
-                    }
+                val tint = theme.accentPrimary
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val cX = size.width / 2f
+                    val cY = size.height / 2f
+
+                    drawLine(
+                        color = tint.copy(alpha = 0.12f),
+                        start = Offset(0f, cY),
+                        end = Offset(size.width, cY),
+                        strokeWidth = 2.5.dp.toPx()
+                    )
+
+                    drawCircle(
+                        color = tint.copy(alpha = 0.15f),
+                        radius = 42.dp.toPx() * scale,
+                        center = Offset(cX, cY),
+                        style = Stroke(width = 2.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(2f, 8f), 0f))
+                    )
+                    drawCircle(
+                        color = tint.copy(alpha = 0.08f),
+                        radius = 54.dp.toPx() * scale,
+                        center = Offset(cX, cY),
+                        style = Stroke(width = 2.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3f, 12f), 0f))
+                    )
                 }
 
-                Box(
+                Column(
                     modifier = Modifier
-                        .size((56 * scale).dp)
-                        .background(theme.accentPrimary.copy(alpha = 0.12f), RoundedCornerShape(50))
-                        .border(2.dp, theme.accentPrimary, RoundedCornerShape(50))
-                        .clickable {
-                            val key = if (musicState.isPlaying) android.view.KeyEvent.KEYCODE_MEDIA_PAUSE else android.view.KeyEvent.KEYCODE_MEDIA_PLAY
-                            HudMediaManager.sendControl(key)
-                        },
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(horizontal = (8 * scale).dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Canvas(modifier = Modifier.size((24 * scale).dp)) {
-                        val tint = theme.accentPrimary
-                        if (musicState.isPlaying) {
-                            val w = size.width
-                            val h = size.height
-                            drawRect(color = tint, topLeft = Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(w * 0.3f, h))
-                            drawRect(color = tint, topLeft = Offset(w * 0.7f, 0f), size = androidx.compose.ui.geometry.Size(w * 0.3f, h))
-                        } else {
-                            val path = Path().apply {
-                                moveTo(0f, 0f)
-                                lineTo(size.width, size.height / 2f)
-                                lineTo(0f, size.height)
-                                close()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = if (useCompactControls) Arrangement.SpaceEvenly else Arrangement.spacedBy(controlSpacing)
+                    ) {
+                        if (!useCompactControls) {
+                            Box(
+                                modifier = Modifier
+                                    .size(extraControlSize)
+                                    .clickable {
+                                        HudMediaManager.sendControl(android.view.KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK)
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Canvas(modifier = Modifier.size(iconSize)) {
+                                    val color = theme.textSecondary.copy(alpha = 0.7f)
+                                    val w = size.width
+                                    val h = size.height
+                                    val p1 = Path().apply {
+                                        moveTo(0f, h * 0.2f)
+                                        lineTo(w * 0.4f, h * 0.2f)
+                                        lineTo(w * 0.7f, h * 0.8f)
+                                        lineTo(w, h * 0.8f)
+                                    }
+                                    drawPath(p1, color = color, style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round))
+                                    drawPath(
+                                        Path().apply {
+                                            moveTo(w * 0.85f, h * 0.7f)
+                                            lineTo(w, h * 0.8f)
+                                            lineTo(w * 0.85f, h * 0.9f)
+                                        },
+                                        color = color,
+                                        style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round)
+                                    )
+
+                                    val p2 = Path().apply {
+                                        moveTo(0f, h * 0.8f)
+                                        lineTo(w * 0.4f, h * 0.8f)
+                                        lineTo(w * 0.7f, h * 0.2f)
+                                        lineTo(w, h * 0.2f)
+                                    }
+                                    drawPath(p2, color = color, style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round))
+                                    drawPath(
+                                        Path().apply {
+                                            moveTo(w * 0.85f, h * 0.1f)
+                                            lineTo(w, h * 0.2f)
+                                            lineTo(w * 0.85f, h * 0.3f)
+                                        },
+                                        color = color,
+                                        style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round)
+                                    )
+                                }
                             }
-                            drawPath(path, color = tint)
                         }
-                    }
-                }
 
-                Box(
-                    modifier = Modifier
-                        .size((36 * scale).dp)
-                        .clickable {
-                            HudMediaManager.sendControl(android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Canvas(modifier = Modifier.size((20 * scale).dp)) {
-                        val tint = theme.textSecondary
-                        val w = size.width
-                        val h = size.height
-                        val path = Path().apply {
-                            moveTo(0f, 0f)
-                            lineTo(w * 0.7f, h / 2f)
-                            lineTo(0f, h)
-                            close()
+                        Box(
+                            modifier = Modifier
+                                .size(navControlSize)
+                                .border(1.dp, theme.textSecondary.copy(alpha = 0.3f), CircleShape)
+                                .clickable {
+                                    HudMediaManager.sendControl(android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Canvas(modifier = Modifier.size(iconSize)) {
+                                val color = theme.textPrimary
+                                val w = size.width
+                                val h = size.height
+                                val path = Path().apply {
+                                    moveTo(w * 0.8f, h * 0.2f)
+                                    lineTo(w * 0.35f, h * 0.5f)
+                                    lineTo(w * 0.8f, h * 0.8f)
+                                    close()
+                                }
+                                drawPath(path, color = color)
+                                drawRect(color = color, topLeft = Offset(w * 0.2f, h * 0.2f), size = androidx.compose.ui.geometry.Size(w * 0.1f, h * 0.6f))
+                            }
                         }
-                        drawPath(path, color = tint)
-                        drawRect(color = tint, topLeft = Offset(w * 0.8f, 0f), size = androidx.compose.ui.geometry.Size(w * 0.2f, h))
+
+                        Box(
+                            modifier = Modifier
+                                .size(primaryControlSize)
+                                .border(1.5.dp, tint, CircleShape)
+                                .clickable {
+                                    val key = if (musicState.isPlaying) android.view.KeyEvent.KEYCODE_MEDIA_PAUSE else android.view.KeyEvent.KEYCODE_MEDIA_PLAY
+                                    HudMediaManager.sendControl(key)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Canvas(modifier = Modifier.size(primaryIconSize)) {
+                                if (musicState.isPlaying) {
+                                    val w = size.width
+                                    val h = size.height
+                                    drawRect(color = tint, topLeft = Offset(w * 0.3f, h * 0.25f), size = androidx.compose.ui.geometry.Size(w * 0.12f, h * 0.5f))
+                                    drawRect(color = tint, topLeft = Offset(w * 0.58f, h * 0.25f), size = androidx.compose.ui.geometry.Size(w * 0.12f, h * 0.5f))
+                                } else {
+                                    val path = Path().apply {
+                                        moveTo(size.width * 0.35f, size.height * 0.25f)
+                                        lineTo(size.width * 0.75f, size.height * 0.5f)
+                                        lineTo(size.width * 0.35f, size.height * 0.75f)
+                                        close()
+                                    }
+                                    drawPath(path, color = tint)
+                                }
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(navControlSize)
+                                .border(1.dp, theme.textSecondary.copy(alpha = 0.3f), CircleShape)
+                                .clickable {
+                                    HudMediaManager.sendControl(android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Canvas(modifier = Modifier.size(iconSize)) {
+                                val color = theme.textPrimary
+                                val w = size.width
+                                val h = size.height
+                                val path = Path().apply {
+                                    moveTo(w * 0.2f, h * 0.2f)
+                                    lineTo(w * 0.65f, h * 0.5f)
+                                    lineTo(w * 0.2f, h * 0.8f)
+                                    close()
+                                }
+                                drawPath(path, color = color)
+                                drawRect(color = color, topLeft = Offset(w * 0.7f, h * 0.2f), size = androidx.compose.ui.geometry.Size(w * 0.1f, h * 0.6f))
+                            }
+                        }
                     }
                 }
             }
