@@ -558,7 +558,7 @@ fun HomeScreen(
                 ) {
                     repeat(dockRows) { rowIndex ->
                         if (dockRows == 1) {
-                            val sortedDockApps = dockApps.sortedBy { it.gridPosition }
+                            val sortedDockApps = dockApps.sortedBy { it.gridPosition }.take(dockVisibleCount)
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()

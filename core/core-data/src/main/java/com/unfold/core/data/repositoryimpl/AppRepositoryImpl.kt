@@ -126,20 +126,25 @@ class AppRepositoryImpl @Inject constructor(
         }
 
         val sortedApps = discoveredApps.values.sortedBy { it.label.lowercase() }
+        val isFirstRun = currentEntities.isEmpty()
         var nextGridPosIndex = 0
 
         val newEntities = sortedApps.map { app ->
             val existing = currentEntities[app.appId]
             val assignedPosition = existing?.gridPosition ?: run {
-                val pos = if (nextGridPosIndex < 6) {
-                    100 + nextGridPosIndex
-                } else if (nextGridPosIndex < 12) {
-                    nextGridPosIndex - 6
+                if (isFirstRun) {
+                    val pos = if (nextGridPosIndex < 6) {
+                        100 + nextGridPosIndex
+                    } else if (nextGridPosIndex < 12) {
+                        nextGridPosIndex - 6
+                    } else {
+                        null
+                    }
+                    nextGridPosIndex++
+                    pos
                 } else {
                     null
                 }
-                nextGridPosIndex++
-                pos
             }
 
             AppEntity(
@@ -162,7 +167,7 @@ class AppRepositoryImpl @Inject constructor(
 
         val hasDockApps = newEntities.any { it.gridPosition != null && it.gridPosition >= 100 }
         val allPositionedApps = newEntities.filter { it.gridPosition != null }
-        val finalEntities = if (!hasDockApps && allPositionedApps.isNotEmpty()) {
+        val finalEntitiesWithPositions = if (!hasDockApps && allPositionedApps.isNotEmpty()) {
             newEntities.mapIndexed { index, entity ->
                 if (entity.gridPosition != null) {
                     val newPos = if (index < 6) 100 + index else index - 6
@@ -173,6 +178,22 @@ class AppRepositoryImpl @Inject constructor(
             }
         } else {
             newEntities
+        }
+
+        // Deduplicate positions: guarantee no two apps share the same non-null gridPosition
+        val occupiedPositions = mutableSetOf<Int>()
+        val finalEntities = finalEntitiesWithPositions.map { entity ->
+            val pos = entity.gridPosition
+            if (pos != null) {
+                if (occupiedPositions.contains(pos)) {
+                    entity.copy(gridPosition = null)
+                } else {
+                    occupiedPositions.add(pos)
+                    entity
+                }
+            } else {
+                entity
+            }
         }
 
         appDao.insertApps(finalEntities)
