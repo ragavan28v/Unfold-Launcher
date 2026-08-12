@@ -41,6 +41,28 @@ import androidx.compose.ui.unit.sp
 import com.unfold.core.ui.theme.LocalUnfoldTheme
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import android.widget.Toast
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import org.json.JSONObject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import com.unfold.core.domain.model.AppInfo
 
 @Composable
 fun HudBackgroundGrid(modifier: Modifier = Modifier) {
@@ -303,8 +325,114 @@ fun HudHome(
     scale: Float = 1f
 ) {
     val theme = LocalUnfoldTheme.current
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val sharedPrefs = remember { context.getSharedPreferences("weather_prefs", Context.MODE_PRIVATE) }
+
     var timeText by remember { mutableStateOf("") }
     var dateText by remember { mutableStateOf("") }
+    var weatherTemp by remember { mutableStateOf(sharedPrefs.getString("weather_temp", "28°") ?: "28°") }
+    var weatherDesc by remember { mutableStateOf(sharedPrefs.getString("weather_desc", "Partly Cloudy") ?: "Partly Cloudy") }
+    var weatherLoc by remember { mutableStateOf(sharedPrefs.getString("weather_loc", "COIMBATORE, TAMIL NADU, INDIA") ?: "COIMBATORE, TAMIL NADU, INDIA") }
+
+    var showDialog by remember { mutableStateOf(false) }
+    var dialogInput by remember { mutableStateOf("") }
+    var isFetching by remember { mutableStateOf(false) }
+
+    fun fetchWeather(cityName: String) {
+        coroutineScope.launch {
+            isFetching = true
+            val success = withContext(Dispatchers.IO) {
+                try {
+                    var lat: Double? = null
+                    var lon: Double? = null
+                    var displayLoc = cityName.trim().uppercase()
+
+                    val parts = cityName.split(Regex("[\\s,]+"))
+                    if (parts.size == 2) {
+                        val p1 = parts[0].toDoubleOrNull()
+                        val p2 = parts[1].toDoubleOrNull()
+                        if (p1 != null && p2 != null) {
+                            lat = p1
+                            lon = p2
+                            displayLoc = "LAT: $lat, LON: $lon"
+                        }
+                    }
+
+                    if (lat == null || lon == null) {
+                        val encodedCity = URLEncoder.encode(cityName, "UTF-8")
+                        val geoUrl = URL("https://geocoding-api.open-meteo.com/v1/search?name=$encodedCity&count=1&language=en&format=json")
+                        val geoConn = geoUrl.openConnection() as HttpURLConnection
+                        geoConn.connectTimeout = 5000
+                        geoConn.readTimeout = 5000
+                        val geoResponse = geoConn.inputStream.bufferedReader().readText()
+                        geoConn.disconnect()
+
+                        val geoJson = JSONObject(geoResponse)
+                        val results = geoJson.optJSONArray("results")
+                        if (results != null && results.length() > 0) {
+                            val firstResult = results.getJSONObject(0)
+                            lat = firstResult.getDouble("latitude")
+                            lon = firstResult.getDouble("longitude")
+                            val name = firstResult.getString("name")
+                            val admin1 = firstResult.optString("admin1")
+                            val country = firstResult.optString("country")
+                            displayLoc = listOf(name, admin1, country)
+                                .filter { it.isNotBlank() }
+                                .joinToString(", ")
+                                .uppercase()
+                        }
+                    }
+
+                    if (lat != null && lon != null) {
+                        val weatherUrl = URL("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current_weather=true")
+                        val weatherConn = weatherUrl.openConnection() as HttpURLConnection
+                        weatherConn.connectTimeout = 5000
+                        weatherConn.readTimeout = 5000
+                        val weatherResponse = weatherConn.inputStream.bufferedReader().readText()
+                        weatherConn.disconnect()
+
+                        val weatherJson = JSONObject(weatherResponse)
+                        val currentWeather = weatherJson.getJSONObject("current_weather")
+                        val tempVal = currentWeather.getDouble("temperature").toInt()
+                        val weathercode = currentWeather.getInt("weathercode")
+                        val condition = when (weathercode) {
+                            0 -> "Clear Sky"
+                            1, 2, 3 -> "Partly Cloudy"
+                            45, 48 -> "Foggy"
+                            51, 53, 55 -> "Drizzle"
+                            61, 63, 65 -> "Rainy"
+                            71, 73, 75 -> "Snowy"
+                            80, 81, 82 -> "Rain Showers"
+                            95 -> "Thunderstorm"
+                            else -> "Overcast"
+                        }
+
+                        sharedPrefs.edit()
+                            .putString("weather_temp", "${tempVal}°")
+                            .putString("weather_desc", condition)
+                            .putString("weather_loc", displayLoc)
+                            .apply()
+
+                        weatherTemp = "${tempVal}°"
+                        weatherDesc = condition
+                        weatherLoc = displayLoc
+                        true
+                    } else {
+                        false
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    false
+                }
+            }
+            isFetching = false
+            if (!success) {
+                Toast.makeText(context, "Weather update failed, showing cached data", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     val verticalPadding = when (gridRows) {
         1 -> 22.dp
         2 -> 18.dp
@@ -316,7 +444,6 @@ fun HudHome(
         else -> 12.dp
     } * scale
 
-    // responsive font sizes driven by the home grid rows
     val timeFontSize = when (gridRows) {
         1 -> 54.sp
         2 -> 48.sp
@@ -342,6 +469,44 @@ fun HudHome(
         }
     }
 
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("SET WEATHER LOCATION", color = theme.textPrimary, fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Enter city name:", color = theme.textSecondary, modifier = Modifier.padding(bottom = 8.dp))
+                    TextField(
+                        value = dialogInput,
+                        onValueChange = { dialogInput = it },
+                        placeholder = { Text("e.g. Coimbatore", color = theme.textMuted) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (dialogInput.isNotBlank()) {
+                            fetchWeather(dialogInput)
+                        }
+                        showDialog = false
+                    }
+                ) {
+                    Text("SAVE", color = theme.accentPrimary, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("CANCEL", color = theme.textSecondary)
+                }
+            },
+            containerColor = theme.bgPanel.copy(alpha = 0.95f),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -349,7 +514,6 @@ fun HudHome(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(sectionSpacing)
     ) {
-        // Time & Date Header
         Column {
             Text(
                 text = timeText,
@@ -367,19 +531,22 @@ fun HudHome(
                 letterSpacing = 1.sp
             )
             Spacer(modifier = Modifier.height((4 * scale).dp))
-            StatusChip(text = "OPUS OS // SYSTEM ACTIVE", isActive = true, scale = scale)
+            StatusChip(
+                text = if (isFetching) "WEATHER UPDATING..." else "OPUS OS // SYSTEM ACTIVE",
+                isActive = true,
+                scale = scale
+            )
         }
 
         Spacer(modifier = Modifier.height((8 * scale).dp))
 
-        // Weather Details block
         Column(verticalArrangement = Arrangement.spacedBy((6 * scale).dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy((8 * scale).dp)
             ) {
                 Text(
-                    text = "28°",
+                    text = weatherTemp,
                     color = theme.textPrimary,
                     fontSize = degreeFontSize,
                     fontWeight = FontWeight.Bold,
@@ -387,21 +554,26 @@ fun HudHome(
                 )
                 Icon(
                     imageVector = Icons.Default.Info,
-                    contentDescription = null,
+                    contentDescription = "Set Location",
                     tint = theme.accentPrimary,
-                    modifier = Modifier.size((32 * scale).dp)
+                    modifier = Modifier
+                        .size((32 * scale).dp)
+                        .clickable {
+                            dialogInput = ""
+                            showDialog = true
+                        }
                 )
             }
 
             Text(
-                text = "Partly Cloudy",
+                text = weatherDesc,
                 color = theme.accentPrimary,
                 fontSize = (16 * scale).sp,
                 fontWeight = FontWeight.SemiBold
             )
 
             Text(
-                text = "COIMBATORE, TAMIL NADU, INDIA",
+                text = weatherLoc,
                 color = theme.textSecondary.copy(alpha = 0.7f),
                 fontSize = (11 * scale).sp,
                 fontFamily = FontFamily.Monospace,
@@ -446,6 +618,49 @@ fun HudHome(
     }
 }
 
+object HudMediaManager {
+    data class MusicState(
+        val title: String = "Nothing Playing",
+        val artist: String = "NO SOURCE ACTIVE",
+        val packageName: String = "",
+        val isPlaying: Boolean = false,
+        val position: Long = 0L,
+        val duration: Long = 0L,
+        val albumArt: ImageBitmap? = null
+    )
+
+    private val _musicState = MutableStateFlow(MusicState())
+    val musicState: StateFlow<MusicState> = _musicState.asStateFlow()
+
+    private var _onMediaControlListener: ((Int) -> Unit)? = null
+    var onMediaControlListener: ((Int) -> Unit)?
+        get() = _onMediaControlListener
+        set(value) { _onMediaControlListener = value }
+
+    fun updateState(state: MusicState) {
+        _musicState.value = state
+    }
+
+    fun sendControl(keyCode: Int) {
+        _onMediaControlListener?.invoke(keyCode)
+    }
+}
+
+private fun isNotificationServiceEnabled(context: Context): Boolean {
+    val flat = android.provider.Settings.Secure.getString(
+        context.contentResolver,
+        "enabled_notification_listeners"
+    )
+    return flat?.contains(context.packageName) == true
+}
+
+private fun formatTime(ms: Long): String {
+    val totalSecs = ms / 1000
+    val mins = totalSecs / 60
+    val secs = totalSecs % 60
+    return String.format("%d:%02d", mins, secs)
+}
+
 @Composable
 fun HudMusic(
     modifier: Modifier = Modifier,
@@ -453,7 +668,19 @@ fun HudMusic(
     scale: Float = 1f
 ) {
     val theme = LocalUnfoldTheme.current
-    var isPlaying by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    
+    val musicState by HudMediaManager.musicState.collectAsState()
+
+    var isNotificationEnabled by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            isNotificationEnabled = isNotificationServiceEnabled(context)
+            kotlinx.coroutines.delay(2000)
+        }
+    }
+
     val contentPadding = when (gridRows) {
         1 -> 18.dp
         2 -> 14.dp
@@ -465,6 +692,62 @@ fun HudMusic(
         else -> 12.dp
     } * scale
 
+    val musicAppPackages = listOf(
+        "com.spotify.music",
+        "com.google.android.apps.youtube.music",
+        "com.apple.android.music",
+        "org.videolan.vlc",
+        "com.soundcloud.android",
+        "com.amazon.mp3",
+        "deezer.android.app",
+        "com.pandora.android"
+    )
+
+    val installedMusicApps = remember(context) {
+        musicAppPackages.mapNotNull { pkg ->
+            try {
+                val appInfo = context.packageManager.getApplicationInfo(pkg, 0)
+                val drawable = context.packageManager.getApplicationIcon(appInfo)
+                val width = drawable.intrinsicWidth.coerceAtLeast(1)
+                val height = drawable.intrinsicHeight.coerceAtLeast(1)
+                val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+                val canvas = android.graphics.Canvas(bitmap)
+
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && 
+                    drawable is android.graphics.drawable.AdaptiveIconDrawable) {
+                    val bg = drawable.background
+                    val fg = drawable.foreground
+                    bg.setBounds(0, 0, width, height)
+                    bg.draw(canvas)
+                    val size = Math.min(width, height)
+                    val circularBitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+                    val circularCanvas = android.graphics.Canvas(circularBitmap)
+                    val paint = android.graphics.Paint().apply { isAntiAlias = true }
+                    circularCanvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+                    paint.setXfermode(android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN))
+                    circularCanvas.drawBitmap(bitmap, null, android.graphics.Rect(0, 0, size, size), paint)
+                    paint.setXfermode(null)
+                    fg.setBounds(0, 0, size, size)
+                    fg.draw(circularCanvas)
+                    pkg to circularBitmap.asImageBitmap()
+                } else {
+                    drawable.setBounds(0, 0, width, height)
+                    drawable.draw(canvas)
+                    val size = Math.min(width, height)
+                    val circularBitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+                    val circularCanvas = android.graphics.Canvas(circularBitmap)
+                    val paint = android.graphics.Paint().apply { isAntiAlias = true }
+                    circularCanvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+                    paint.setXfermode(android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN))
+                    circularCanvas.drawBitmap(bitmap, null, android.graphics.Rect(0, 0, size, size), paint)
+                    pkg to circularBitmap.asImageBitmap()
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -472,7 +755,33 @@ fun HudMusic(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(sectionSpacing)
     ) {
-        // Track Card
+        if (!isNotificationEnabled) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape((12 * scale).dp))
+                    .background(theme.accentPrimary.copy(alpha = 0.08f))
+                    .border(1.dp, theme.accentPrimary.copy(alpha = 0.3f), RoundedCornerShape((12 * scale).dp))
+                    .clickable {
+                        try {
+                            context.startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Open Settings -> Notification Access manually", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                    .padding((12 * scale).dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "TAP TO SYNC LIVE MUSIC TRACK DETAILS",
+                    color = theme.accentPrimary,
+                    fontSize = (11 * scale).sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy((16 * scale).dp)
@@ -485,39 +794,72 @@ fun HudMusic(
                     .border(1.dp, theme.panelBorder.copy(alpha = 0.4f), RoundedCornerShape((12 * scale).dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = theme.accentPrimary,
-                    modifier = Modifier.size((28 * scale).dp)
-                )
+                if (musicState.albumArt != null) {
+                    Image(
+                        bitmap = musicState.albumArt!!,
+                        contentDescription = "Album Art",
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape((12 * scale).dp))
+                    )
+                } else {
+                    Canvas(modifier = Modifier.size((28 * scale).dp)) {
+                        val tint = theme.accentPrimary
+                        val w = size.width
+                        val h = size.height
+                        drawOval(
+                            color = tint,
+                            topLeft = Offset(w * 0.2f, h * 0.6f),
+                            size = androidx.compose.ui.geometry.Size(w * 0.35f, h * 0.25f)
+                        )
+                        drawLine(
+                            color = tint,
+                            start = Offset(w * 0.5f, h * 0.7f),
+                            end = Offset(w * 0.5f, h * 0.2f),
+                            strokeWidth = 3.dp.toPx() * scale,
+                            cap = StrokeCap.Round
+                        )
+                        val flagPath = Path().apply {
+                            moveTo(w * 0.5f, h * 0.2f)
+                            quadraticTo(w * 0.7f, h * 0.25f, w * 0.8f, h * 0.4f)
+                            quadraticTo(w * 0.7f, h * 0.35f, w * 0.5f, h * 0.35f)
+                            close()
+                        }
+                        drawPath(flagPath, color = tint)
+                    }
+                }
             }
 
-            Column {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState())
+            ) {
                 Text(
-                    text = "Nothing Playing",
+                    text = "${musicState.title} - ${musicState.artist}",
                     color = theme.textPrimary,
-                    fontSize = (18 * scale).sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "NO SOURCE ACTIVE",
-                    color = theme.textSecondary.copy(alpha = 0.6f),
-                    fontSize = (11 * scale).sp,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp
+                    fontSize = (16 * scale).sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
                 )
             }
         }
 
-        // Timeline Slider
         Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("0:00", color = theme.textMuted, fontSize = (10 * scale).sp, fontFamily = FontFamily.Monospace)
-                Text("0:00", color = theme.textMuted, fontSize = (10 * scale).sp, fontFamily = FontFamily.Monospace)
+                Text(
+                    text = formatTime(musicState.position),
+                    color = theme.textMuted,
+                    fontSize = (10 * scale).sp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = formatTime(musicState.duration),
+                    color = theme.textMuted,
+                    fontSize = (10 * scale).sp,
+                    fontFamily = FontFamily.Monospace
+                )
             }
             Spacer(modifier = Modifier.height((4 * scale).dp))
             Canvas(
@@ -525,39 +867,46 @@ fun HudMusic(
                     .fillMaxWidth()
                     .height((12 * scale).dp)
             ) {
+                val duration = if (musicState.duration > 0) musicState.duration else 1L
+                val progressFraction = (musicState.position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+
                 drawLine(
                     color = theme.panelBorder.copy(alpha = 0.3f),
                     start = Offset(0f, size.height / 2),
                     end = Offset(size.width, size.height / 2),
                     strokeWidth = 2.dp.toPx() * scale
                 )
+                
+                val handleX = size.width * progressFraction
+                drawLine(
+                    color = theme.accentPrimary,
+                    start = Offset(0f, size.height / 2),
+                    end = Offset(handleX, size.height / 2),
+                    strokeWidth = 2.dp.toPx() * scale
+                )
                 drawCircle(
                     color = theme.accentPrimary,
                     radius = 4.dp.toPx() * scale,
-                    center = Offset((24 * scale).dp.toPx(), size.height / 2)
+                    center = Offset(handleX, size.height / 2)
                 )
             }
         }
 
-        // Controls Area with surrounding traces
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height((100 * scale).dp),
             contentAlignment = Alignment.Center
         ) {
-            // Background interactive traces
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val cX = size.width / 2f
                 val cY = size.height / 2f
-                // Draw horizontal trace line
                 drawLine(
                     color = theme.accentPrimary.copy(alpha = 0.15f),
                     start = Offset(0f, cY),
                     end = Offset(size.width, cY),
                     strokeWidth = 1.dp.toPx() * scale
                 )
-                // Junction lines
                 drawLine(
                     color = theme.accentPrimary.copy(alpha = 0.15f),
                     start = Offset(cX - 60.dp.toPx() * scale, cY),
@@ -576,39 +925,124 @@ fun HudMusic(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy((24 * scale).dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = theme.textSecondary,
+                Box(
                     modifier = Modifier
-                        .size((28 * scale).dp)
-                        .clickable { }
-                )
+                        .size((36 * scale).dp)
+                        .clickable {
+                            HudMediaManager.sendControl(android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Canvas(modifier = Modifier.size((20 * scale).dp)) {
+                        val tint = theme.textSecondary
+                        val w = size.width
+                        val h = size.height
+                        val path = Path().apply {
+                            moveTo(w * 0.7f, 0f)
+                            lineTo(0f, h / 2f)
+                            lineTo(w * 0.7f, h)
+                            close()
+                        }
+                        drawPath(path, color = tint)
+                        drawRect(color = tint, topLeft = Offset(w * 0.8f, 0f), size = androidx.compose.ui.geometry.Size(w * 0.2f, h))
+                    }
+                }
 
                 Box(
                     modifier = Modifier
                         .size((56 * scale).dp)
                         .background(theme.accentPrimary.copy(alpha = 0.12f), RoundedCornerShape(50))
                         .border(2.dp, theme.accentPrimary, RoundedCornerShape(50))
-                        .clickable { isPlaying = !isPlaying },
+                        .clickable {
+                            val key = if (musicState.isPlaying) android.view.KeyEvent.KEYCODE_MEDIA_PAUSE else android.view.KeyEvent.KEYCODE_MEDIA_PLAY
+                            HudMediaManager.sendControl(key)
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.PlayArrow else Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = theme.accentPrimary,
-                        modifier = Modifier.size((32 * scale).dp)
-                    )
+                    Canvas(modifier = Modifier.size((24 * scale).dp)) {
+                        val tint = theme.accentPrimary
+                        if (musicState.isPlaying) {
+                            val w = size.width
+                            val h = size.height
+                            drawRect(color = tint, topLeft = Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(w * 0.3f, h))
+                            drawRect(color = tint, topLeft = Offset(w * 0.7f, 0f), size = androidx.compose.ui.geometry.Size(w * 0.3f, h))
+                        } else {
+                            val path = Path().apply {
+                                moveTo(0f, 0f)
+                                lineTo(size.width, size.height / 2f)
+                                lineTo(0f, size.height)
+                                close()
+                            }
+                            drawPath(path, color = tint)
+                        }
+                    }
                 }
 
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = theme.textSecondary,
+                Box(
                     modifier = Modifier
+                        .size((36 * scale).dp)
+                        .clickable {
+                            HudMediaManager.sendControl(android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Canvas(modifier = Modifier.size((20 * scale).dp)) {
+                        val tint = theme.textSecondary
+                        val w = size.width
+                        val h = size.height
+                        val path = Path().apply {
+                            moveTo(0f, 0f)
+                            lineTo(w * 0.7f, h / 2f)
+                            lineTo(0f, h)
+                            close()
+                        }
+                        drawPath(path, color = tint)
+                        drawRect(color = tint, topLeft = Offset(w * 0.8f, 0f), size = androidx.compose.ui.geometry.Size(w * 0.2f, h))
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = (8 * scale).dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "SOURCES: ",
+                color = theme.textSecondary.copy(alpha = 0.5f),
+                fontSize = (8 * scale).sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(end = (8 * scale).dp)
+            )
+            installedMusicApps.forEach { (pkg, icon) ->
+                val isCurrent = musicState.packageName == pkg
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = (4 * scale).dp)
                         .size((28 * scale).dp)
-                        .clickable { }
-                )
+                        .border(
+                            width = if (isCurrent) 1.5.dp else 0.5.dp,
+                            color = if (isCurrent) theme.accentPrimary else theme.panelBorder.copy(alpha = 0.4f),
+                            shape = CircleShape
+                        )
+                        .clickable {
+                            try {
+                                val intent = context.packageManager.getLaunchIntentForPackage(pkg)
+                                intent?.let { context.startActivity(it) }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        bitmap = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size((22 * scale).dp).clip(CircleShape)
+                    )
+                }
             }
         }
     }
