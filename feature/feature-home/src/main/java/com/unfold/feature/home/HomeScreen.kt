@@ -162,7 +162,7 @@ fun HomeScreen(
         ) {
             val totalHudHeight = maxHeight
             val standardHudHeight = 360.dp
-            val scale = (totalHudHeight / standardHudHeight).coerceIn(0.5f, 1.1f)
+            val scale = (totalHudHeight / standardHudHeight).coerceIn(0.4f, 1.1f)
 
             // Background PCB grid
             HudBackgroundGrid()
@@ -346,7 +346,7 @@ fun HomeScreen(
                                 .fillMaxSize()
                                 .padding(
                                     top = (2 * scale).dp,
-                                    bottom = (10 * scale).dp,
+                                    bottom = (4 * scale).dp,
                                     start = 12.dp,
                                     end = 12.dp
                                 )

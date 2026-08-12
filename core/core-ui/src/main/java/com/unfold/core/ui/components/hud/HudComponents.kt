@@ -113,7 +113,7 @@ fun HudRailItem(
     )
 
     val sizeCoerced by animateDpAsState(
-        targetValue = if (isSelected) (46 * sizeMultiplier).dp else (42 * sizeMultiplier).dp,
+        targetValue = if (isSelected) (40 * sizeMultiplier).dp else (36 * sizeMultiplier).dp,
         animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "size"
     )
@@ -630,9 +630,9 @@ fun HudSystem(
 ) {
     val theme = LocalUnfoldTheme.current
     val contentPadding = when (gridRows) {
-        1 -> 18.dp
-        2 -> 14.dp
-        else -> 12.dp
+        1 -> 8.dp
+        2 -> 6.dp
+        else -> 4.dp
     } * scale
     val gaugeSize = when (gridRows) {
         1 -> 150.dp
@@ -665,7 +665,7 @@ fun HudSystem(
             modifier = Modifier
                 .weight(1.2f)
                 .padding(start = (8 * scale).dp),
-            verticalArrangement = Arrangement.spacedBy((8 * scale).dp)
+            verticalArrangement = Arrangement.spacedBy((6 * scale).dp)
         ) {
             HudInfoCard(
                 title = "RAM",
@@ -785,7 +785,7 @@ fun HudInfoCard(
             .clip(RoundedCornerShape((12 * scale).dp))
             .background(theme.bgPanel.copy(alpha = 0.4f))
             .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape((12 * scale).dp))
-            .padding((12 * scale).dp),
+            .padding(horizontal = (12 * scale).dp, vertical = (8 * scale).dp),
         verticalArrangement = Arrangement.spacedBy((4 * scale).dp)
     ) {
         Row(
