@@ -1266,7 +1266,7 @@ fun HudSystem(
                 .fillMaxSize()
                 .padding(top = (18 * scale).dp, bottom = (18 * scale).dp)
         ) {
-            val railX = size.width * 0.405f
+            val railX = size.width * 0.475f
             val topY = size.height * 0.13f
             val bottomY = size.height * 0.87f
             val nodeRadius = 2.6.dp.toPx() * scale
@@ -1278,9 +1278,9 @@ fun HudSystem(
                 strokeWidth = railStroke
             )
             val nodeYs = listOf(
-                topY + (size.height * 0.13f),
-                topY + (size.height * 0.44f),
-                topY + (size.height * 0.75f)
+                topY,
+                (topY + bottomY) / 2f,
+                bottomY
             )
             nodeYs.forEach { y ->
                 drawCircle(color = theme.accentPrimary, radius = nodeRadius, center = Offset(railX, y))
@@ -1393,34 +1393,16 @@ fun HudBatteryGauge(
                     cap = StrokeCap.Round
                 )
             }
-
-            val markerAngle = (-72f).toRadians()
-            val markerRadius = radius + 3.dp.toPx() * scale
-            drawCircle(
-                color = theme.accentPrimary,
-                radius = 2.8.dp.toPx() * scale,
-                center = Offset(
-                    center.x + markerRadius * kotlin.math.cos(markerAngle).toFloat(),
-                    center.y + markerRadius * kotlin.math.sin(markerAngle).toFloat()
-                )
-            )
         }
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height((4 * scale).dp))
-            Icon(
-                imageVector = Icons.Default.ElectricBolt,
-                contentDescription = "Battery",
-                tint = theme.accentPrimary,
-                modifier = Modifier.size((18 * scale).dp)
-            )
             Text(
                 text = text,
                 color = theme.textPrimary,
-                fontSize = (28 * scale).sp,
+                fontSize = (20 * scale).sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
             )
@@ -1430,6 +1412,13 @@ fun HudBatteryGauge(
                 fontSize = (8 * scale).sp,
                 letterSpacing = 1.1.sp,
                 fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height((6 * scale).dp))
+            Icon(
+                imageVector = Icons.Default.ElectricBolt,
+                contentDescription = "Battery",
+                tint = theme.accentPrimary,
+                modifier = Modifier.size((18 * scale).dp)
             )
         }
     }
