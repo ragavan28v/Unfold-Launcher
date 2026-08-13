@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.geometry.center
 import androidx.compose.ui.text.style.TextOverflow
 import java.net.HttpURLConnection
 import java.net.URL
@@ -1242,67 +1243,103 @@ fun HudSystem(
     scale: Float = 1f
 ) {
     val theme = LocalUnfoldTheme.current
-    val contentPadding = when (gridRows) {
-        1 -> 8.dp
-        2 -> 6.dp
-        else -> 4.dp
+    val outerPadding = when (gridRows) {
+        1 -> 12.dp
+        2 -> 10.dp
+        else -> 8.dp
     } * scale
+    val columnGap = (18 * scale).dp
+    val stackedGap = (10 * scale).dp
     val gaugeSize = when (gridRows) {
-        1 -> 150.dp
-        2 -> 130.dp
-        else -> 110.dp
+        1 -> 188.dp
+        2 -> 176.dp
+        else -> 166.dp
     } * scale
 
-    Row(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = (12 * scale).dp, vertical = contentPadding),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = (14 * scale).dp, vertical = outerPadding)
     ) {
-        // Battery Gauge on Left
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.weight(1f)
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = (18 * scale).dp, bottom = (18 * scale).dp)
         ) {
-            HudBatteryGauge(
-                percent = batteryPercent,
-                text = batteryText,
-                modifier = Modifier.size(gaugeSize),
-                scale = scale
+            val railX = size.width * 0.405f
+            val topY = size.height * 0.13f
+            val bottomY = size.height * 0.87f
+            val nodeRadius = 2.6.dp.toPx() * scale
+            val railStroke = 1.4.dp.toPx() * scale
+            drawLine(
+                color = theme.accentPrimary.copy(alpha = 0.75f),
+                start = Offset(railX, topY),
+                end = Offset(railX, bottomY),
+                strokeWidth = railStroke
             )
+            val nodeYs = listOf(
+                topY + (size.height * 0.13f),
+                topY + (size.height * 0.44f),
+                topY + (size.height * 0.75f)
+            )
+            nodeYs.forEach { y ->
+                drawCircle(color = theme.accentPrimary, radius = nodeRadius, center = Offset(railX, y))
+                drawCircle(color = theme.accentPrimary.copy(alpha = 0.22f), radius = nodeRadius * 2.2f, center = Offset(railX, y))
+            }
         }
 
-        // Stat Cards stacked on Right
-        Column(
+        Row(
             modifier = Modifier
-                .weight(1.2f)
-                .padding(start = (8 * scale).dp),
-            verticalArrangement = Arrangement.spacedBy((6 * scale).dp)
+                .align(Alignment.Center)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(columnGap),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            HudInfoCard(
-                title = "RAM",
-                value = ramUsedText.split("/").firstOrNull()?.trim() ?: "4.2 GB",
-                subtitle = "of " + (ramUsedText.split("/").lastOrNull()?.trim() ?: "8 GB"),
-                progress = ramUsedPercent,
-                scale = scale
-            )
+            Box(
+                modifier = Modifier.weight(0.98f),
+                contentAlignment = Alignment.Center
+            ) {
+                HudBatteryGauge(
+                    percent = batteryPercent,
+                    text = batteryText,
+                    modifier = Modifier.size(gaugeSize),
+                    scale = scale
+                )
+            }
 
-            HudInfoCard(
-                title = "STORAGE",
-                value = storageUsedText.split("/").firstOrNull()?.trim() ?: "64 GB",
-                subtitle = "of " + (storageUsedText.split("/").lastOrNull()?.trim() ?: "128 GB"),
-                progress = storageUsedPercent,
-                scale = scale
-            )
+            Column(
+                modifier = Modifier.weight(1.08f),
+                verticalArrangement = Arrangement.spacedBy(stackedGap),
+                horizontalAlignment = Alignment.End
+            ) {
+                HudStatCard(
+                    icon = Icons.Default.Memory,
+                    title = "RAM",
+                    value = ramUsedText.split("/").firstOrNull()?.trim() ?: "5.8 GB",
+                    subtitle = "of " + (ramUsedText.split("/").lastOrNull()?.trim() ?: "7.8 GB"),
+                    progress = ramUsedPercent,
+                    scale = scale
+                )
 
-            HudInfoCard(
-                title = "TEMP",
-                value = cpuTempText,
-                subtitle = "battery status ok",
-                progress = cpuTemp / 100f,
-                scale = scale
-            )
+                HudStatCard(
+                    icon = Icons.Default.Storage,
+                    title = "STORAGE",
+                    value = storageUsedText.split("/").firstOrNull()?.trim() ?: "80.5 GB",
+                    subtitle = "of " + (storageUsedText.split("/").lastOrNull()?.trim() ?: "109.9 GB"),
+                    progress = storageUsedPercent,
+                    scale = scale
+                )
+
+                HudStatCard(
+                    icon = Icons.Default.Thermostat,
+                    title = "TEMP",
+                    value = cpuTempText,
+                    subtitle = "battery status ok",
+                    progress = cpuTemp / 100f,
+                    showSparkline = true,
+                    scale = scale
+                )
+            }
         }
     }
 }
@@ -1315,71 +1352,254 @@ fun HudBatteryGauge(
     scale: Float = 1f
 ) {
     val theme = LocalUnfoldTheme.current
-    val infiniteTransition = rememberInfiniteTransition(label = "gauge")
-    val rotateAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(8000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rotate"
-    )
 
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size((110 * scale).dp)) {
-            val strokeWidth = 5.dp.toPx() * scale
-            // Track
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = size.center
+            val radius = size.minDimension * 0.39f
+            val strokeWidth = 3.dp.toPx() * scale
+
             drawCircle(
-                color = theme.panelBorder.copy(alpha = 0.2f),
+                color = theme.panelBorder.copy(alpha = 0.18f),
+                radius = radius,
+                center = center,
                 style = Stroke(width = strokeWidth)
             )
 
-            // Progress Arc
-            drawArc(
-                color = theme.accentPrimary,
-                startAngle = rotateAngle - 90f,
-                sweepAngle = 360f * percent,
-                useCenter = false,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
+            val tickCount = 56
+            val activeTicks = (tickCount * percent.coerceIn(0f, 1f)).toInt()
+            val outerTickRadius = radius + 8.dp.toPx() * scale
+            val innerTickRadius = radius - 2.dp.toPx() * scale
 
-            // Decorative inner ticks
-            val tickCount = 20
-            val tickRadius = 45.dp.toPx() * scale
             for (i in 0 until tickCount) {
-                val angle = (360f / tickCount) * i
-                val x = size.width / 2 + tickRadius * kotlin.math.cos(Math.toRadians(angle.toDouble())).toFloat()
-                val y = size.height / 2 + tickRadius * kotlin.math.sin(Math.toRadians(angle.toDouble())).toFloat()
-                drawCircle(
-                    color = theme.accentPrimary.copy(alpha = if (angle / 360f < percent) 0.6f else 0.15f),
-                    radius = 1.5.dp.toPx() * scale,
-                    center = Offset(x, y)
+                val angle = (360f / tickCount) * i - 90f
+                val angleRad = Math.toRadians(angle.toDouble())
+                val cosAngle = kotlin.math.cos(angleRad).toFloat()
+                val sinAngle = kotlin.math.sin(angleRad).toFloat()
+
+                val outerX = center.x + outerTickRadius * cosAngle
+                val outerY = center.y + outerTickRadius * sinAngle
+                val innerX = center.x + innerTickRadius * cosAngle
+                val innerY = center.y + innerTickRadius * sinAngle
+
+                drawLine(
+                    color = if (i <= activeTicks) theme.accentPrimary.copy(alpha = 0.9f) else theme.textSecondary.copy(alpha = 0.55f),
+                    start = Offset(innerX, innerY),
+                    end = Offset(outerX, outerY),
+                    strokeWidth = 1.2.dp.toPx() * scale,
+                    cap = StrokeCap.Round
                 )
             }
+
+            val markerAngle = (-72f).toRadians()
+            val markerRadius = radius + 3.dp.toPx() * scale
+            drawCircle(
+                color = theme.accentPrimary,
+                radius = 2.8.dp.toPx() * scale,
+                center = Offset(
+                    center.x + markerRadius * kotlin.math.cos(markerAngle).toFloat(),
+                    center.y + markerRadius * kotlin.math.sin(markerAngle).toFloat()
+                )
+            )
         }
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Spacer(modifier = Modifier.height((4 * scale).dp))
+            Icon(
+                imageVector = Icons.Default.ElectricBolt,
+                contentDescription = "Battery",
+                tint = theme.accentPrimary,
+                modifier = Modifier.size((18 * scale).dp)
+            )
             Text(
                 text = text,
                 color = theme.textPrimary,
-                fontSize = (24 * scale).sp,
+                fontSize = (28 * scale).sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
             )
             Text(
                 text = "ON BATTERY",
-                color = theme.textSecondary.copy(alpha = 0.6f),
+                color = theme.textSecondary.copy(alpha = 0.7f),
                 fontSize = (8 * scale).sp,
-                letterSpacing = 1.sp,
+                letterSpacing = 1.1.sp,
                 fontWeight = FontWeight.Bold
             )
         }
     }
 }
+
+@Composable
+fun HudStatCard(
+    icon: ImageVector,
+    title: String,
+    value: String,
+    subtitle: String,
+    progress: Float,
+    showSparkline: Boolean = false,
+    modifier: Modifier = Modifier,
+    scale: Float = 1f
+) {
+    val theme = LocalUnfoldTheme.current
+    val (valueNumber, valueUnit) = splitHudValue(value)
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = (96 * scale).dp)
+            .clip(RoundedCornerShape((15 * scale).dp))
+            .background(theme.bgPanel.copy(alpha = 0.34f))
+            .border(1.dp, theme.panelBorder.copy(alpha = 0.3f), RoundedCornerShape((15 * scale).dp))
+            .padding(horizontal = (12 * scale).dp, vertical = (10 * scale).dp),
+        verticalArrangement = Arrangement.spacedBy((4 * scale).dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy((10 * scale).dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size((34 * scale).dp)
+                    .clip(RoundedCornerShape((18 * scale).dp))
+                    .background(theme.bgPanel.copy(alpha = 0.55f))
+                    .border(1.dp, theme.accentPrimary.copy(alpha = 0.45f), RoundedCornerShape((18 * scale).dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = theme.accentPrimary,
+                    modifier = Modifier.size((16 * scale).dp)
+                )
+            }
+
+            Text(
+                text = title,
+                color = theme.textSecondary.copy(alpha = 0.9f),
+                fontSize = (9.5 * scale).sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.1.sp
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = theme.textMuted.copy(alpha = 0.8f),
+                modifier = Modifier.size((16 * scale).dp)
+            )
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy((2 * scale).dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy((3 * scale).dp)
+            ) {
+                Text(
+                    text = valueNumber,
+                    color = theme.textPrimary,
+                    fontSize = (17 * scale).sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = (-0.4).sp
+                )
+                if (valueUnit.isNotBlank()) {
+                    Text(
+                        text = valueUnit,
+                        color = theme.textPrimary.copy(alpha = 0.9f),
+                        fontSize = (11 * scale).sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(bottom = (1 * scale).dp)
+                    )
+                }
+            }
+
+            Text(
+                text = subtitle.lowercase(),
+                color = theme.textMuted.copy(alpha = 0.88f),
+                fontSize = (8.5 * scale).sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 0.4.sp,
+                maxLines = 1
+            )
+
+            if (showSparkline) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height((20 * scale).dp)
+                ) {
+                    val waveColor = theme.accentPrimary
+                    val centerY = size.height * 0.62f
+                    val points = listOf(0.0f, 0.12f, 0.20f, 0.31f, 0.41f, 0.53f, 0.66f, 0.78f, 0.89f, 1f)
+                    val path = Path()
+                    points.forEachIndexed { index, x ->
+                        val wave = kotlin.math.sin((x * 7.5f + 0.2f) * Math.PI).toFloat()
+                        val y = centerY + wave * (2.8f * scale)
+                        val px = size.width * x
+                        if (index == 0) path.moveTo(px, y) else path.lineTo(px, y)
+                    }
+                    drawPath(
+                        path = path,
+                        color = waveColor,
+                        style = Stroke(width = 1.6.dp.toPx() * scale, cap = StrokeCap.Round)
+                    )
+                    drawCircle(
+                        color = waveColor,
+                        radius = 2.2.dp.toPx() * scale,
+                        center = Offset(size.width * 0.995f, centerY)
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height((4 * scale).dp)
+                        .clip(RoundedCornerShape((2 * scale).dp))
+                        .background(theme.panelBorder.copy(alpha = 0.28f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(progress.coerceIn(0f, 1f))
+                            .background(
+                                color = theme.accentPrimary,
+                                shape = RoundedCornerShape((2 * scale).dp)
+                            )
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun splitHudValue(raw: String): Pair<String, String> {
+    val text = raw.trim()
+    if (text.isEmpty()) return "" to ""
+
+    val match = Regex("^([0-9.,]+)\\s*(.*)$").find(text)
+    return if (match != null) {
+        val number = match.groupValues[1].trim()
+        val unit = match.groupValues[2].trim()
+        number to unit
+    } else {
+        text to ""
+    }
+}
+
+private fun Float.toRadians(): Double = Math.toRadians(this.toDouble())
 
 @Composable
 fun HudInfoCard(
