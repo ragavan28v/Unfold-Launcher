@@ -17,8 +17,13 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -181,14 +186,14 @@ fun HomeScreen(
                     )
                     HudTrace(horizontal = true, length = (16 * scale).dp)
                     HudRailItem(
-                        icon = Icons.Default.PlayArrow,
+                        icon = Icons.Default.MusicNote,
                         isSelected = pagerState.currentPage == 1,
                         onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } },
                         sizeMultiplier = scale
                     )
                     HudTrace(horizontal = true, length = (16 * scale).dp)
                     HudRailItem(
-                        icon = Icons.Default.Build,
+                        icon = Icons.Default.Memory,
                         isSelected = pagerState.currentPage == 2,
                         onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } },
                         sizeMultiplier = scale
@@ -198,7 +203,7 @@ fun HomeScreen(
                     // Flashlight Rail Item
                     val context = LocalContext.current
                     HudRailItem(
-                        icon = Icons.Default.Info, // Flashlight representation
+                        icon = Icons.Default.FlashOn,
                         isSelected = flashlightEnabled,
                         onClick = {
                             flashlightEnabled = !flashlightEnabled
@@ -262,22 +267,22 @@ fun HomeScreen(
                         HudTrace(horizontal = false, length = (8 * scale).dp)
                         
                         // Widgets
-                        HudRailItem(
-                            icon = Icons.Default.Info,
-                            isSelected = pagerState.currentPage == 4,
-                            onClick = {
-                                coroutineScope.launch { pagerState.animateScrollToPage(4) }
+                    HudRailItem(
+                        icon = Icons.Default.Dashboard,
+                        isSelected = pagerState.currentPage == 4,
+                        onClick = {
+                            coroutineScope.launch { pagerState.animateScrollToPage(4) }
                             },
                             sizeMultiplier = scale
                         )
                         HudTrace(horizontal = false, length = (8 * scale).dp)
                         
                         // Folders / Category Org
-                        HudRailItem(
-                            icon = Icons.Default.Menu,
-                            isSelected = pagerState.currentPage == 5,
-                            onClick = {
-                                coroutineScope.launch { pagerState.animateScrollToPage(5) }
+                    HudRailItem(
+                        icon = Icons.Default.GridView,
+                        isSelected = pagerState.currentPage == 5,
+                        onClick = {
+                            coroutineScope.launch { pagerState.animateScrollToPage(5) }
                             },
                             sizeMultiplier = scale
                         )
