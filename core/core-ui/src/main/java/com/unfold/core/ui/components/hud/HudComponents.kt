@@ -337,7 +337,7 @@ fun HudHome(
     var dateText by remember { mutableStateOf("") }
     var weatherTemp by remember { mutableStateOf(sharedPrefs.getString("weather_temp", "28°") ?: "28°") }
     var weatherDesc by remember { mutableStateOf(sharedPrefs.getString("weather_desc", "Partly Cloudy") ?: "Partly Cloudy") }
-    var weatherLoc by remember { mutableStateOf(sharedPrefs.getString("weather_loc", "COIMBATORE, TAMIL NADU, INDIA") ?: "COIMBATORE, TAMIL NADU, INDIA") }
+    var weatherLoc by remember { mutableStateOf(sharedPrefs.getString("weather_loc", "Coimbatore, Tamil Nadu, India") ?: "Coimbatore, Tamil Nadu, India") }
 
     var showDialog by remember { mutableStateOf(false) }
     var dialogInput by remember { mutableStateOf("") }
@@ -468,7 +468,7 @@ fun HudHome(
         while (true) {
             val now = Calendar.getInstance().time
             timeText = SimpleDateFormat("h:mm a", Locale.getDefault()).format(now)
-            dateText = SimpleDateFormat("EEEE · d MMMM yyyy", Locale.getDefault()).format(now).uppercase()
+            dateText = SimpleDateFormat("EEEE • d MMMM yyyy", Locale.getDefault()).format(now).uppercase()
             kotlinx.coroutines.delay(1000)
         }
     }
@@ -518,7 +518,8 @@ fun HudHome(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(sectionSpacing)
     ) {
-        Column {
+        // Time and Date Section
+        Column(verticalArrangement = Arrangement.spacedBy((2 * scale).dp)) {
             Text(
                 text = timeText,
                 color = theme.textPrimary,
@@ -534,21 +535,32 @@ fun HudHome(
                 fontFamily = FontFamily.Monospace,
                 letterSpacing = 1.sp
             )
-            Spacer(modifier = Modifier.height((4 * scale).dp))
+            Spacer(modifier = Modifier.height((6 * scale).dp))
             StatusChip(
-                text = if (isFetching) "WEATHER UPDATING..." else "OPUS OS // SYSTEM ACTIVE",
+                text = if (isFetching) "WEATHER UPDATING..." else "UNFOLD OS // SYSTEM ACTIVE",
                 isActive = true,
                 scale = scale
             )
         }
 
-        Spacer(modifier = Modifier.height((8 * scale).dp))
+        Spacer(modifier = Modifier.height((12 * scale).dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy((6 * scale).dp)) {
+        // Weather Section with Vertical Divider
+        Column(verticalArrangement = Arrangement.spacedBy((8 * scale).dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy((8 * scale).dp)
+                horizontalArrangement = Arrangement.spacedBy((12 * scale).dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
+                // Cloud Icon
+                Icon(
+                    imageVector = Icons.Default.Cloud,
+                    contentDescription = "Weather",
+                    tint = theme.textSecondary,
+                    modifier = Modifier.size((48 * scale).dp)
+                )
+
+                // Temperature
                 Text(
                     text = weatherTemp,
                     color = theme.textPrimary,
@@ -556,68 +568,77 @@ fun HudHome(
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace
                 )
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = "Set Location",
-                    tint = theme.accentPrimary,
-                    modifier = Modifier
-                        .size((32 * scale).dp)
-                        .clickable {
-                            dialogInput = ""
-                            showDialog = true
-                        }
-                )
             }
 
-            Text(
-                text = weatherDesc,
-                color = theme.accentPrimary,
-                fontSize = (16 * scale).sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            // Weather Description and Location
+            Column(verticalArrangement = Arrangement.spacedBy((2 * scale).dp)) {
+                Text(
+                    text = weatherDesc,
+                    color = theme.accentPrimary,
+                    fontSize = (14 * scale).sp,
+                    fontWeight = FontWeight.SemiBold
+                )
 
-            Text(
-                text = weatherLoc,
-                color = theme.textSecondary.copy(alpha = 0.7f),
-                fontSize = (11 * scale).sp,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.sp
+                Text(
+                    text = weatherLoc,
+                    color = theme.textSecondary.copy(alpha = 0.6f),
+                    fontSize = (10 * scale).sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 0.5.sp
+                )
+            }
+        }
+
+        // Horizontal Divider
+        Canvas(modifier = Modifier
+            .fillMaxWidth()
+            .height((1 * scale).dp)) {
+            drawLine(
+                color = theme.accentPrimary.copy(alpha = 0.5f),
+                start = Offset(0f, size.height / 2),
+                end = Offset(size.width, size.height / 2),
+                strokeWidth = 1.dp.toPx() * scale
             )
         }
 
-        // High / Low temp bar
+        // High / Low Temperature Section
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy((16 * scale).dp),
-            modifier = Modifier.padding(top = (8 * scale).dp)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = (4 * scale).dp)
         ) {
-            Canvas(modifier = Modifier.size(width = (8 * scale).dp, height = (36 * scale).dp)) {
-                drawLine(
-                    color = theme.accentPrimary.copy(alpha = 0.3f),
-                    start = Offset(size.width / 2, 0f),
-                    end = Offset(size.width / 2, size.height),
-                    strokeWidth = 2.dp.toPx() * scale
-                )
-                drawCircle(
-                    color = theme.accentPrimary,
-                    radius = 3.dp.toPx() * scale,
-                    center = Offset(size.width / 2, size.height / 2)
-                )
-            }
-            Column {
-                Text(
-                    text = "TODAY",
-                    color = theme.textMuted,
-                    fontSize = (9 * scale).sp,
-                    fontWeight = FontWeight.Bold
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy((12 * scale).dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Thermostat,
+                    contentDescription = "Temperature",
+                    tint = theme.textSecondary,
+                    modifier = Modifier.size((28 * scale).dp)
                 )
                 Text(
                     text = "32° / 24°",
                     color = theme.textPrimary,
                     fontSize = (18 * scale).sp,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
+
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = "Set Location",
+                tint = theme.accentPrimary,
+                modifier = Modifier
+                    .size((28 * scale).dp)
+                    .clickable {
+                        dialogInput = ""
+                        showDialog = true
+                    }
+            )
         }
     }
 }
@@ -1866,5 +1887,3 @@ fun HudCategories(
         }
     }
 }
-
-
