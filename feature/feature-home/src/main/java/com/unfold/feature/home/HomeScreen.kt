@@ -2,7 +2,9 @@ package com.unfold.feature.home
 
 import android.content.Context
 import android.content.ComponentName
+import android.content.BroadcastReceiver
 import android.content.Intent
+import android.media.AudioManager
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
@@ -18,7 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.FlashlightOff
+import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.GridView
@@ -44,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -85,6 +89,12 @@ import com.unfold.core.ui.components.hud.*
 import com.unfold.core.ui.theme.LocalUnfoldTheme
 import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.launch
+
+private enum class SoundMode {
+    GENERAL,
+    VIBRATE,
+    SILENT
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -156,8 +166,115 @@ fun HomeScreen(
         ) {
         Spacer(modifier = Modifier.height(2.dp))
         // 1. Top HUD Area (HUD panels nested inside NodeRail horizontally, stretches dynamically)
+        val audioManager = remember(context) {
+            context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        }
         var flashlightEnabled by remember { mutableStateOf(false) }
-        var isSilentEnabled by remember { mutableStateOf(true) }
+        var soundMode by remember {
+            mutableStateOf(
+                when {
+                    audioManager?.ringerMode == AudioManager.RINGER_MODE_VIBRATE -> SoundMode.VIBRATE
+                    audioManager?.ringerMode == AudioManager.RINGER_MODE_SILENT -> SoundMode.SILENT
+                    audioManager?.getStreamVolume(AudioManager.STREAM_RING) == 0 ->
+                        SoundMode.SILENT
+                    else -> SoundMode.GENERAL
+                }
+            )
+        }
+        var savedRingVolume by remember { mutableStateOf(audioManager?.getStreamVolume(AudioManager.STREAM_RING) ?: 0) }
+        var savedNotificationVolume by remember { mutableStateOf(audioManager?.getStreamVolume(AudioManager.STREAM_NOTIFICATION) ?: 0) }
+
+        fun syncSoundModeFromSystem() {
+            val detectedMode = when {
+                audioManager?.ringerMode == AudioManager.RINGER_MODE_VIBRATE -> SoundMode.VIBRATE
+                audioManager?.ringerMode == AudioManager.RINGER_MODE_SILENT -> SoundMode.SILENT
+                audioManager?.getStreamVolume(AudioManager.STREAM_RING) == 0 &&
+                    audioManager?.getStreamVolume(AudioManager.STREAM_NOTIFICATION) == 0 -> SoundMode.SILENT
+                else -> SoundMode.GENERAL
+            }
+            soundMode = detectedMode
+        }
+
+        fun applySoundMode(nextMode: SoundMode) {
+            try {
+                when (nextMode) {
+                    SoundMode.GENERAL -> {
+                        audioManager?.ringerMode = AudioManager.RINGER_MODE_NORMAL
+                        audioManager?.adjustStreamVolume(
+                            AudioManager.STREAM_RING,
+                            AudioManager.ADJUST_UNMUTE,
+                            0
+                        )
+                        audioManager?.adjustStreamVolume(
+                            AudioManager.STREAM_NOTIFICATION,
+                            AudioManager.ADJUST_UNMUTE,
+                            0
+                        )
+                        if (savedRingVolume > 0) {
+                            audioManager?.setStreamVolume(AudioManager.STREAM_RING, savedRingVolume, 0)
+                        }
+                        if (savedNotificationVolume > 0) {
+                            audioManager?.setStreamVolume(AudioManager.STREAM_NOTIFICATION, savedNotificationVolume, 0)
+                        }
+                    }
+                    SoundMode.VIBRATE -> {
+                        audioManager?.ringerMode = AudioManager.RINGER_MODE_VIBRATE
+                    }
+                    SoundMode.SILENT -> {
+                        savedRingVolume = audioManager?.getStreamVolume(AudioManager.STREAM_RING) ?: savedRingVolume
+                        savedNotificationVolume = audioManager?.getStreamVolume(AudioManager.STREAM_NOTIFICATION) ?: savedNotificationVolume
+                        audioManager?.ringerMode = AudioManager.RINGER_MODE_NORMAL
+                        audioManager?.adjustStreamVolume(
+                            AudioManager.STREAM_RING,
+                            AudioManager.ADJUST_MUTE,
+                            AudioManager.FLAG_REMOVE_SOUND_AND_VIBRATE
+                        )
+                        audioManager?.adjustStreamVolume(
+                            AudioManager.STREAM_NOTIFICATION,
+                            AudioManager.ADJUST_MUTE,
+                            AudioManager.FLAG_REMOVE_SOUND_AND_VIBRATE
+                        )
+                    }
+                }
+                soundMode = nextMode
+            } catch (e: SecurityException) {
+                Log.e("SoundMode", "Unable to change sound mode: ${e.message}")
+            } catch (e: Exception) {
+                Log.e("SoundMode", "Unexpected sound mode error: ${e.message}")
+            }
+        }
+
+        fun cycleSoundMode() {
+            val nextMode = when (soundMode) {
+                SoundMode.GENERAL -> SoundMode.VIBRATE
+                SoundMode.VIBRATE -> SoundMode.SILENT
+                SoundMode.SILENT -> SoundMode.GENERAL
+            }
+            applySoundMode(nextMode)
+        }
+
+        DisposableEffect(context, audioManager) {
+            syncSoundModeFromSystem()
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    syncSoundModeFromSystem()
+                }
+            }
+            val filter = android.content.IntentFilter().apply {
+                addAction(AudioManager.RINGER_MODE_CHANGED_ACTION)
+                addAction("android.media.VOLUME_CHANGED_ACTION")
+            }
+            context.registerReceiver(receiver, filter)
+            onDispose {
+                runCatching { context.unregisterReceiver(receiver) }
+            }
+        }
+
+        val ringerLabel = when (soundMode) {
+            SoundMode.SILENT -> "SILENT"
+            SoundMode.VIBRATE -> "VIBRATE"
+            SoundMode.GENERAL -> "GENERAL"
+        }
 
         BoxWithConstraints(
             modifier = Modifier
@@ -203,7 +320,7 @@ fun HomeScreen(
                     // Flashlight Rail Item
                     val context = LocalContext.current
                     HudRailItem(
-                        icon = Icons.Default.FlashOn,
+                        icon = if (flashlightEnabled) Icons.Default.FlashlightOn else Icons.Default.FlashlightOff,
                         isSelected = flashlightEnabled,
                         onClick = {
                             flashlightEnabled = !flashlightEnabled
@@ -225,11 +342,11 @@ fun HomeScreen(
                     
                     Spacer(modifier = Modifier.weight(1f))
                     
-                    // SILENT Chip
+                    // SILENT / GENERAL Chip
                     StatusChip(
-                        text = if (isSilentEnabled) "SILENT" else "GENERAL",
-                        isActive = isSilentEnabled,
-                        modifier = Modifier.clickable { isSilentEnabled = !isSilentEnabled },
+                        text = ringerLabel,
+                        isActive = soundMode != SoundMode.GENERAL,
+                        modifier = Modifier.clickable { cycleSoundMode() },
                         scale = scale
                     )
                 }
