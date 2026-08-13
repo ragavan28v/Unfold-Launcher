@@ -563,11 +563,11 @@ fun HudHome(
                 horizontalArrangement = Arrangement.spacedBy((12 * scale).dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Cloud Icon
+                // Cloud Icon - Cyan Color
                 Icon(
                     imageVector = Icons.Default.Cloud,
                     contentDescription = "Weather",
-                    tint = theme.textSecondary,
+                    tint = theme.accentPrimary,
                     modifier = Modifier.size((48 * scale).dp)
                 )
 
