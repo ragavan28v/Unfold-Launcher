@@ -1,4 +1,4 @@
-package com.unfold.core.ui.components.hud
+﻿package com.unfold.core.ui.components.hud
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -467,7 +467,7 @@ fun HudHome(
     LaunchedEffect(Unit) {
         while (true) {
             val now = Calendar.getInstance().time
-            timeText = SimpleDateFormat("h:mm a", Locale.getDefault()).format(now)
+            timeText = SimpleDateFormat("h:mm", Locale.getDefault()).format(now)
             dateText = SimpleDateFormat("EEEE • d MMMM yyyy", Locale.getDefault()).format(now).uppercase()
             kotlinx.coroutines.delay(1000)
         }
@@ -520,14 +520,27 @@ fun HudHome(
     ) {
         // Time and Date Section
         Column(verticalArrangement = Arrangement.spacedBy((2 * scale).dp)) {
-            Text(
-                text = timeText,
-                color = theme.textPrimary,
-                fontSize = timeFontSize,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = (-1).sp
-            )
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy((4 * scale).dp)
+            ) {
+                Text(
+                    text = timeText,
+                    color = theme.textPrimary,
+                    fontSize = timeFontSize,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = (-1).sp
+                )
+                val amPmText = SimpleDateFormat("a", Locale.getDefault()).format(Calendar.getInstance().time)
+                Text(
+                    text = amPmText,
+                    color = theme.accentPrimary,
+                    fontSize = (timeFontSize * 0.55f),
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
             Text(
                 text = dateText,
                 color = theme.textSecondary,
@@ -542,8 +555,6 @@ fun HudHome(
                 scale = scale
             )
         }
-
-        Spacer(modifier = Modifier.height((12 * scale).dp))
 
         // Weather Section with Vertical Divider
         Column(verticalArrangement = Arrangement.spacedBy((8 * scale).dp)) {
