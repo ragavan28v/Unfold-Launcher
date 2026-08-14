@@ -2,6 +2,7 @@ package com.unfold.core.data.local.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.unfold.core.domain.model.AppInfo
 import com.unfold.core.domain.model.FolderInfo
 
 @Entity(tableName = "folders")
@@ -11,13 +12,13 @@ data class FolderEntity(
     val gridPosition: Int,
     val accentColorOverride: String? = null
 ) {
-    fun toDomain(): FolderInfo {
+    fun toDomain(apps: List<AppInfo> = emptyList()): FolderInfo {
         return FolderInfo(
             id = id,
             name = name,
             gridPosition = gridPosition,
             accentColorOverride = accentColorOverride,
-            apps = emptyList()
+            apps = apps
         )
     }
 

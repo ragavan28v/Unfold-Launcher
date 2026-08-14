@@ -24,6 +24,15 @@ interface AppDao {
     @Query("UPDATE apps SET gridPosition = :position WHERE appId = :appId")
     suspend fun setGridPosition(appId: String, position: Int?)
 
+    @Query("UPDATE apps SET folderId = :folderId WHERE appId = :appId")
+    suspend fun setFolderId(appId: String, folderId: String?)
+
+    @Query("UPDATE apps SET folderId = :folderId WHERE appId IN (:appIds)")
+    suspend fun setFolderForApps(folderId: String?, appIds: List<String>)
+
+    @Query("UPDATE apps SET folderId = NULL WHERE folderId = :folderId")
+    suspend fun clearFolder(folderId: String)
+
     @Query("UPDATE apps SET launchCount = launchCount + 1, lastUsedTimestamp = :timestamp WHERE appId = :appId")
     suspend fun recordLaunch(appId: String, timestamp: Long)
 

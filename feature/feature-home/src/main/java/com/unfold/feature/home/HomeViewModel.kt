@@ -33,6 +33,7 @@ enum class HomePanelType {
 data class HomeUiState(
     val panels: List<HomePanelType> = listOf(HomePanelType.CLOCK_WEATHER, HomePanelType.SYSTEM_HUD),
     val gridApps: List<AppInfo> = emptyList(),
+    val installedApps: List<AppInfo> = emptyList(),
     val folders: List<FolderInfo> = emptyList(),
     val gestureBindings: Map<GestureType, GestureBinding> = emptyMap(),
     val systemStats: SystemStats? = null,
@@ -73,7 +74,8 @@ class HomeViewModel @Inject constructor(
     private val reorderGrid: ReorderHomeGridUseCase,
     private val gestureRepository: com.unfold.core.domain.repository.GestureRepository,
     private val appRepository: com.unfold.core.domain.repository.AppRepository,
-    private val themeRepository: com.unfold.core.domain.repository.ThemeRepository
+    private val themeRepository: com.unfold.core.domain.repository.ThemeRepository,
+    private val folderRepository: com.unfold.core.domain.repository.FolderRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -95,7 +97,16 @@ class HomeViewModel @Inject constructor(
                 val gridApps = apps.filter { it.gridPosition != null }.sortedBy { it.gridPosition }
                 _uiState.value = _uiState.value.copy(
                     gridApps = gridApps,
+                    installedApps = apps,
                     isLoading = false
+                )
+            }
+            .launchIn(viewModelScope)
+
+        folderRepository.observeFolders()
+            .onEach { folders ->
+                _uiState.value = _uiState.value.copy(
+                    folders = folders.sortedBy { it.gridPosition }
                 )
             }
             .launchIn(viewModelScope)
@@ -175,6 +186,36 @@ class HomeViewModel @Inject constructor(
             HomeUiIntent.RefreshStats -> {
                 // Automatically refreshed by Flow subscription
             }
+        }
+    }
+
+    fun createFolder(name: String, appIds: List<String>) {
+        viewModelScope.launch {
+            folderRepository.createFolder(name, appIds)
+        }
+    }
+
+    fun renameFolder(folderId: String, name: String) {
+        viewModelScope.launch {
+            folderRepository.renameFolder(folderId, name)
+        }
+    }
+
+    fun deleteFolder(folderId: String) {
+        viewModelScope.launch {
+            folderRepository.deleteFolder(folderId)
+        }
+    }
+
+    fun updateFolderApps(folderId: String, appIds: List<String>) {
+        viewModelScope.launch {
+            folderRepository.updateFolderApps(folderId, appIds)
+        }
+    }
+
+    fun reorderFolders(folderIdsInOrder: List<String>) {
+        viewModelScope.launch {
+            folderRepository.reorderFolders(folderIdsInOrder)
         }
     }
 }

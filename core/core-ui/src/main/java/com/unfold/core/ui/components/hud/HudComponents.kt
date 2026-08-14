@@ -19,8 +19,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,8 +42,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -48,6 +54,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -62,14 +69,20 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -77,7 +90,9 @@ import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import com.unfold.core.ui.components.CarvedIcon
 import com.unfold.core.domain.model.AppInfo
+import com.unfold.core.domain.model.FolderInfo
 
 @Composable
 fun HudBackgroundGrid(modifier: Modifier = Modifier) {
@@ -1829,72 +1844,37 @@ fun HudWidgets(
     }
 }
 
-data class HudCategory(
-    val id: String,
-    val name: String,
-    val apps: List<AppInfo>,
-    val order: Int = 0,
-    val isCustom: Boolean = true
-)
-
-private fun buildDefaultHudCategories(apps: List<AppInfo>): List<HudCategory> {
-    val socialKeywords = listOf("whatsapp", "telegram", "discord", "gmail", "mail", "chrome", "browser", "chat", "message", "facebook", "twitter", "instagram", "signal")
-    val gamesKeywords = listOf("game", "play", "gamer", "minecraft", "pubg", "fortnite", "steam", "league", "rival", "arcade")
-    val officeKeywords = listOf("docs", "sheet", "slides", "office", "drive", "notion", "calendar", "keep", "excel", "word", "powerpoint")
-
-    fun matchesAny(label: String, keywords: List<String>): Boolean {
-        val normalized = label.lowercase()
-        return keywords.any { normalized.contains(it) }
-    }
-
-    val socialApps = apps.filter { app ->
-        matchesAny(app.label, socialKeywords) || matchesAny(app.packageName, socialKeywords)
-    }.distinctBy { it.packageName }
-
-    val gameApps = apps.filter { app ->
-        matchesAny(app.label, gamesKeywords) || matchesAny(app.packageName, gamesKeywords)
-    }.distinctBy { it.packageName }
-
-    val officeApps = apps.filter { app ->
-        matchesAny(app.label, officeKeywords) || matchesAny(app.packageName, officeKeywords)
-    }.distinctBy { it.packageName }
-
-    return listOf(
-        HudCategory("social", "Social", socialApps.ifEmpty { apps.take(4) }, 0, false),
-        HudCategory("games", "Games", gameApps.ifEmpty { apps.takeLast(3).ifEmpty { apps.take(3) } }, 1, false),
-        HudCategory("office", "Office", officeApps.ifEmpty {
-            apps.filter { app ->
-                app.label.contains("doc", ignoreCase = true) ||
-                    app.label.contains("sheet", ignoreCase = true) ||
-                    app.label.contains("drive", ignoreCase = true) ||
-                    app.label.contains("mail", ignoreCase = true) ||
-                    app.label.contains("cal", ignoreCase = true)
-            }.ifEmpty { apps.take(3) }
-        }, 2, false)
-    ).filter { it.apps.isNotEmpty() }.ifEmpty {
-        listOf(
-            HudCategory("social", "Social", apps.take(3), 0, false),
-            HudCategory("games", "Games", apps.takeLast(3).ifEmpty { apps.take(3) }, 1, false),
-            HudCategory("office", "Office", apps.take(2).ifEmpty { apps.take(2) }, 2, false)
-        )
-    }
-}
-
 @Composable
 fun HudCategories(
-    apps: List<AppInfo>,
+    folders: List<FolderInfo>,
+    allApps: List<AppInfo>,
     modifier: Modifier = Modifier,
     gridRows: Int = 3,
-    scale: Float = 1f
+    scale: Float = 1f,
+    onCreateFolder: (String, List<String>) -> Unit,
+    onRenameFolder: (String, String) -> Unit,
+    onDeleteFolder: (String) -> Unit,
+    onUpdateFolderApps: (String, List<String>) -> Unit,
+    onReorderFolders: (List<String>) -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
-    val defaultCategories = remember(apps) { buildDefaultHudCategories(apps).sortedBy { it.order } }
-    var categories by remember(apps) { mutableStateOf(defaultCategories) }
-    
-    var expandedCategoryId by remember { mutableStateOf<String?>(null) }
-    var showNewCategoryDialog by remember { mutableStateOf(false) }
-    var editingCategory by remember { mutableStateOf<HudCategory?>(null) }
+    var orderedFolders by remember(folders) { mutableStateOf(folders.sortedBy { it.gridPosition }) }
+    var selectedFolderId by remember { mutableStateOf<String?>(null) }
+    var folderMenuId by remember { mutableStateOf<String?>(null) }
+    var editingFolderId by remember { mutableStateOf<String?>(null) }
+    var managingFolderId by remember { mutableStateOf<String?>(null) }
+    var deletingFolderId by remember { mutableStateOf<String?>(null) }
+    var creatingFolder by remember { mutableStateOf(false) }
+    var draggingFolderId by remember { mutableStateOf<String?>(null) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    val folderBounds = remember { mutableStateMapOf<String, Rect>() }
+
+    LaunchedEffect(folders) {
+        if (draggingFolderId == null) {
+            orderedFolders = folders.sortedBy { it.gridPosition }
+        }
+    }
 
     val contentPadding = when (gridRows) {
         1 -> 18.dp
@@ -1902,263 +1882,352 @@ fun HudCategories(
         else -> 12.dp
     } * scale
 
+    fun selectFolder(folderId: String) {
+        selectedFolderId = folderId
+        folderMenuId = null
+    }
+
+    fun reorderAfterDrag(folderId: String) {
+        val currentIndex = orderedFolders.indexOfFirst { it.id == folderId }
+        val draggedBounds = folderBounds[folderId] ?: return
+        val targetCenterY = (draggedBounds.top + draggedBounds.bottom) / 2f + dragOffsetY
+        val targetIndex = orderedFolders.indices.minByOrNull { index ->
+            val candidateId = orderedFolders[index].id
+            val bounds = folderBounds[candidateId]
+            val centerY = ((bounds?.top ?: 0f) + (bounds?.bottom ?: 0f)) / 2f
+            kotlin.math.abs(centerY - targetCenterY)
+        } ?: currentIndex
+
+        if (currentIndex >= 0 && targetIndex >= 0 && currentIndex != targetIndex) {
+            val mutable = orderedFolders.toMutableList()
+            val item = mutable.removeAt(currentIndex)
+            val insertAt = targetIndex.coerceIn(0, mutable.size)
+            mutable.add(insertAt, item)
+            orderedFolders = mutable
+            onReorderFolders(mutable.map { it.id })
+        }
+        draggingFolderId = null
+        dragOffsetY = 0f
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp, vertical = contentPadding)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy((12 * scale).dp)
+        verticalArrangement = Arrangement.spacedBy((10 * scale).dp)
     ) {
         Text(
-            text = "CATEGORIES",
+            text = "FOLDERS",
             color = theme.accentPrimary,
             fontSize = (14 * scale).sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
             letterSpacing = 2.sp
         )
-        Spacer(modifier = Modifier.height((12 * scale).dp))
 
-        // Category Grid (N rows x 2 columns)
         Column(verticalArrangement = Arrangement.spacedBy((10 * scale).dp)) {
-            val categoriesWithAdd = categories + HudCategory("new", "+", emptyList(), 999, false)
-            
-            categoriesWithAdd.chunked(2).forEach { rowCategories ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy((10 * scale).dp)
-                ) {
-                    rowCategories.forEach { category ->
-                        Box(modifier = Modifier.weight(1f)) {
-                            if (category.id == "new") {
-                                HudCategoryAddButton(
-                                    scale = scale,
-                                    onClick = { showNewCategoryDialog = true }
-                                )
-                            } else {
-                                HudCategoryNameButton(
-                                    category = category,
-                                    isExpanded = expandedCategoryId == category.id,
-                                    scale = scale,
-                                    onClick = { expandedCategoryId = if (expandedCategoryId == category.id) null else category.id },
-                                    onEdit = { editingCategory = category }
-                                )
-                            }
-                        }
+            orderedFolders.forEach { folder ->
+                HudFolderTile(
+                    folder = folder,
+                    isSelected = selectedFolderId == folder.id,
+                    isDragging = draggingFolderId == folder.id,
+                    dragOffsetY = if (draggingFolderId == folder.id) dragOffsetY else 0f,
+                    scale = scale,
+                    onBoundsChanged = { rect -> folderBounds[folder.id] = rect },
+                    onOpen = { selectFolder(folder.id) },
+                    onMenu = { folderMenuId = folder.id },
+                    onDragStart = {
+                        draggingFolderId = folder.id
+                        dragOffsetY = 0f
+                        selectedFolderId = folder.id
+                    },
+                    onDrag = { amount -> dragOffsetY += amount.y },
+                    onDragEnd = { reorderAfterDrag(folder.id) },
+                    onDragCancel = {
+                        draggingFolderId = null
+                        dragOffsetY = 0f
                     }
-                    repeat((2 - rowCategories.size).coerceAtLeast(0)) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
+                )
             }
 
-            // Expanded Category View
-            if (expandedCategoryId != null) {
-                val expandedCategory = categories.firstOrNull { it.id == expandedCategoryId }
-                if (expandedCategory != null) {
-                    HudCategoryExpandedView(
-                        category = expandedCategory,
-                        apps = apps,
-                        scale = scale,
-                        onAppClick = { app ->
-                            try {
-                                val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                launchIntent?.let { context.startActivity(it) }
-                            } catch (_: Exception) {}
-                        }
-                    )
-                }
-            }
+            HudFolderAddButton(
+                scale = scale,
+                onClick = { creatingFolder = true }
+            )
         }
     }
 
-    if (editingCategory != null) {
-        HudCategoryEditDialog(
-            category = editingCategory!!,
-            allApps = apps.distinctBy { it.packageName },
-            onDismiss = { editingCategory = null },
-            onRename = { newName ->
-                categories = categories.map { 
-                    if (it.id == editingCategory!!.id) it.copy(name = newName) else it 
-                }
-                editingCategory = null
-            },
-            onDelete = {
-                categories = categories.filter { it.id != editingCategory!!.id }
-                expandedCategoryId = null
-                editingCategory = null
-            },
-            onUpdateApps = { updatedApps ->
-                categories = categories.map { 
-                    if (it.id == editingCategory!!.id) it.copy(apps = updatedApps) else it 
-                }
-                editingCategory = null
-            }
-        )
+    selectedFolderId?.let { folderId ->
+        val folder = orderedFolders.firstOrNull { it.id == folderId }
+        if (folder != null) {
+            HudFolderPopupDialog(
+                folder = folder,
+                scale = scale,
+                onDismiss = { selectedFolderId = null }
+            )
+        } else {
+            selectedFolderId = null
+        }
     }
 
-    if (showNewCategoryDialog) {
-        HudCategoryCreateDialog(
-            allApps = apps.distinctBy { it.packageName },
-            onDismiss = { showNewCategoryDialog = false },
-            onCreate = { name, selectedApps ->
-                val newCategory = HudCategory(
-                    id = "custom_${System.currentTimeMillis()}",
-                    name = name,
-                    apps = selectedApps,
-                    order = categories.maxOfOrNull { it.order } ?: 0 + 1,
-                    isCustom = true
-                )
-                categories = categories + newCategory
-                showNewCategoryDialog = false
+    folderMenuId?.let { folderId ->
+        val folder = orderedFolders.firstOrNull { it.id == folderId }
+        if (folder != null) {
+            HudFolderMenuDialog(
+                folder = folder,
+                onDismiss = { folderMenuId = null },
+                onEditName = { editingFolderId = folder.id; folderMenuId = null },
+                onDelete = { deletingFolderId = folder.id; folderMenuId = null },
+                onManageApps = { managingFolderId = folder.id; folderMenuId = null }
+            )
+        } else {
+            folderMenuId = null
+        }
+    }
+
+    editingFolderId?.let { folderId ->
+        val folder = orderedFolders.firstOrNull { it.id == folderId }
+        if (folder != null) {
+            HudFolderRenameDialog(
+                folder = folder,
+                onDismiss = { editingFolderId = null },
+                onSave = { newName ->
+                    onRenameFolder(folder.id, newName)
+                    editingFolderId = null
+                }
+            )
+        } else {
+            editingFolderId = null
+        }
+    }
+
+    managingFolderId?.let { folderId ->
+        val folder = orderedFolders.firstOrNull { it.id == folderId }
+        if (folder != null) {
+            HudFolderManageAppsDialog(
+                folder = folder,
+                allApps = allApps,
+                onDismiss = { managingFolderId = null },
+                onSave = { appIds ->
+                    onUpdateFolderApps(folder.id, appIds)
+                    managingFolderId = null
+                }
+            )
+        } else {
+            managingFolderId = null
+        }
+    }
+
+    deletingFolderId?.let { folderId ->
+        val folder = orderedFolders.firstOrNull { it.id == folderId }
+        if (folder != null) {
+            HudConfirmDeleteDialog(
+                title = "Delete folder",
+                message = "Remove \"${folder.name}\" and unassign its apps?",
+                onDismiss = { deletingFolderId = null },
+                onConfirm = {
+                    onDeleteFolder(folder.id)
+                    deletingFolderId = null
+                }
+            )
+        } else {
+            deletingFolderId = null
+        }
+    }
+
+    if (creatingFolder) {
+        HudFolderCreateDialog(
+            allApps = allApps,
+            onDismiss = { creatingFolder = false },
+            onCreate = { name, selectedAppIds ->
+                onCreateFolder(name, selectedAppIds)
+                creatingFolder = false
             }
         )
     }
 }
 
 @Composable
-private fun HudCategoryNameButton(
-    category: HudCategory,
-    isExpanded: Boolean,
+private fun HudFolderTile(
+    folder: FolderInfo,
+    isSelected: Boolean,
+    isDragging: Boolean,
+    dragOffsetY: Float,
     scale: Float,
-    onClick: () -> Unit,
-    onEdit: () -> Unit
+    onBoundsChanged: (Rect) -> Unit,
+    onOpen: () -> Unit,
+    onMenu: () -> Unit,
+    onDragStart: () -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
-    
+    val shape = RoundedCornerShape((18 * scale).dp)
+    val alpha = if (isSelected) 0.18f else 0.12f
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape((14 * scale).dp))
+            .graphicsLayer {
+                translationY = if (isDragging) dragOffsetY else 0f
+                scaleX = if (isDragging) 0.985f else 1f
+                scaleY = if (isDragging) 0.985f else 1f
+                this.alpha = if (isDragging) 0.72f else 1f
+            }
+            .onGloballyPositioned { coords ->
+                onBoundsChanged(coords.boundsInRoot())
+            }
+            .clip(shape)
             .background(
-                if (isExpanded) theme.accentPrimary.copy(alpha = 0.15f)
-                else theme.bgPanel.copy(alpha = 0.3f)
+                if (isSelected) theme.accentPrimary.copy(alpha = alpha)
+                else theme.bgPanel.copy(alpha = 0.28f)
             )
             .border(
-                width = if (isExpanded) 1.5.dp else 1.dp,
-                color = if (isExpanded) theme.accentPrimary else theme.panelBorder.copy(alpha = 0.2f),
-                shape = RoundedCornerShape((14 * scale).dp)
+                width = if (isSelected) 1.5.dp else 1.dp,
+                color = if (isSelected) theme.accentPrimary else theme.panelBorder.copy(alpha = 0.22f),
+                shape = shape
             )
-            .clickable(onClick = onClick)
-            .padding((16 * scale).dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy((8 * scale).dp)
+            .clickable(onClick = onOpen)
+            .pointerInput(folder.id) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        onDragStart()
+                    },
+                    onDrag = { change, amount ->
+                        change.consume()
+                        onDrag(amount)
+                    },
+                    onDragEnd = onDragEnd,
+                    onDragCancel = onDragCancel
+                )
+            }
+            .padding(horizontal = (16 * scale).dp, vertical = (14 * scale).dp),
+        verticalArrangement = Arrangement.spacedBy((4 * scale).dp)
     ) {
-        Text(
-            text = category.name.uppercase(),
-            color = theme.textPrimary,
-            fontSize = (13 * scale).sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
-        )
-
-        Text(
-            text = "${category.apps.size} Apps",
-            color = theme.accentPrimary,
-            fontSize = (10 * scale).sp,
-            fontFamily = FontFamily.Monospace
-        )
-
-        if (!isExpanded) {
-            Spacer(modifier = Modifier.height((4 * scale).dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = folder.name,
+                color = theme.textPrimary,
+                fontSize = (13 * scale).sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.weight(1f)
+            )
             Icon(
                 imageVector = Icons.Default.MoreVert,
-                contentDescription = "Edit",
+                contentDescription = "Folder options",
                 tint = theme.textSecondary,
                 modifier = Modifier
-                    .size((16 * scale).dp)
-                    .clickable(onClick = onEdit)
+                    .size((18 * scale).dp)
+                    .clickable(onClick = onMenu)
             )
         }
     }
 }
 
 @Composable
-private fun HudCategoryAddButton(
+private fun HudFolderAddButton(
     scale: Float,
     onClick: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
-
-    Column(
+    val shape = RoundedCornerShape((18 * scale).dp)
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape((14 * scale).dp))
-            .background(theme.bgPanel.copy(alpha = 0.2f))
-            .border(
-                width = 1.5.dp,
-                color = theme.accentPrimary.copy(alpha = 0.4f),
-                shape = RoundedCornerShape((14 * scale).dp)
-            )
+            .clip(shape)
+            .background(theme.bgPanel.copy(alpha = 0.18f))
+            .border(1.5.dp, theme.accentPrimary.copy(alpha = 0.35f), shape)
             .clickable(onClick = onClick)
-            .padding((16 * scale).dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(horizontal = (16 * scale).dp, vertical = (14 * scale).dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Icon(
-            imageVector = Icons.Default.Add,
-            contentDescription = "Add Category",
-            tint = theme.accentPrimary,
-            modifier = Modifier.size((28 * scale).dp)
-        )
-
-        Spacer(modifier = Modifier.height((8 * scale).dp))
         Text(
-            text = "NEW",
+            text = "+",
             color = theme.accentPrimary,
-            fontSize = (11 * scale).sp,
+            fontSize = (18 * scale).sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace
         )
-    }
-}
-
-@Composable
-private fun HudCategoryExpandedView(
-    category: HudCategory,
-    apps: List<AppInfo>,
-    scale: Float,
-    onAppClick: (AppInfo) -> Unit
-) {
-    val theme = LocalUnfoldTheme.current
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape((14 * scale).dp))
-            .background(theme.bgPanel.copy(alpha = 0.4f))
-            .border(1.5.dp, theme.accentPrimary.copy(alpha = 0.3f), RoundedCornerShape((14 * scale).dp))
-            .padding((14 * scale).dp),
-        verticalArrangement = Arrangement.spacedBy((10 * scale).dp)
-    ) {
         Text(
-            text = "APPS IN ${category.name.uppercase()}",
+            text = "NEW FOLDER",
             color = theme.accentPrimary,
             fontSize = (11 * scale).sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
             letterSpacing = 1.sp
         )
+    }
+}
 
-        Column(verticalArrangement = Arrangement.spacedBy((8 * scale).dp)) {
-            category.apps.distinctBy { it.packageName }.chunked(2).forEach { rowApps ->
+@Composable
+private fun HudFolderPopupDialog(
+    folder: FolderInfo,
+    scale: Float,
+    onDismiss: () -> Unit
+) {
+    val theme = LocalUnfoldTheme.current
+    val context = LocalContext.current
+    Dialog(onDismissRequest = onDismiss) {
+        AnimatedVisibility(
+            visible = true,
+            enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
+            exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(140))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth(0.94f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(theme.bgPanel.copy(alpha = 0.96f))
+                    .border(1.dp, theme.panelBorder.copy(alpha = 0.28f), RoundedCornerShape(24.dp))
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy((8 * scale).dp)
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    rowApps.forEach { app ->
-                        Box(modifier = Modifier.weight(1f)) {
-                            HudCategoryAppTile(
+                    Text(
+                        text = folder.name,
+                        color = theme.textPrimary,
+                        fontSize = (16 * scale).sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = onDismiss) {
+                        Text("Close", color = theme.textSecondary)
+                    }
+                }
+
+                if (folder.apps.isEmpty()) {
+                    Text(
+                        text = "No apps in this folder yet.",
+                        color = theme.textSecondary,
+                        fontSize = (11 * scale).sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(4),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.heightIn(max = 420.dp)
+                    ) {
+                        items(folder.apps.distinctBy { it.appId }) { app ->
+                            HudFolderAppCell(
                                 app = app,
                                 scale = scale,
-                                onClick = { onAppClick(app) }
+                                onClick = {
+                                    launchApp(context, app)
+                                }
                             )
                         }
-                    }
-                    repeat((2 - rowApps.size).coerceAtLeast(0)) {
-                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -2167,11 +2236,10 @@ private fun HudCategoryExpandedView(
 }
 
 @Composable
-private fun HudCategoryAppTile(
+private fun HudFolderAppCell(
     app: AppInfo,
     scale: Float,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onClick: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
@@ -2187,40 +2255,34 @@ private fun HudCategoryAppTile(
     }
 
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape((10 * scale).dp))
-            .background(theme.bgPanel.copy(alpha = 0.24f))
-            .border(1.dp, theme.panelBorder.copy(alpha = 0.12f), RoundedCornerShape((10 * scale).dp))
+        modifier = Modifier
             .clickable(onClick = onClick)
-            .padding((8 * scale).dp),
+            .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy((6 * scale).dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size((42 * scale).dp)
-                .clip(RoundedCornerShape((12 * scale).dp))
-                .background(theme.accentPrimary.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (iconBitmap != null) {
-                Image(
-                    bitmap = iconBitmap!!,
-                    contentDescription = app.label,
-                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape((12 * scale).dp))
-                )
-            } else {
-                Text(
-                    text = app.label.take(2).uppercase(),
-                    color = theme.accentPrimary,
-                    fontSize = (12 * scale).sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
-        }
-
+        CarvedIcon(
+            size = (52 * scale).dp,
+            icon = {
+                if (iconBitmap != null) {
+                    Image(
+                        bitmap = iconBitmap!!,
+                        contentDescription = app.label,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                    )
+                } else {
+                    Text(
+                        text = app.label.take(2).uppercase(),
+                        color = theme.accentPrimary,
+                        fontSize = (12 * scale).sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            },
+            contentDescription = app.label,
+            onClick = onClick
+        )
         Text(
             text = app.label,
             color = theme.textSecondary,
@@ -2228,99 +2290,96 @@ private fun HudCategoryAppTile(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
             fontFamily = FontFamily.Monospace
         )
     }
 }
 
 @Composable
-private fun HudCategoryEditDialog(
-    category: HudCategory,
-    allApps: List<AppInfo>,
+private fun HudFolderMenuDialog(
+    folder: FolderInfo,
     onDismiss: () -> Unit,
-    onRename: (String) -> Unit,
+    onEditName: () -> Unit,
     onDelete: () -> Unit,
-    onUpdateApps: (List<AppInfo>) -> Unit
+    onManageApps: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
-    var newName by remember { mutableStateOf(category.name) }
-    var showAppSelector by remember { mutableStateOf(false) }
-    var selectedApps by remember { mutableStateOf(category.apps) }
-
-    if (showAppSelector) {
-        HudCategoryAppSelectorDialog(
-            allApps = allApps,
-            selectedApps = selectedApps,
-            onDismiss = { showAppSelector = false },
-            onSave = { updated ->
-                selectedApps = updated
-                showAppSelector = false
-            }
-        )
-        return
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.82f)
+                .clip(RoundedCornerShape(18.dp))
+                .background(theme.bgPanel.copy(alpha = 0.98f))
+                .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = folder.name.uppercase(),
+                color = theme.textPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+            Divider(color = theme.panelBorder.copy(alpha = 0.18f))
+            HudMenuItem("Edit folder name", onEditName)
+            HudMenuItem("Delete folder", onDelete)
+            HudMenuItem("Manage apps", onManageApps)
+        }
     }
+}
+
+@Composable
+private fun HudMenuItem(
+    label: String,
+    onClick: () -> Unit
+) {
+    val theme = LocalUnfoldTheme.current
+    Text(
+        text = label,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 12.dp),
+        color = theme.textPrimary,
+        fontSize = 12.sp,
+        fontFamily = FontFamily.Monospace
+    )
+}
+
+@Composable
+private fun HudFolderRenameDialog(
+    folder: FolderInfo,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    val theme = LocalUnfoldTheme.current
+    var name by remember(folder.id) { mutableStateOf(folder.name) }
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
+                .fillMaxWidth(0.88f)
                 .clip(RoundedCornerShape(18.dp))
-                .background(theme.bgPanel.copy(alpha = 0.96f))
+                .background(theme.bgPanel.copy(alpha = 0.98f))
                 .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
-                .padding(20.dp),
+                .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                text = "EDIT ${category.name.uppercase()}",
+                text = "EDIT FOLDER NAME",
                 color = theme.textPrimary,
-                fontSize = 16.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
             )
-
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Folder Name",
-                    color = theme.textSecondary,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace
-                )
-                TextField(
-                    value = newName,
-                    onValueChange = { newName = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp)),
-                    singleLine = true
-                )
-            }
-
-            Row(
+            TextField(
+                value = name,
+                onValueChange = { name = it },
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = { showAppSelector = true },
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                ) {
-                    Text("MANAGE APPS", color = theme.textPrimary, fontSize = 11.sp)
-                }
-
-                if (category.isCustom) {
-                    Button(
-                        onClick = onDelete,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                    ) {
-                        Text("DELETE", color = theme.textPrimary, fontSize = 11.sp)
-                    }
-                }
-            }
-
+                singleLine = true
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -2329,12 +2388,11 @@ private fun HudCategoryEditDialog(
                     Text("Cancel", color = theme.textSecondary)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                TextButton(onClick = {
-                    if (newName.isNotBlank()) {
-                        onRename(newName)
-                        onUpdateApps(selectedApps)
+                TextButton(
+                    onClick = {
+                        if (name.isNotBlank()) onSave(name)
                     }
-                }) {
+                ) {
                     Text("Save", color = theme.accentPrimary)
                 }
             }
@@ -2343,44 +2401,42 @@ private fun HudCategoryEditDialog(
 }
 
 @Composable
-private fun HudCategoryAppSelectorDialog(
+private fun HudFolderManageAppsDialog(
+    folder: FolderInfo,
     allApps: List<AppInfo>,
-    selectedApps: List<AppInfo>,
     onDismiss: () -> Unit,
-    onSave: (List<AppInfo>) -> Unit
+    onSave: (List<String>) -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
-    val selectedPackages = remember(selectedApps) { selectedApps.map { it.packageName }.toMutableSet() }
-    var currentSelection by remember(selectedApps) { mutableStateOf(selectedApps.toMutableList()) }
     val context = LocalContext.current
+    var selectedIds by remember(folder.id, folder.apps) {
+        mutableStateOf(folder.apps.map { it.appId }.toSet())
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(theme.bgPanel.copy(alpha = 0.96f))
-                .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(16.dp))
+                .fillMaxWidth(0.92f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(theme.bgPanel.copy(alpha = 0.98f))
+                .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "SELECT APPS",
+                text = "MANAGE APPS",
                 color = theme.textPrimary,
-                fontSize = 16.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
             )
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 200.dp, max = 400.dp)
-                    .verticalScroll(rememberScrollState()),
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 420.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                allApps.sortedBy { it.label.lowercase() }.forEach { app ->
-                    val isChecked = currentSelection.any { it.packageName == app.packageName }
+                itemsIndexed(allApps.sortedBy { it.label.lowercase() }) { _, app ->
+                    val isChecked = selectedIds.contains(app.appId)
                     val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
                         value = withContext(Dispatchers.IO) {
                             try {
@@ -2395,57 +2451,59 @@ private fun HudCategoryAppSelectorDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(theme.bgPanel.copy(alpha = 0.28f))
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(theme.bgPanel.copy(alpha = 0.24f))
                             .clickable {
-                                if (isChecked) {
-                                    currentSelection.removeAll { it.packageName == app.packageName }
+                                selectedIds = if (isChecked) {
+                                    selectedIds - app.appId
                                 } else {
-                                    currentSelection.add(app)
+                                    selectedIds + app.appId
                                 }
                             }
-                            .padding(8.dp),
+                            .padding(10.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Box(
+                            modifier = Modifier.size(34.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(theme.accentPrimary.copy(alpha = 0.12f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (iconBitmap != null) {
-                                    Image(
-                                        bitmap = iconBitmap!!,
-                                        contentDescription = app.label,
-                                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
-                                    )
-                                } else {
-                                    Text(
-                                        text = app.label.take(2).uppercase(),
-                                        color = theme.accentPrimary,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = app.label,
-                                color = theme.textPrimary,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                            CarvedIcon(
+                                size = 34.dp,
+                                icon = {
+                                    if (iconBitmap != null) {
+                                        Image(
+                                            bitmap = iconBitmap!!,
+                                            contentDescription = app.label,
+                                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                        )
+                                    } else {
+                                        Text(
+                                            text = app.label.take(2).uppercase(),
+                                            color = theme.accentPrimary,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                },
+                                contentDescription = app.label,
+                                onClick = null
                             )
                         }
-
-                        Checkbox(checked = isChecked, onCheckedChange = null)
+                        Text(
+                            text = app.label,
+                            color = theme.textPrimary,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Checkbox(
+                            checked = isChecked,
+                            onCheckedChange = {
+                                selectedIds = if (it) selectedIds + app.appId else selectedIds - app.appId
+                            }
+                        )
                     }
                 }
             }
@@ -2458,7 +2516,7 @@ private fun HudCategoryAppSelectorDialog(
                     Text("Cancel", color = theme.textSecondary)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                TextButton(onClick = { onSave(currentSelection) }) {
+                TextButton(onClick = { onSave(selectedIds.toList()) }) {
                     Text("Save", color = theme.accentPrimary)
                 }
             }
@@ -2467,23 +2525,28 @@ private fun HudCategoryAppSelectorDialog(
 }
 
 @Composable
-private fun HudCategoryCreateDialog(
+private fun HudFolderCreateDialog(
     allApps: List<AppInfo>,
     onDismiss: () -> Unit,
-    onCreate: (String, List<AppInfo>) -> Unit
+    onCreate: (String, List<String>) -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
-    var categoryName by remember { mutableStateOf("") }
-    var selectedApps by remember { mutableStateOf(emptyList<AppInfo>()) }
+    var name by remember { mutableStateOf("") }
+    var selectedIds by remember { mutableStateOf(setOf<String>()) }
     var showAppSelector by remember { mutableStateOf(false) }
 
     if (showAppSelector) {
-        HudCategoryAppSelectorDialog(
+        HudFolderManageAppsDialog(
+            folder = FolderInfo(
+                id = "new",
+                name = name.ifBlank { "New Folder" },
+                gridPosition = 0,
+                apps = emptyList()
+            ),
             allApps = allApps,
-            selectedApps = selectedApps,
             onDismiss = { showAppSelector = false },
-            onSave = { updated ->
-                selectedApps = updated
+            onSave = { ids ->
+                selectedIds = ids.toSet()
                 showAppSelector = false
             }
         )
@@ -2495,44 +2558,28 @@ private fun HudCategoryCreateDialog(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
                 .clip(RoundedCornerShape(18.dp))
-                .background(theme.bgPanel.copy(alpha = 0.96f))
+                .background(theme.bgPanel.copy(alpha = 0.98f))
                 .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "CREATE NEW FOLDER",
+                text = "CREATE FOLDER",
                 color = theme.textPrimary,
-                fontSize = 16.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
             )
-
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Folder Name",
-                    color = theme.textSecondary,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace
-                )
-                TextField(
-                    value = categoryName,
-                    onValueChange = { categoryName = it },
-                    placeholder = { Text("Enter folder name", color = theme.textMuted) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp)),
-                    singleLine = true
-                )
+            TextField(
+                value = name,
+                onValueChange = { name = it },
+                placeholder = { Text("Folder name", color = theme.textMuted) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            TextButton(onClick = { showAppSelector = true }) {
+                Text("SELECT APPS (${selectedIds.size})", color = theme.accentPrimary)
             }
-
-            TextButton(
-                onClick = { showAppSelector = true },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("SELECT APPS (${selectedApps.size})", color = theme.accentPrimary)
-            }
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -2541,15 +2588,80 @@ private fun HudCategoryCreateDialog(
                     Text("Cancel", color = theme.textSecondary)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                TextButton(onClick = {
-                    if (categoryName.isNotBlank() && selectedApps.isNotEmpty()) {
-                        onCreate(categoryName, selectedApps)
-                    }
-                }) {
+                TextButton(onClick = { if (name.isNotBlank()) onCreate(name, selectedIds.toList()) }) {
                     Text("Create", color = theme.accentPrimary)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HudConfirmDeleteDialog(
+    title: String,
+    message: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val theme = LocalUnfoldTheme.current
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.84f)
+                .clip(RoundedCornerShape(18.dp))
+                .background(theme.bgPanel.copy(alpha = 0.98f))
+                .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = title.uppercase(),
+                color = theme.textPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = message,
+                color = theme.textSecondary,
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel", color = theme.textSecondary)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                TextButton(onClick = onConfirm) {
+                    Text("Delete", color = theme.accentPrimary)
+                }
+            }
+        }
+    }
+}
+
+private fun launchApp(context: Context, app: AppInfo) {
+    try {
+        val launcherApps = context.getSystemService(android.content.pm.LauncherApps::class.java)
+        val userManager = context.getSystemService(android.os.UserManager::class.java)
+        val userHandle = userManager?.getUserForSerialNumber(app.userSerial)
+        if (launcherApps != null && userHandle != null && app.activityName.isNotBlank()) {
+            launcherApps.startMainActivity(
+                android.content.ComponentName(app.packageName, app.activityName),
+                userHandle,
+                null,
+                null
+            )
+            return
+        }
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        launchIntent?.let { context.startActivity(it) }
+    } catch (_: Exception) {
     }
 }
 

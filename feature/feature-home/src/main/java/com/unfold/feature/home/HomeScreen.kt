@@ -491,7 +491,18 @@ fun HomeScreen(
                                 )
                                 3 -> HudGoogleFeed(modifier = hudPageModifier, gridRows = rows, scale = scale)
                                 4 -> HudWidgets(modifier = hudPageModifier, gridRows = rows, scale = scale)
-                                5 -> HudCategories(apps = state.gridApps, modifier = hudPageModifier, gridRows = rows, scale = scale)
+                                5 -> HudCategories(
+                                    folders = state.folders,
+                                    allApps = state.installedApps,
+                                    modifier = hudPageModifier,
+                                    gridRows = rows,
+                                    scale = scale,
+                                    onCreateFolder = { name, appIds -> viewModel.createFolder(name, appIds) },
+                                    onRenameFolder = { folderId, name -> viewModel.renameFolder(folderId, name) },
+                                    onDeleteFolder = { folderId -> viewModel.deleteFolder(folderId) },
+                                    onUpdateFolderApps = { folderId, appIds -> viewModel.updateFolderApps(folderId, appIds) },
+                                    onReorderFolders = { folderIds -> viewModel.reorderFolders(folderIds) }
+                                )
                             }
                         }
                     }

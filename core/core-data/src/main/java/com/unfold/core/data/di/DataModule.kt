@@ -4,10 +4,12 @@ import android.content.Context
 import com.unfold.core.data.local.AppDatabase
 import com.unfold.core.data.local.dao.*
 import com.unfold.core.data.repositoryimpl.AppRepositoryImpl
+import com.unfold.core.data.repositoryimpl.FolderRepositoryImpl
 import com.unfold.core.data.repositoryimpl.GestureRepositoryImpl
 import com.unfold.core.data.repositoryimpl.SystemStatsRepositoryImpl
 import com.unfold.core.data.repositoryimpl.ThemeRepositoryImpl
 import com.unfold.core.domain.repository.AppRepository
+import com.unfold.core.domain.repository.FolderRepository
 import com.unfold.core.domain.repository.GestureRepository
 import com.unfold.core.domain.repository.SystemStatsRepository
 import com.unfold.core.domain.repository.ThemeRepository
@@ -26,6 +28,10 @@ abstract class DataModule {
     @Binds
     @Singleton
     abstract fun bindAppRepository(impl: AppRepositoryImpl): AppRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindFolderRepository(impl: FolderRepositoryImpl): FolderRepository
 
     @Binds
     @Singleton
