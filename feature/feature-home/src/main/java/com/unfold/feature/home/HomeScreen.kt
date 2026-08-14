@@ -145,6 +145,7 @@ fun HomeScreen(
             .fillMaxSize()
             .background(theme.bgVoid)
             .combinedClickable(
+                enabled = pagerState.currentPage != 5,
                 onClick = {},
                 onLongClick = onNavigateToSettings
             )

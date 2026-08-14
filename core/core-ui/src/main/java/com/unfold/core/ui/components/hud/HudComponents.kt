@@ -19,7 +19,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.lazy.LazyColumn
@@ -70,6 +72,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
@@ -90,6 +93,7 @@ import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import com.unfold.core.ui.components.GlassPanel
 import com.unfold.core.ui.components.CarvedIcon
 import com.unfold.core.domain.model.AppInfo
 import com.unfold.core.domain.model.FolderInfo
@@ -1867,6 +1871,7 @@ fun HudCategories(
     var deletingFolderId by remember { mutableStateOf<String?>(null) }
     var creatingFolder by remember { mutableStateOf(false) }
     var draggingFolderId by remember { mutableStateOf<String?>(null) }
+    var activeFolderDragId by remember { mutableStateOf<String?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
     val folderBounds = remember { mutableStateMapOf<String, Rect>() }
 
@@ -1935,17 +1940,25 @@ fun HudCategories(
                     dragOffsetY = if (draggingFolderId == folder.id) dragOffsetY else 0f,
                     scale = scale,
                     onBoundsChanged = { rect -> folderBounds[folder.id] = rect },
-                    onOpen = { selectFolder(folder.id) },
+                    onOpen = {
+                        if (activeFolderDragId == null) {
+                            selectFolder(folder.id)
+                        }
+                    },
                     onMenu = { folderMenuId = folder.id },
                     onDragStart = {
                         draggingFolderId = folder.id
+                        activeFolderDragId = folder.id
                         dragOffsetY = 0f
-                        selectedFolderId = folder.id
                     },
                     onDrag = { amount -> dragOffsetY += amount.y },
-                    onDragEnd = { reorderAfterDrag(folder.id) },
+                    onDragEnd = {
+                        reorderAfterDrag(folder.id)
+                        activeFolderDragId = null
+                    },
                     onDragCancel = {
                         draggingFolderId = null
+                        activeFolderDragId = null
                         dragOffsetY = 0f
                     }
                 )
@@ -2088,20 +2101,6 @@ private fun HudFolderTile(
                 color = if (isSelected) theme.accentPrimary else theme.panelBorder.copy(alpha = 0.22f),
                 shape = shape
             )
-            .clickable(onClick = onOpen)
-            .pointerInput(folder.id) {
-                detectDragGesturesAfterLongPress(
-                    onDragStart = {
-                        onDragStart()
-                    },
-                    onDrag = { change, amount ->
-                        change.consume()
-                        onDrag(amount)
-                    },
-                    onDragEnd = onDragEnd,
-                    onDragCancel = onDragCancel
-                )
-            }
             .padding(horizontal = (16 * scale).dp, vertical = (14 * scale).dp),
         verticalArrangement = Arrangement.spacedBy((4 * scale).dp)
     ) {
@@ -2109,14 +2108,45 @@ private fun HudFolderTile(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = folder.name,
-                color = theme.textPrimary,
-                fontSize = (13 * scale).sp,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.weight(1f)
-            )
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .pointerInput(folder.id) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val longPress = awaitLongPressOrCancellation(down.id)
+                            if (longPress != null) {
+                                onDragStart()
+                                val dragId = down.id
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == dragId } ?: break
+                                    if (!change.pressed) {
+                                        onDragEnd()
+                                        break
+                                    }
+                                    val dragAmount = change.positionChange()
+                                    if (dragAmount != Offset.Zero) {
+                                        change.consume()
+                                        onDrag(dragAmount)
+                                    }
+                                }
+                            } else {
+                                onOpen()
+                            }
+                        }
+                    },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = folder.name,
+                    color = theme.textPrimary,
+                    fontSize = (13 * scale).sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.weight(1f)
+                )
+            }
             Icon(
                 imageVector = Icons.Default.MoreVert,
                 contentDescription = "Folder options",
@@ -2182,51 +2212,58 @@ private fun HudFolderPopupDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth(0.94f)
+                    .wrapContentHeight()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(theme.bgPanel.copy(alpha = 0.96f))
-                    .border(1.dp, theme.panelBorder.copy(alpha = 0.28f), RoundedCornerShape(24.dp))
-                    .padding(18.dp),
+                    .background(theme.bgPanel.copy(alpha = 0.82f))
+                    .border(1.dp, theme.panelBorder.copy(alpha = 0.24f), RoundedCornerShape(24.dp)),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text(
-                        text = folder.name,
-                        color = theme.textPrimary,
-                        fontSize = (16 * scale).sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(onClick = onDismiss) {
-                        Text("Close", color = theme.textSecondary)
-                    }
-                }
-
-                if (folder.apps.isEmpty()) {
-                    Text(
-                        text = "No apps in this folder yet.",
-                        color = theme.textSecondary,
-                        fontSize = (11 * scale).sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(4),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.heightIn(max = 420.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        items(folder.apps.distinctBy { it.appId }) { app ->
-                            HudFolderAppCell(
-                                app = app,
-                                scale = scale,
-                                onClick = {
-                                    launchApp(context, app)
-                                }
-                            )
+                        Text(
+                            text = folder.name,
+                            color = theme.textPrimary,
+                            fontSize = (16 * scale).sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = onDismiss) {
+                            Text("Close", color = theme.textSecondary)
+                        }
+                    }
+
+                    if (folder.apps.isEmpty()) {
+                        Text(
+                            text = "No apps in this folder yet.",
+                            color = theme.textSecondary,
+                            fontSize = (11 * scale).sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(4),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.heightIn(max = 300.dp)
+                        ) {
+                            items(folder.apps.distinctBy { it.appId }) { app ->
+                                HudFolderAppCell(
+                                    app = app,
+                                    scale = scale,
+                                    onClick = {
+                                        launchApp(context, app)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -2308,23 +2345,30 @@ private fun HudFolderMenuDialog(
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.82f)
+                .wrapContentHeight()
                 .clip(RoundedCornerShape(18.dp))
-                .background(theme.bgPanel.copy(alpha = 0.98f))
-                .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
-                .padding(14.dp),
+                .background(theme.bgPanel.copy(alpha = 0.84f))
+                .border(1.dp, theme.panelBorder.copy(alpha = 0.24f), RoundedCornerShape(18.dp)),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = folder.name.uppercase(),
-                color = theme.textPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
-            )
-            Divider(color = theme.panelBorder.copy(alpha = 0.18f))
-            HudMenuItem("Edit folder name", onEditName)
-            HudMenuItem("Delete folder", onDelete)
-            HudMenuItem("Manage apps", onManageApps)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = folder.name.uppercase(),
+                    color = theme.textPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+                Divider(color = theme.panelBorder.copy(alpha = 0.18f))
+                HudMenuItem("Edit folder name", onEditName)
+                HudMenuItem("Delete folder", onDelete)
+                HudMenuItem("Manage apps", onManageApps)
+            }
         }
     }
 }
@@ -2361,39 +2405,46 @@ private fun HudFolderRenameDialog(
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.88f)
+                .wrapContentHeight()
                 .clip(RoundedCornerShape(18.dp))
-                .background(theme.bgPanel.copy(alpha = 0.98f))
-                .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
-                .padding(18.dp),
+                .background(theme.bgPanel.copy(alpha = 0.84f))
+                .border(1.dp, theme.panelBorder.copy(alpha = 0.24f), RoundedCornerShape(18.dp)),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(
-                text = "EDIT FOLDER NAME",
-                color = theme.textPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
-            )
-            TextField(
-                value = name,
-                onValueChange = { name = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel", color = theme.textSecondary)
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                TextButton(
-                    onClick = {
-                        if (name.isNotBlank()) onSave(name)
-                    }
+                Text(
+                    text = "EDIT FOLDER NAME",
+                    color = theme.textPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+                TextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Save", color = theme.accentPrimary)
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = theme.textSecondary)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(
+                        onClick = {
+                            if (name.isNotBlank()) onSave(name)
+                        }
+                    ) {
+                        Text("Save", color = theme.accentPrimary)
+                    }
                 }
             }
         }
@@ -2417,107 +2468,114 @@ private fun HudFolderManageAppsDialog(
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
+                .wrapContentHeight()
                 .clip(RoundedCornerShape(20.dp))
-                .background(theme.bgPanel.copy(alpha = 0.98f))
-                .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
-                .padding(16.dp),
+                .background(theme.bgPanel.copy(alpha = 0.84f))
+                .border(1.dp, theme.panelBorder.copy(alpha = 0.24f), RoundedCornerShape(20.dp)),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "MANAGE APPS",
-                color = theme.textPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
-            )
-
-            LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                itemsIndexed(allApps.sortedBy { it.label.lowercase() }) { _, app ->
-                    val isChecked = selectedIds.contains(app.appId)
-                    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
-                        value = withContext(Dispatchers.IO) {
-                            try {
-                                val drawable = context.packageManager.getApplicationIcon(app.packageName)
-                                drawableToImageBitmap(drawable)
-                            } catch (_: Exception) {
-                                null
-                            }
-                        }
-                    }
+                Text(
+                    text = "MANAGE APPS",
+                    color = theme.textPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(theme.bgPanel.copy(alpha = 0.24f))
-                            .clickable {
-                                selectedIds = if (isChecked) {
-                                    selectedIds - app.appId
-                                } else {
-                                    selectedIds + app.appId
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 420.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    itemsIndexed(allApps.sortedBy { it.label.lowercase() }) { _, app ->
+                        val isChecked = selectedIds.contains(app.appId)
+                        val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
+                            value = withContext(Dispatchers.IO) {
+                                try {
+                                    val drawable = context.packageManager.getApplicationIcon(app.packageName)
+                                    drawableToImageBitmap(drawable)
+                                } catch (_: Exception) {
+                                    null
                                 }
                             }
-                            .padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.size(34.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CarvedIcon(
-                                size = 34.dp,
-                                icon = {
-                                    if (iconBitmap != null) {
-                                        Image(
-                                            bitmap = iconBitmap!!,
-                                            contentDescription = app.label,
-                                            modifier = Modifier.fillMaxSize().clip(CircleShape)
-                                        )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(theme.bgPanel.copy(alpha = 0.20f))
+                                .clickable {
+                                    selectedIds = if (isChecked) {
+                                        selectedIds - app.appId
                                     } else {
-                                        Text(
-                                            text = app.label.take(2).uppercase(),
-                                            color = theme.accentPrimary,
-                                            fontSize = 8.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                        selectedIds + app.appId
                                     }
-                                },
-                                contentDescription = app.label,
-                                onClick = null
+                                }
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.size(34.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CarvedIcon(
+                                    size = 34.dp,
+                                    icon = {
+                                        if (iconBitmap != null) {
+                                            Image(
+                                                bitmap = iconBitmap!!,
+                                                contentDescription = app.label,
+                                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                            )
+                                        } else {
+                                            Text(
+                                                text = app.label.take(2).uppercase(),
+                                                color = theme.accentPrimary,
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    },
+                                    contentDescription = app.label,
+                                    onClick = null
+                                )
+                            }
+                            Text(
+                                text = app.label,
+                                color = theme.textPrimary,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Checkbox(
+                                checked = isChecked,
+                                onCheckedChange = {
+                                    selectedIds = if (it) selectedIds + app.appId else selectedIds - app.appId
+                                }
                             )
                         }
-                        Text(
-                            text = app.label,
-                            color = theme.textPrimary,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Checkbox(
-                            checked = isChecked,
-                            onCheckedChange = {
-                                selectedIds = if (it) selectedIds + app.appId else selectedIds - app.appId
-                            }
-                        )
                     }
                 }
-            }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel", color = theme.textSecondary)
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                TextButton(onClick = { onSave(selectedIds.toList()) }) {
-                    Text("Save", color = theme.accentPrimary)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = theme.textSecondary)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(onClick = { onSave(selectedIds.toList()) }) {
+                        Text("Save", color = theme.accentPrimary)
+                    }
                 }
             }
         }
@@ -2557,39 +2615,46 @@ private fun HudFolderCreateDialog(
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
+                .wrapContentHeight()
                 .clip(RoundedCornerShape(18.dp))
-                .background(theme.bgPanel.copy(alpha = 0.98f))
-                .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
-                .padding(16.dp),
+                .background(theme.bgPanel.copy(alpha = 0.84f))
+                .border(1.dp, theme.panelBorder.copy(alpha = 0.24f), RoundedCornerShape(18.dp)),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "CREATE FOLDER",
-                color = theme.textPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
-            )
-            TextField(
-                value = name,
-                onValueChange = { name = it },
-                placeholder = { Text("Folder name", color = theme.textMuted) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            TextButton(onClick = { showAppSelector = true }) {
-                Text("SELECT APPS (${selectedIds.size})", color = theme.accentPrimary)
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel", color = theme.textSecondary)
+                Text(
+                    text = "CREATE FOLDER",
+                    color = theme.textPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+                TextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    placeholder = { Text("Folder name", color = theme.textMuted) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                TextButton(onClick = { showAppSelector = true }) {
+                    Text("SELECT APPS (${selectedIds.size})", color = theme.accentPrimary)
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                TextButton(onClick = { if (name.isNotBlank()) onCreate(name, selectedIds.toList()) }) {
-                    Text("Create", color = theme.accentPrimary)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = theme.textSecondary)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(onClick = { if (name.isNotBlank()) onCreate(name, selectedIds.toList()) }) {
+                        Text("Create", color = theme.accentPrimary)
+                    }
                 }
             }
         }
@@ -2608,35 +2673,42 @@ private fun HudConfirmDeleteDialog(
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.84f)
+                .wrapContentHeight()
                 .clip(RoundedCornerShape(18.dp))
-                .background(theme.bgPanel.copy(alpha = 0.98f))
-                .border(1.dp, theme.panelBorder.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
-                .padding(16.dp),
+                .background(theme.bgPanel.copy(alpha = 0.84f))
+                .border(1.dp, theme.panelBorder.copy(alpha = 0.24f), RoundedCornerShape(18.dp)),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                text = title.uppercase(),
-                color = theme.textPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
-            )
-            Text(
-                text = message,
-                color = theme.textSecondary,
-                fontSize = 12.sp,
-                fontFamily = FontFamily.Monospace
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel", color = theme.textSecondary)
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                TextButton(onClick = onConfirm) {
-                    Text("Delete", color = theme.accentPrimary)
+                Text(
+                    text = title.uppercase(),
+                    color = theme.textPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = message,
+                    color = theme.textSecondary,
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = theme.textSecondary)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(onClick = onConfirm) {
+                        Text("Delete", color = theme.accentPrimary)
+                    }
                 }
             }
         }
