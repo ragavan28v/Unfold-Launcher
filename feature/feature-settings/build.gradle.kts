@@ -40,6 +40,7 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.coroutines.android)
+    implementation(libs.coil.compose)
     
     implementation(libs.biometric.ktx)
 }

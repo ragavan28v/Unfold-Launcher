@@ -70,12 +70,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
+import coil.compose.rememberAsyncImagePainter
 import androidx.compose.foundation.verticalScroll
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.window.Dialog
@@ -115,7 +117,8 @@ private data class SettingsSectionInfo(
 private data class WallpaperPreset(
     val name: String,
     val colorHex: String,
-    val pattern: WallpaperPatternMode
+    val pattern: WallpaperPatternMode,
+    val imageResName: String? = null
 )
 
 private enum class LauncherSettingsPage {
@@ -705,6 +708,9 @@ private fun WallpaperSettingsPanel(
                     onPatternSelected = { pattern ->
                         onUpdate(config.copy(homeWallpaperPattern = pattern))
                     },
+                    onImageUriChanged = { uri ->
+                        onUpdate(config.copy(homeWallpaperMode = WallpaperMode.PRESET, homeWallpaperImageUri = uri))
+                    },
                     onPickImage = { homePicker.launch(arrayOf("image/*")) },
                     isDrawer = false
                 )
@@ -724,6 +730,9 @@ private fun WallpaperSettingsPanel(
                     },
                     onPatternSelected = { pattern ->
                         onUpdate(config.copy(drawerWallpaperPattern = pattern))
+                    },
+                    onImageUriChanged = { uri ->
+                        onUpdate(config.copy(drawerWallpaperMode = WallpaperMode.PRESET, drawerWallpaperImageUri = uri))
                     },
                     onPickImage = { drawerPicker.launch(arrayOf("image/*")) },
                     isDrawer = true,
@@ -785,6 +794,7 @@ private fun WallpaperSourceCard(
     onModeSelected: (WallpaperMode) -> Unit,
     onColorHexChanged: (String) -> Unit,
     onPatternSelected: (WallpaperPatternMode) -> Unit,
+    onImageUriChanged: (String) -> Unit,
     onPickImage: () -> Unit,
     isDrawer: Boolean,
     syncEnabled: Boolean = false,
@@ -839,16 +849,18 @@ private fun WallpaperSourceCard(
 
         ChoiceRow(
             label = "Mode",
-            options = listOf("Solid", "Patterns", "Custom"),
+            options = listOf("Solid", "Patterns", "Preset", "Custom"),
             selected = when (mode) {
                 WallpaperMode.SOLID -> "Solid"
                 WallpaperMode.PATTERN -> "Patterns"
+                WallpaperMode.PRESET -> "Preset"
                 WallpaperMode.CUSTOM -> "Custom"
             },
             onSelected = {
                 onModeSelected(
                     when (it) {
                         "Patterns" -> WallpaperMode.PATTERN
+                        "Preset" -> WallpaperMode.PRESET
                         "Custom" -> WallpaperMode.CUSTOM
                         else -> WallpaperMode.SOLID
                     }
@@ -955,6 +967,25 @@ private fun WallpaperSourceCard(
                 )
             }
 
+            WallpaperMode.PRESET -> {
+                Text(
+                    text = "Preset wallpapers",
+                    color = theme.textPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                PresetWallpaperGrid(
+                    currentImageUri = imageUri,
+                    onPresetPicked = { preset ->
+                        val nextUri = "android.resource://com.ragavan.unfold/drawable/${preset.imageResName ?: "w1"}"
+                        onModeSelected(WallpaperMode.PRESET)
+                        onColorHexChanged(preset.colorHex)
+                        onImageUriChanged(nextUri)
+                    }
+                )
+            }
+
             WallpaperMode.CUSTOM -> {
                 Text(
                     text = "Custom wallpaper image",
@@ -1012,6 +1043,61 @@ private fun WallpaperPresetGrid(
             color = theme.textSecondary,
             fontSize = 11.sp
         )
+    }
+}
+
+@Composable
+private fun PresetWallpaperGrid(
+    currentImageUri: String,
+    onPresetPicked: (WallpaperPreset) -> Unit
+) {
+    val rows = presetWallpapers.chunked(3)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        rows.forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { preset ->
+                    val selected = preset.imageResName != null && (currentImageUri.endsWith(preset.imageResName) || currentImageUri.contains(preset.imageResName))
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(92.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .border(
+                                width = if (selected) 2.dp else 1.dp,
+                                color = if (selected) LocalUnfoldTheme.current.accentPrimary else LocalUnfoldTheme.current.panelBorder.copy(alpha = 0.65f),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .clickable { onPresetPicked(preset) }
+                    ) {
+                        Image(
+                            painter = rememberAsyncImagePainter("android.resource://com.ragavan.unfold/drawable/${preset.imageResName ?: "w1"}"),
+                            contentDescription = preset.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter)
+                                .background(Color.Black.copy(alpha = 0.28f))
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = preset.name,
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+                repeat((3 - row.size).coerceAtLeast(0)) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
     }
 }
 
@@ -1691,6 +1777,16 @@ private val wallpaperPresets = listOf(
     WallpaperPreset("Aurora Blush", "#C026D3", WallpaperPatternMode.GEOMETRIC),
     WallpaperPreset("Soft Ember", "#FB7185", WallpaperPatternMode.MINIMAL)
 )
+
+private val presetWallpapers = listOf(
+    WallpaperPreset("w1", "#0B1020", WallpaperPatternMode.MINIMAL, "w1"),
+    WallpaperPreset("w2", "#141B2D", WallpaperPatternMode.MINIMAL, "w2"),
+    WallpaperPreset("w3", "#1A1F36", WallpaperPatternMode.MINIMAL, "w3"),
+    WallpaperPreset("w4", "#20182B", WallpaperPatternMode.MINIMAL, "w4"),
+    WallpaperPreset("w5", "#101827", WallpaperPatternMode.MINIMAL, "w5"),
+    WallpaperPreset("w6", "#1F2237", WallpaperPatternMode.MINIMAL, "w6")
+)
+
 
 private fun colorFromHex(hex: String): Color {
     return runCatching { Color(android.graphics.Color.parseColor(hex)) }

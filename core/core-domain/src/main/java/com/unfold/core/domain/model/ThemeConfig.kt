@@ -42,6 +42,7 @@ enum class AppDrawerStyleMode {
 enum class WallpaperMode {
     SOLID,
     PATTERN,
+    PRESET,
     CUSTOM
 }
 
@@ -70,15 +71,15 @@ data class ThemeConfig(
     val dockLabelsEnabled: Boolean = true,
     val dockBackgroundMode: DockBackgroundMode = DockBackgroundMode.DEFAULT,
     val dockBackgroundHex: String = "#12161E",
-    val homeWallpaperMode: WallpaperMode = WallpaperMode.SOLID,
+    val homeWallpaperMode: WallpaperMode = WallpaperMode.PRESET,
     val homeWallpaperHex: String = "#0B1020",
     val homeWallpaperPattern: WallpaperPatternMode = WallpaperPatternMode.MINIMAL,
-    val homeWallpaperImageUri: String = "",
+    val homeWallpaperImageUri: String = "android.resource://com.ragavan.unfold/drawable/w1",
     val drawerWallpaperSyncWithHome: Boolean = true,
-    val drawerWallpaperMode: WallpaperMode = WallpaperMode.SOLID,
+    val drawerWallpaperMode: WallpaperMode = WallpaperMode.PRESET,
     val drawerWallpaperHex: String = "#0B1020",
     val drawerWallpaperPattern: WallpaperPatternMode = WallpaperPatternMode.MINIMAL,
-    val drawerWallpaperImageUri: String = "",
+    val drawerWallpaperImageUri: String = "android.resource://com.ragavan.unfold/drawable/w1",
     val appDrawerLayoutMode: AppDrawerLayoutMode = AppDrawerLayoutMode.ALPHABETIC_GRID,
     val appDrawerGridRows: Int = 5,
     val appDrawerGridColumns: Int = 4,

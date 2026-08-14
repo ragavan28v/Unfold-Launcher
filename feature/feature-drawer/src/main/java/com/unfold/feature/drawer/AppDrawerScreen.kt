@@ -1489,6 +1489,7 @@ private fun LauncherWallpaperBackdrop(
                 }
             }
 
+            WallpaperMode.PRESET,
             WallpaperMode.CUSTOM -> {
                 if (imageUri.isNotBlank()) {
                     Image(
