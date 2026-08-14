@@ -65,7 +65,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -801,7 +803,16 @@ private fun WallpaperSourceCard(
     onSyncToggle: ((Boolean) -> Unit)? = null
 ) {
     val theme = LocalUnfoldTheme.current
-    var showColorPicker by rememberSaveable { mutableStateOf(false) }
+    var selectedPatternFilter by rememberSaveable { mutableStateOf("All") }
+    var hue by rememberSaveable(colorHex) { mutableStateOf(hexToHsv(colorHex)[0]) }
+    var saturation by rememberSaveable(colorHex) { mutableStateOf(hexToHsv(colorHex)[1]) }
+    var value by rememberSaveable(colorHex) { mutableStateOf(hexToHsv(colorHex)[2]) }
+    val liveColor = remember(hue, saturation, value) {
+        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, value)))
+    }
+    val liveHex = remember(hue, saturation, value) {
+        colorIntToHex(android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, value)))
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -879,7 +890,7 @@ private fun WallpaperSourceCard(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(colorFromHex(colorHex))
+                            .background(liveColor)
                             .border(1.dp, theme.panelBorder, RoundedCornerShape(14.dp))
                     )
                     Column(modifier = Modifier.weight(1f)) {
@@ -890,13 +901,13 @@ private fun WallpaperSourceCard(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = colorHex.uppercase(),
+                            text = liveHex,
                             color = theme.textSecondary,
                             fontSize = 11.sp
                         )
                     }
-                    OutlinedButton(onClick = { showColorPicker = true }) {
-                        Text("Pick color")
+                    OutlinedButton(onClick = { onColorHexChanged(liveHex) }) {
+                        Text("Apply")
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -917,52 +928,93 @@ private fun WallpaperSourceCard(
                         )
                     }
                 }
-                if (showColorPicker) {
-                    ColorPickerDialog(
-                        initialHex = colorHex,
-                        onDismiss = { showColorPicker = false },
-                        onPick = { chosenHex ->
-                            onColorHexChanged(chosenHex)
-                            showColorPicker = false
-                        }
-                    )
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(theme.bgVoid.copy(alpha = 0.18f))
+                        .border(1.dp, theme.panelBorder.copy(alpha = 0.6f), RoundedCornerShape(18.dp))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SaturationValuePad(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(170.dp),
+                            hue = hue,
+                            saturation = saturation,
+                            value = value,
+                            onChanged = { newSaturation, newValue ->
+                                saturation = newSaturation
+                                value = newValue
+                            },
+                            onMeasured = { }
+                        )
+                        HueRail(
+                            modifier = Modifier
+                                .width(22.dp)
+                                .height(170.dp),
+                            hue = hue,
+                            onHueChanged = { hue = it },
+                            onMeasured = { }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(liveColor)
+                                .border(1.dp, theme.panelBorder, RoundedCornerShape(12.dp))
+                        )
+                        Text(
+                            text = liveHex,
+                            color = theme.textPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
             WallpaperMode.PATTERN -> {
                 Text(
-                    text = "Built-in wallpapers",
+                    text = "Pattern",
                     color = theme.textPrimary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(2.dp))
+                ChoiceRow(
+                    label = "Type",
+                    options = listOf("All", "Geometric", "Abstract", "Minimal"),
+                    selected = selectedPatternFilter,
+                    onSelected = { selectedPatternFilter = it }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 WallpaperPresetGrid(
                     currentColorHex = colorHex,
                     currentPattern = pattern,
+                    selectedFilter = selectedPatternFilter,
                     onPresetPicked = { preset ->
+                        selectedPatternFilter = when (preset.pattern) {
+                            WallpaperPatternMode.GEOMETRIC -> "Geometric"
+                            WallpaperPatternMode.ABSTRACT -> "Abstract"
+                            WallpaperPatternMode.MINIMAL -> "Minimal"
+                        }
                         onModeSelected(WallpaperMode.PATTERN)
                         onColorHexChanged(preset.colorHex)
                         onPatternSelected(preset.pattern)
-                    }
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                ChoiceRow(
-                    label = "Pattern",
-                    options = listOf("Geometric", "Abstract", "Minimal"),
-                    selected = when (pattern) {
-                        WallpaperPatternMode.GEOMETRIC -> "Geometric"
-                        WallpaperPatternMode.ABSTRACT -> "Abstract"
-                        WallpaperPatternMode.MINIMAL -> "Minimal"
-                    },
-                    onSelected = {
-                        onPatternSelected(
-                            when (it) {
-                                "Geometric" -> WallpaperPatternMode.GEOMETRIC
-                                "Abstract" -> WallpaperPatternMode.ABSTRACT
-                                else -> WallpaperPatternMode.MINIMAL
-                            }
-                        )
                     }
                 )
             }
@@ -1016,10 +1068,19 @@ private fun WallpaperSourceCard(
 private fun WallpaperPresetGrid(
     currentColorHex: String,
     currentPattern: WallpaperPatternMode,
+    selectedFilter: String,
     onPresetPicked: (WallpaperPreset) -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
-    val rows = wallpaperPresets.chunked(3)
+    val filteredPresets = wallpaperPresets.filter { preset ->
+        selectedFilter == "All" || when (selectedFilter) {
+            "Geometric" -> preset.pattern == WallpaperPatternMode.GEOMETRIC
+            "Abstract" -> preset.pattern == WallpaperPatternMode.ABSTRACT
+            "Minimal" -> preset.pattern == WallpaperPatternMode.MINIMAL
+            else -> true
+        }
+    }
+    val rows = filteredPresets.chunked(3)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         rows.forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1038,11 +1099,19 @@ private fun WallpaperPresetGrid(
                 }
             }
         }
-        Text(
-            text = "Tap a tile to load a ready-made wallpaper look.",
-            color = theme.textSecondary,
-            fontSize = 11.sp
-        )
+        if (filteredPresets.isEmpty()) {
+            Text(
+                text = "No wallpapers in this category.",
+                color = theme.textSecondary,
+                fontSize = 11.sp
+            )
+        } else {
+            Text(
+                text = "Tap a tile to load a ready-made wallpaper look.",
+                color = theme.textSecondary,
+                fontSize = 11.sp
+            )
+        }
     }
 }
 
@@ -1126,33 +1195,48 @@ private fun WallpaperPresetTile(
             val tint = Color.White.copy(alpha = 0.18f)
             when (preset.pattern) {
                 WallpaperPatternMode.GEOMETRIC -> {
-                    repeat(4) { index ->
+                    repeat(5) { index ->
+                        val cx = size.width * (0.16f + index * 0.18f)
+                        val cy = size.height * (0.28f + (index % 2) * 0.28f)
                         drawCircle(
-                            color = tint.copy(alpha = 0.18f + index * 0.05f),
-                            radius = 8f + index * 7f,
-                            center = Offset(size.width * (0.2f + index * 0.22f), size.height * 0.32f)
+                            color = tint.copy(alpha = 0.12f + index * 0.07f),
+                            radius = 20f + index * 14f,
+                            center = Offset(cx, cy)
+                        )
+                    }
+                    repeat(3) { index ->
+                        drawLine(
+                            color = tint.copy(alpha = 0.28f + index * 0.08f),
+                            start = Offset(0f, size.height * (0.2f + index * 0.24f)),
+                            end = Offset(size.width, size.height * (0.24f + index * 0.18f)),
+                            strokeWidth = 5f + index * 2.4f
                         )
                     }
                 }
                 WallpaperPatternMode.ABSTRACT -> {
-                    repeat(3) { index ->
+                    repeat(4) { index ->
                         drawLine(
-                            color = tint.copy(alpha = 0.12f + index * 0.06f),
-                            start = Offset(0f, size.height * (0.24f + index * 0.22f)),
-                            end = Offset(size.width, size.height * (0.42f + index * 0.18f)),
-                            strokeWidth = 8f
+                            color = tint.copy(alpha = 0.14f + index * 0.08f),
+                            start = Offset(0f, size.height * (0.22f + index * 0.18f)),
+                            end = Offset(size.width, size.height * (0.62f + index * 0.12f)),
+                            strokeWidth = 7f + index * 2.5f
                         )
                     }
+                    drawRoundRect(
+                        color = tint.copy(alpha = 0.08f),
+                        topLeft = Offset(size.width * 0.12f, size.height * 0.12f),
+                        size = Size(size.width * 0.72f, size.height * 0.58f),
+                        cornerRadius = CornerRadius(28f, 28f)
+                    )
                 }
                 WallpaperPatternMode.MINIMAL -> {
-                    repeat(10) { index ->
+                    repeat(18) { index ->
+                        val x = ((index * 47) % size.width.toInt()).toFloat()
+                        val y = ((index * 61) % size.height.toInt()).toFloat()
                         drawCircle(
-                            color = tint.copy(alpha = 0.08f + (index % 3) * 0.03f),
-                            radius = 3f + (index % 4) * 1.6f,
-                            center = Offset(
-                                (index * 31f) % size.width,
-                                (index * 19f) % size.height
-                            )
+                            color = tint.copy(alpha = 0.1f + (index % 4) * 0.04f),
+                            radius = 4f + (index % 5) * 2.2f,
+                            center = Offset(x, y)
                         )
                     }
                 }
@@ -1761,21 +1845,24 @@ private val dockBackgroundPalette = listOf(
 )
 
 private val wallpaperPalette = listOf(
-    "#120A20",
-    "#1A1030",
-    "#2A1456",
-    "#6B1E7C",
-    "#B12B84",
-    "#FF4D8D"
+    "#071A2A",
+    "#0B2440",
+    "#123A5B",
+    "#1B5F7A",
+    "#2BB8D9",
+    "#7EE7FF",
+    "#B7F9FF"
 )
 
 private val wallpaperPresets = listOf(
-    WallpaperPreset("Rose Glow", "#FF4D8D", WallpaperPatternMode.ABSTRACT),
-    WallpaperPreset("Pink Pulse", "#E11D74", WallpaperPatternMode.GEOMETRIC),
-    WallpaperPreset("Violet Bloom", "#7C3AED", WallpaperPatternMode.MINIMAL),
-    WallpaperPreset("Midnight Neon", "#1E1B4B", WallpaperPatternMode.ABSTRACT),
-    WallpaperPreset("Aurora Blush", "#C026D3", WallpaperPatternMode.GEOMETRIC),
-    WallpaperPreset("Soft Ember", "#FB7185", WallpaperPatternMode.MINIMAL)
+    WallpaperPreset("Night Drift", "#071A2A", WallpaperPatternMode.ABSTRACT),
+    WallpaperPreset("Aqua Mesh", "#0E2E45", WallpaperPatternMode.GEOMETRIC),
+    WallpaperPreset("Glass Tide", "#123B57", WallpaperPatternMode.MINIMAL),
+    WallpaperPreset("Polar Current", "#0F2740", WallpaperPatternMode.ABSTRACT),
+    WallpaperPreset("Cyan Orbit", "#1A4968", WallpaperPatternMode.GEOMETRIC),
+    WallpaperPreset("Mist Arc", "#1E5F7A", WallpaperPatternMode.MINIMAL),
+    WallpaperPreset("Deep Current", "#102D3A", WallpaperPatternMode.ABSTRACT),
+    WallpaperPreset("Blue Echo", "#153C52", WallpaperPatternMode.GEOMETRIC)
 )
 
 private val presetWallpapers = listOf(
