@@ -21,7 +21,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.lazy.LazyColumn
@@ -72,6 +71,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -93,6 +93,7 @@ import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import com.unfold.core.ui.components.GlassPanel
 import com.unfold.core.ui.components.CarvedIcon
 import com.unfold.core.domain.model.AppInfo
@@ -2113,25 +2114,63 @@ private fun HudFolderTile(
                     .weight(1f)
                     .pointerInput(folder.id) {
                         awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            val longPress = awaitLongPressOrCancellation(down.id)
-                            if (longPress != null) {
-                                onDragStart()
-                                val dragId = down.id
+                            val down = awaitFirstDown(
+                                requireUnconsumed = false,
+                                pass = PointerEventPass.Initial
+                            )
+                            val pointerId = down.id
+                            val startPosition = down.position
+                            var releasedBeforeLongPress = false
+                            var movedPastSlop = false
+
+                            val longPressTriggered = withTimeoutOrNull(
+                                viewConfiguration.longPressTimeoutMillis
+                            ) {
                                 while (true) {
-                                    val event = awaitPointerEvent()
-                                    val change = event.changes.firstOrNull { it.id == dragId } ?: break
+                                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull { it.id == pointerId }
+                                        ?: continue
+
                                     if (!change.pressed) {
-                                        onDragEnd()
-                                        break
+                                        releasedBeforeLongPress = true
+                                        return@withTimeoutOrNull false
                                     }
-                                    val dragAmount = change.positionChange()
-                                    if (dragAmount != Offset.Zero) {
-                                        change.consume()
-                                        onDrag(dragAmount)
+
+                                    val moveDistance = (change.position - startPosition).getDistance()
+                                    if (moveDistance > viewConfiguration.touchSlop) {
+                                        movedPastSlop = true
+                                        return@withTimeoutOrNull false
                                     }
                                 }
-                            } else {
+                            } == null
+
+                            if (longPressTriggered) {
+                                onDragStart()
+                                var dragFinished = false
+                                try {
+                                    while (true) {
+                                        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                        val change = event.changes.firstOrNull { it.id == pointerId }
+                                            ?: break
+
+                                        if (!change.pressed) {
+                                            onDragEnd()
+                                            dragFinished = true
+                                            break
+                                        }
+
+                                        val dragAmount = change.positionChange()
+                                        if (dragAmount != Offset.Zero) {
+                                            change.consume()
+                                            onDrag(dragAmount)
+                                        }
+                                    }
+                                } finally {
+                                    if (!dragFinished) {
+                                        onDragCancel()
+                                    }
+                                }
+                            } else if (releasedBeforeLongPress && !movedPastSlop) {
                                 onOpen()
                             }
                         }
