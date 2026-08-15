@@ -1,14 +1,12 @@
 package com.unfold.core.data.local
 
 import android.content.Context
-import androidx.lifecycle.ViewModelProvider.NewInstanceFactory.Companion.instance
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.unfold.core.data.local.dao.*
 import com.unfold.core.data.local.entity.*
-import com.unfold.core.domain.navigation.UnfoldRoute
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -47,17 +45,7 @@ abstract class AppDatabase : RoomDatabase() {
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
-                        CoroutineScope(Dispatchers.IO).launch {
-                            val defaultGestures = listOf(
-                                GestureEntity("SWIPE_LEFT_1F", "OPEN_INTENT", targetIntentUri = "tel:"),
-                                GestureEntity("SWIPE_RIGHT_1F", "LAUNCH_APP", targetPackage = "com.whatsapp"),
-                                GestureEntity("SWIPE_LEFT_2F", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.HiddenSpace.route),
-                                GestureEntity("SWIPE_RIGHT_2F", "OPEN_INTENT", targetIntentUri = "market://details?id="),
-                                GestureEntity("SWIPE_DOWN_1F", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.UniversalSearch.route),
-                                GestureEntity("SWIPE_UP_1F", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.AppDrawer.route)
-                            )
-                            instance?.gestureDao()?.insertAll(defaultGestures)
-                        }
+                        AppDatabaseSeedData.seedDatabase(db)
                     }
                 })
                 .build()

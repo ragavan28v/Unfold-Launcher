@@ -1,0 +1,834 @@
+Unfold — App Classification Seed
+Database
+Purpose:
+ This document defines the initial app-classification
+database and matching logic Unfold uses on first launch to
+auto-sort a user's installed apps into folders. Paste this whole
+document into the agentic builder as the spec for the "smart
+folder seeding" module.
+1. Design Principles
+1. 
+2. 
+3. 
+4. 
+Never hardcode a lookup table as the only path.
+ Use a
+priority-ordered resolver (Section 4) so
+unknown/regional/future apps still get classified.
+Backend categories ≠
+ 
+user-facing folders.
+ Classify into the
+full 36-category taxonomy internally, then collapse into ~10
+15 folders for display (Section 3).
+Package name is the primary key.
+ App names
+change/localize; package names don't.
+Ship as data, not code.
+ The database should live in a
+JSON asset (or bundled Room-prepopulated DB) so it can
+be updated without an app release.
+5. 
+Never block first launch on classification.
+ Run seeding as
+a background/async pass; show "Other" or "Unsorted"
+immediately, then animate apps into folders as
+classification completes.
+2. Backend Category Taxonomy (36
+categories)
+SOCIAL, MESSAGING, COMMUNICATION, GAMES, 
+ENTERTAINMENT, MUSIC, VIDEO,
+PRODUCTIVITY, OFFICE, EDUCATION, FINANCE, 
+SHOPPING, FOOD_DELIVERY,
+TRAVEL, MAPS_NAVIGATION, PHOTOGRAPHY, 
+VIDEO_EDITING, HEALTH_FITNESS,
+NEWS, WEATHER, UTILITIES, TOOLS, BROWSER, 
+EMAIL, CLOUD_STORAGE,
+DEVELOPER, SECURITY, LIFESTYLE, GOVERNMENT, 
+TRANSPORTATION, DATING,
+BOOKS_READING, KIDS, ART_DESIGN, AI, OTHER
+User-facing
+folder
+3. User-Facing Folder Collapse Map
+Default collapse (editable by user later in settings):
+Backend categories merged in
+Social
+SOCIAL, MESSAGING, COMMUNICATION
+User-facing
+folder
+Games
+Entertainment
+Work &
+Productivity
+Finance
+Shopping
+Travel & Maps
+Creative
+Health &
+Fitness
+Learn & Read
+News & Info
+AI
+Backend categories merged in
+GAMES
+ENTERTAINMENT, VIDEO, MUSIC
+PRODUCTIVITY, OFFICE, CLOUD_STORAGE,
+EMAIL
+FINANCE
+SHOPPING, FOOD_DELIVERY
+TRAVEL, MAPS_NAVIGATION,
+TRANSPORTATION
+PHOTOGRAPHY, VIDEO_EDITING,
+ART_DESIGN
+HEALTH_FITNESS
+EDUCATION, BOOKS_READING, KIDS
+NEWS, WEATHER
+AI
+Utilities
+UTILITIES, TOOLS, BROWSER, DEVELOPER,
+SECURITY, GOVERNMENT
+User-facing
+folder
+Lifestyle &
+Dating
+Other
+Backend categories merged in
+LIFESTYLE, DATING
+OTHER (unmatched apps)
+Rule of thumb: if a user has fewer than ~3 apps in a merged
+bucket, fold it into the nearest neighbor or into "Other" rather
+than showing a near-empty folder.
+4. Classification Resolver (priority order)
+resolve(installedApp):
+1. Exact package-name match in seed DB   
+→ return category
+2. Package-name PREFIX/regex rule match  
+→ return category
+(e.g. "com.supercell.*" → GAMES, 
+"com.king.*" → GAMES,
+"*.bank*"/"*.upi*" heuristics → 
+FINANCE)
+3. Play Store category metadata (if 
+fetchable)    
+→ map Play category → our 
+taxonomy
+4. App label keyword match (fallback)    
+→ e.g. "bank", "pay", "wallet" → FINANCE;
+"cam", "photo" → PHOTOGRAPHY
+5. Unmatched                             
+→ OTHER (user can manually re-sort;
+log package name for future DB update)
+Store each seed entry as:
+{
+}
+"package": "com.instagram.android",
+"appName": "Instagram",
+"category": "SOCIAL",
+"aliases": ["com.instagram.lite"]
+Package-rule entries (regex, applied at step 2) as a separate
+array:
+{ "pattern": "^com\\.supercell\\.", 
+"category": "GAMES" },
+{ "pattern": "^com\\.king\\.", "category": 
+"GAMES" },
+{ "pattern": 
+"^com\\.miHoYo\\.|^com\\.HoYoverse\\.", 
+"category": "GAMES" },
+{ "pattern": 
+".*\\.bank.*|.*\\.upi.*|.*payzapp.*|.*imobi
+le.*", "category": "FINANCE" },
+{ "pattern": 
+"^com\\.google\\.android\\.apps\\.docs.*", 
+"category": "PRODUCTIVITY" }
+Note: many 
+packageName values above (esp. banking, OTT,
+and regional apps) vary by publisher/region and should be
+verified against the Play Store listing at build time or via a
+periodic scraper
+, not trusted blindly — mark these with
+"verified": false in the JSON so the app can re
+check them via PackageManager category metadata at runtime.
+5. Seed Database (JSON)
+Use this as the initial
+assets/app_classification_seed.json . Entries are
+grouped by category for readability; flatten into one array in
+the actual file.
+{
+"SOCIAL": [
+{"package":"com.instagram.android","appName
+":"Instagram"},
+{"package":"com.facebook.katana","appName":
+"Facebook"},
+{"package":"com.facebook.lite","appName":"F
+acebook Lite"},
+{"package":"com.instagram.barcelona","appNa
+me":"Threads"},
+{"package":"com.twitter.android","appName":
+"X"},
+{"package":"com.reddit.frontpage","appName"
+:"Reddit"},
+{"package":"com.snapchat.android","appName"
+:"Snapchat"},
+{"package":"com.pinterest","appName":"Pinte
+rest"},
+{"package":"com.linkedin.android","appName"
+:"LinkedIn"},
+{"package":"com.tumblr","appName":"Tumblr"}
+,
+{"package":"com.quora.android","appName":"Q
+uora"},
+{"package":"com.zhiliaoapp.musically","appN
+ame":"TikTok"},
+{"package":"com.bereal.ft","appName":"BeRea
+l"},
+{"package":"org.joinmastodon.android","appN
+ame":"Mastodon"},
+{"package":"xyz.blueskyweb.app","appName":"
+Bluesky"},
+{"package":"com.discord","appName":"Discord
+"},
+{"package":"com.sharechat.app","appName":"S
+hareChat"},
+{"package":"in.mohalla.sharechat","appName"
+:"Moj"},
+{"package":"co.vine.android","appName":"Vin
+e"}
+],
+"MESSAGING": [
+{"package":"com.whatsapp","appName":"WhatsA
+pp"},
+{"package":"com.whatsapp.w4b","appName":"Wh
+atsApp Business"},
+{"package":"org.telegram.messenger","appNam
+e":"Telegram"},
+{"package":"org.thoughtcrime.securesms","ap
+pName":"Signal"},
+{"package":"com.facebook.orca","appName":"M
+essenger"},
+{"package":"com.viber.voip","appName":"Vibe
+r"},
+{"package":"jp.naver.line.android","appName
+":"LINE"},
+{"package":"com.tencent.mm","appName":"WeCh
+at"},
+{"package":"com.imo.android.imoim","appName
+":"imo"},
+{"package":"com.skype.raider","appName":"Sk
+ype"},
+{"package":"com.google.android.apps.dynamit
+e","appName":"Google Chat"},
+{"package":"com.kakao.talk","appName":"Kaka
+oTalk"},
+{"package":"com.google.android.apps.messagi
+ng","appName":"Google Messages"}
+],
+"COMMUNICATION": [
+{"package":"com.google.android.apps.tachyon
+","appName":"Google Meet"},
+{"package":"us.zoom.videomeetings","appName
+":"Zoom"},
+{"package":"com.microsoft.teams","appName":
+"Microsoft Teams"},
+{"package":"com.cisco.webex.meetings","appN
+ame":"Cisco Webex"},
+{"package":"com.jio.join","appName":"JioMee
+t"},
+{"package":"com.truecaller","appName":"True
+caller"},
+{"package":"com.google.android.apps.googlev
+oice","appName":"Google Voice"},
+{"package":"com.google.android.dialer","app
+Name":"Google Phone"}
+],
+"GAMES": [
+{"package":"com.tencent.ig","appName":"PUBG 
+Mobile"},
+{"package":"com.pubg.imobile","appName":"BG
+MI"},
+{"package":"com.dts.freefireth","appName":"
+Free Fire"},
+{"package":"com.dts.freefiremax","appName":
+"Free Fire MAX"},
+{"package":"com.mojang.minecraftpe","appNam
+e":"Minecraft"},
+{"package":"com.roblox.client","appName":"R
+oblox"},
+{"package":"com.supercell.clashofclans","ap
+pName":"Clash of Clans"},
+{"package":"com.supercell.clashroyale","app
+Name":"Clash Royale"},
+{"package":"com.supercell.brawlstars","appN
+ame":"Brawl Stars"},
+{"package":"com.king.candycrushsaga","appNa
+me":"Candy Crush Saga"},
+{"package":"com.kiloo.subwaysurf","appName"
+:"Subway Surfers"},
+{"package":"com.imangi.templerun2","appName
+":"Temple Run 2"},
+{"package":"com.gameloft.android.ANMP.Gloft
+A9HM","appName":"Asphalt 9"},
+{"package":"com.activision.callofduty.shoot
+er","appName":"Call of Duty Mobile"},
+{"package":"com.nianticlabs.pokemongo","app
+Name":"Pokémon GO"},
+{"package":"com.ea.gp.fifamobile","appName"
+:"EA SPORTS FC Mobile"},
+{"package":"com.miniclip.eightballpool","ap
+pName":"8 Ball Pool"},
+{"package":"com.ludo.king","appName":"Ludo 
+King"},
+{"package":"com.innersloth.spacemafia","app
+Name":"Among Us"},
+{"package":"com.miHoYo.GenshinImpact","appN
+ame":"Genshin Impact"},
+{"package":"com.HoYoverse.hkrpgoversea","ap
+pName":"Honkai: Star Rail"},
+{"package":"com.kiloo.stumbleguys","appName
+":"Stumble Guys"},
+{"package":"com.headup.escaperoad","appName
+":"Escape Road"},
+{"package":"com.junglee.rummy","appName":"R
+ummyCircle"},
+{"package":"com.games24x7.rummy","appName":
+"Rummy Circle (24x7)"}
+],
+"ENTERTAINMENT": [
+{"package":"com.netflix.mediaclient","appNa
+me":"Netflix"},
+{"package":"com.amazon.avod.thirdpartyclien
+t","appName":"Amazon Prime Video"},
+{"package":"com.sonyliv","appName":"Sony 
+LIV"},
+{"package":"com.graymatrix.did","appName":"
+ZEE5"},
+{"package":"com.mxtech.videoplayer.ad","app
+Name":"MX Player"},
+{"package":"com.plexapp.android","appName":
+"Plex"},
+{"package":"com.crunchyroll.crunchyroid","a
+ppName":"Crunchyroll"},
+{"package":"tv.twitch.android.app","appName
+":"Twitch"},
+{"package":"com.jio.media.jiobeats","appNam
+e":"JioCinema"},
+{"package":"com.voot","appName":"Voot"},
+{"package":"com.balaji.alt","appName":"ALTB
+alaji"},
+{"package":"com.viu.mobile","appName":"Viu"
+}
+],
+"VIDEO": [
+{"package":"com.google.android.youtube","ap
+pName":"YouTube"},
+{"package":"com.google.android.apps.youtube
+.kids","appName":"YouTube Kids"},
+{"package":"com.vimeo.android.videoapp","ap
+pName":"Vimeo"},
+{"package":"org.videolan.vlc","appName":"VL
+C"}
+],
+"MUSIC": [
+{"package":"com.spotify.music","appName":"S
+potify"},
+{"package":"com.google.android.apps.youtube
+.music","appName":"YouTube Music"},
+{"package":"com.apple.android.music","appNa
+me":"Apple Music"},
+{"package":"com.amazon.mp3","appName":"Amaz
+on Music"},
+{"package":"com.soundcloud.android","appNam
+e":"SoundCloud"},
+{"package":"deezer.android.app","appName":"
+Deezer"},
+{"package":"com.aspiro.tidal","appName":"TI
+DAL"},
+{"package":"com.jio.saavn","appName":"JioSa
+avn"},
+{"package":"com.gaana","appName":"Gaana"},
+{"package":"com.bsbportal.music","appName":
+"Wynk Music"},
+{"package":"com.shazam.android","appName":"
+Shazam"}
+],
+"PRODUCTIVITY": [
+{"package":"com.google.android.apps.docs","
+appName":"Google Drive"},
+{"package":"com.google.android.apps.docs.ed
+itors.docs","appName":"Google Docs"},
+{"package":"com.google.android.apps.docs.ed
+itors.sheets","appName":"Google Sheets"},
+{"package":"com.google.android.apps.docs.ed
+itors.slides","appName":"Google Slides"},
+{"package":"com.google.android.keep","appNa
+me":"Google Keep"},
+{"package":"com.google.android.calendar","a
+ppName":"Google Calendar"},
+{"package":"com.google.android.apps.tasks",
+"appName":"Google Tasks"},
+{"package":"com.microsoft.todos","appName":
+"Microsoft To Do"},
+{"package":"notion.id","appName":"Notion"},
+{"package":"com.evernote","appName":"Everno
+te"},
+{"package":"com.todoist","appName":"Todoist
+"},
+{"package":"com.trello","appName":"Trello"}
+,
+{"package":"com.asana.app","appName":"Asana
+"},
+{"package":"com.Slack","appName":"Slack"},
+{"package":"com.microsoft.office.onenote","
+appName":"Microsoft OneNote"},
+{"package":"com.ticktick.task","appName":"T
+ickTick"},
+{"package":"com.anydo","appName":"Any.do"},
+{"package":"com.microsoft.skydrive","appNam
+e":"OneDrive"},
+{"package":"com.dropbox.android","appName":
+"Dropbox"},
+{"package":"com.microsoft.office.word","app
+Name":"Microsoft Word"},
+{"package":"com.microsoft.office.excel","ap
+pName":"Microsoft Excel"},
+{"package":"com.microsoft.office.powerpoint
+","appName":"Microsoft PowerPoint"},
+{"package":"com.adobe.reader","appName":"Ad
+obe Acrobat"},
+{"package":"cn.wps.moffice_eng","appName":"
+WPS Office"},
+{"package":"com.canva.editor","appName":"Ca
+nva"}
+],
+"EMAIL": [
+{"package":"com.google.android.gm","appName
+":"Gmail"},
+{"package":"com.microsoft.office.outlook","
+appName":"Outlook"},
+{"package":"com.yahoo.mobile.client.android
+.mail","appName":"Yahoo Mail"},
+{"package":"ch.protonmail.android","appName
+":"Proton Mail"},
+{"package":"com.zoho.mail","appName":"Zoho 
+Mail"},
+{"package":"com.readdle.spark","appName":"S
+park"},
+{"package":"me.bluemail.mail","appName":"Bl
+ueMail"}
+],
+"EDUCATION": [
+{"package":"com.google.android.apps.classro
+om","appName":"Google Classroom"},
+{"package":"com.duolingo","appName":"Duolin
+go"},
+{"package":"org.coursera.android","appName"
+:"Coursera"},
+{"package":"com.udemy.android","appName":"U
+demy"},
+{"package":"org.khanacademy.android","appNa
+me":"Khan Academy"},
+{"package":"com.quizlet.quizletandroid","ap
+pName":"Quizlet"},
+{"package":"com.unacademyapp","appName":"Un
+academy"},
+{"package":"xyz.penpencil.physicswala","app
+Name":"Physics Wallah"},
+{"package":"com.vedantu.app","appName":"Ved
+antu"},
+{"package":"com.toppr.app","appName":"Toppr
+"},
+{"package":"com.byjus.thelearningapp","appN
+ame":"BYJU'S"}
+],
+"FINANCE": [
+{"package":"com.google.android.apps.nbu.pai
+sa.user","appName":"Google Pay"},
+{"package":"com.phonepe.app","appName":"Pho
+nePe"},
+{"package":"net.one97.paytm","appName":"Pay
+tm"},
+{"package":"in.org.npci.upiapp","appName":"
+BHIM"},
+{"package":"com.dreamplug.androidapp","appN
+ame":"CRED"},
+{"package":"com.mobikwik_new","appName":"Mo
+bikwik"},
+{"package":"com.zerodha.kite3","appName":"Z
+erodha Kite"},
+{"package":"com.nextbillion.groww","appName
+":"Groww"},
+{"package":"in.upstox.pro","appName":"Upsto
+x"},
+{"package":"com.msf.angelmobile","appName":
+"Angel One"},
+{"package":"com.indmoney.indstocks","appNam
+e":"INDmoney"},
+{"package":"com.sbi.lotusintouch","appName"
+:"SBI YONO"},
+{"package":"com.csam.icici.bank.imobile","a
+ppName":"ICICI iMobile"},
+{"package":"com.axis.mobile","appName":"Axi
+s Mobile"},
+{"package":"com.kotak811","appName":"Kotak 
+811"},
+{"package":"com.idfcfirstbank.optimus","app
+Name":"IDFC FIRST"},
+{"package":"com.sliceit.app","appName":"Sli
+ce"},
+{"package":"money.jupiter","appName":"Jupit
+er"},
+{"package":"com.fi.money","appName":"Fi 
+Money"},
+{"package":"com.navi.pl","appName":"Navi"}
+],
+"SHOPPING": [
+{"package":"in.amazon.mShop.android.shoppin
+g","appName":"Amazon"},
+{"package":"com.flipkart.android","appName"
+:"Flipkart"},
+{"package":"com.myntra.android","appName":"
+Myntra"},
+{"package":"com.meesho.supply","appName":"M
+eesho"},
+{"package":"com.ril.ajio","appName":"AJIO"}
+,
+{"package":"com.tatadigital.tcp","appName":
+"Tata CLiQ"},
+{"package":"com.fsn.nykaa","appName":"Nykaa
+"},
+{"package":"com.snapdeal.main","appName":"S
+napdeal"},
+{"package":"com.ebay.mobile","appName":"eBa
+y"},
+{"package":"com.etsy.android","appName":"Et
+sy"},
+{"package":"com.einnovation.temu","appName"
+:"Temu"},
+{"package":"com.zzkko","appName":"SHEIN"}
+],
+"FOOD_DELIVERY": [
+{"package":"in.swiggy.android","appName":"S
+wiggy"},
+{"package":"com.application.zomato","appNam
+e":"Zomato"},
+{"package":"com.grofers.customerapp","appNa
+me":"Blinkit"},
+{"package":"com.zeptoconsumerapp","appName"
+:"Zepto"},
+{"package":"com.bigbasket.mobileapp","appNa
+me":"BigBasket"},
+{"package":"com.Dominos","appName":"Domino'
+s"},
+{"package":"com.rebelfoods.faasos","appName
+":"EatSure"}
+],
+"TRAVEL": [
+{"package":"com.makemytrip","appName":"Make
+MyTrip"},
+{"package":"com.goibibo","appName":"Goibibo
+"},
+{"package":"com.booking","appName":"Booking
+.com"},
+{"package":"com.airbnb.android","appName":"
+Airbnb"},
+{"package":"com.agoda.mobile.consumer","app
+Name":"Agoda"},
+{"package":"com.expedia.bookings","appName"
+:"Expedia"},
+{"package":"cris.org.in.prs.ima","appName":
+"IRCTC Rail Connect"},
+{"package":"com.ixigo","appName":"ixigo"},
+{"package":"in.redbus.android","appName":"r
+edBus"},
+{"package":"com.cleartrip.android","appName
+":"Cleartrip"},
+{"package":"net.skyscanner.android.main","a
+ppName":"Skyscanner"}
+],
+"MAPS_NAVIGATION": [
+{"package":"com.google.android.apps.maps","
+appName":"Google Maps"},
+{"package":"com.waze","appName":"Waze"},
+{"package":"com.here.app.maps","appName":"H
+ERE WeGo"},
+{"package":"com.mapmyindia.mmi","appName":"
+Mappls"},
+{"package":"com.google.earth","appName":"Go
+ogle Earth"}
+],
+"PHOTOGRAPHY": [
+{"package":"com.google.android.apps.photos"
+,"appName":"Google Photos"},
+{"package":"com.adobe.lrmobile","appName":"
+Adobe Lightroom"},
+{"package":"com.niksoftware.snapseed","appN
+ame":"Snapseed"},
+{"package":"com.picsart.studio","appName":"
+Picsart"},
+{"package":"com.vsco.cam","appName":"VSCO"}
+,
+{"package":"com.bigwinepot.nwdn.internation
+al","appName":"Remini"},
+{"package":"com.photoroom.app","appName":"P
+hotoRoom"}
+],
+"VIDEO_EDITING": [
+{"package":"com.lemon.lvoverseas","appName"
+:"CapCut"},
+{"package":"com.frontrow.vlog","appName":"V
+N"},
+{"package":"com.camerasideas.instashot","ap
+pName":"InShot"},
+{"package":"com.nexstreaming.app.kinemaster
+free","appName":"KineMaster"},
+{"package":"com.alightcreative.motion","app
+Name":"Alight Motion"},
+{"package":"com.adobe.premiererush.videoedi
+tor","appName":"Adobe Premiere Rush"}
+],
+"HEALTH_FITNESS": [
+{"package":"com.google.android.apps.fitness
+","appName":"Google Fit"},
+{"package":"com.fitbit.FitbitMobile","appNa
+me":"Fitbit"},
+{"package":"com.strava","appName":"Strava"}
+,
+{"package":"com.nike.plusgps","appName":"Ni
+ke Run Club"},
+{"package":"com.sec.android.app.shealth","a
+ppName":"Samsung Health"},
+{"package":"com.myfitnesspal.android","appN
+ame":"MyFitnessPal"},
+{"package":"com.healthifyme.basic","appName
+":"HealthifyMe"},
+{"package":"com.getsomeheadspace.android","
+appName":"Headspace"},
+{"package":"com.calm.android","appName":"Ca
+lm"},
+{"package":"com.practo.android","appName":"
+Practo"},
+{"package":"com.pharmeasy.retail","appName"
+:"PharmEasy"},
+{"package":"com.onemg.app","appName":"1mg 
+(Tata 1mg)"}
+],
+"NEWS": [
+{"package":"com.google.android.apps.magazin
+es","appName":"Google News"},
+{"package":"com.nis.app","appName":"Inshort
+s"},
+{"package":"com.toi.reader.activities","app
+Name":"Times of India"},
+{"package":"bbc.mobile.news.ww","appName":"
+BBC News"},
+{"package":"com.cnn.mobile.android.phone","
+appName":"CNN"},
+{"package":"com.thomsonreuters.reuters","ap
+pName":"Reuters"},
+{"package":"com.eterno","appName":"Dailyhun
+t"},
+{"package":"flipboard.app","appName":"Flipb
+oard"}
+],
+"WEATHER": [
+{"package":"com.accuweather.android","appNa
+me":"AccuWeather"},
+{"package":"com.weather.Weather","appName":
+"The Weather Channel"},
+{"package":"com.windyty.android","appName":
+"Windy"},
+{"package":"de.wetteronline.wetterapp","app
+Name":"Weather & Radar"}
+],
+"UTILITIES": [
+{"package":"com.google.ar.lens","appName":"
+Google Lens"},
+{"package":"com.google.android.apps.transla
+te","appName":"Google Translate"},
+{"package":"com.google.android.apps.nbu.fil
+es","appName":"Files by Google"},
+{"package":"com.estrongs.android.pop","appN
+ame":"ES File Explorer"}
+],
+"BROWSER": [
+{"package":"com.android.chrome","appName":"
+Google Chrome"},
+{"package":"org.mozilla.firefox","appName":
+"Firefox"},
+{"package":"com.microsoft.emmx","appName":"
+Microsoft Edge"},
+{"package":"com.opera.browser","appName":"O
+pera"},
+{"package":"com.brave.browser","appName":"B
+rave"},
+{"package":"com.duckduckgo.mobile.android",
+"appName":"DuckDuckGo"},
+{"package":"com.sec.android.app.sbrowser","
+appName":"Samsung Internet"},
+{"package":"com.vivaldi.browser","appName":
+"Vivaldi"}
+],
+"DEVELOPER": [
+{"package":"com.github.android","appName":"
+GitHub"},
+{"package":"com.gitlab.android","appName":"
+GitLab"},
+{"package":"com.termux","appName":"Termux"}
+,
+{"package":"com.foxdebug.acode","appName":"
+Acode"},
+{"package":"io.spck","appName":"Spck 
+Editor"},
+{"package":"ru.iiec.pydroid3","appName":"Py
+droid 3"},
+{"package":"com.stackexchange.marvin","appN
+ame":"Stack Exchange"}
+],
+"AI": [
+{"package":"com.openai.chatgpt","appName":"
+ChatGPT"},
+{"package":"com.google.android.apps.bard","
+appName":"Gemini"},
+{"package":"com.microsoft.copilot","appName
+":"Microsoft Copilot"},
+{"package":"com.anthropic.claude","appName"
+:"Claude"},
+{"package":"ai.perplexity.app.android","app
+Name":"Perplexity"},
+{"package":"com.poe.android","appName":"Poe
+"},
+{"package":"ai.character.app","appName":"Ch
+aracter.AI"},
+{"package":"com.meta.ai","appName":"Meta 
+AI"}
+],
+"SECURITY": [
+{"package":"com.google.android.apps.authent
+icator2","appName":"Google Authenticator"},
+{"package":"com.azure.authenticator","appNa
+me":"Microsoft Authenticator"},
+{"package":"com.authy.authy","appName":"Aut
+hy"},
+{"package":"com.x8bit.bitwarden","appName":
+"Bitwarden"},
+{"package":"com.onepassword.android","appNa
+me":"1Password"},
+{"package":"proton.android.pass","appName":
+"Proton Pass"},
+{"package":"com.nordvpn.android","appName":
+"NordVPN"},
+{"package":"ch.protonvpn.android","appName"
+:"Proton VPN"}
+],
+"GOVERNMENT": [
+{"package":"in.gov.umang.negd.g2c","appName
+":"UMANG"},
+{"package":"in.gov.digilocker.android","app
+Name":"DigiLocker"},
+{"package":"in.gov.uidai.mAadhaarPlus","app
+Name":"mAadhaar"},
+{"package":"com.nic.mparivahan","appName":"
+mParivahan"},
+{"package":"nic.goi.aarogyasetu","appName":
+"Aarogya Setu"}
+],
+"TRANSPORTATION": [
+{"package":"com.ubercab","appName":"Uber"},
+{"package":"com.olacabs.customer","appName"
+:"Ola"},
+{"package":"com.rapido.passenger","appName"
+:"Rapido"},
+{"package":"com.tranzmate","appName":"Moovi
+t"}
+],
+"DATING": [
+{"package":"com.tinder","appName":"Tinder"}
+,
+{"package":"com.bumble.app","appName":"Bumb
+le"},
+{"package":"co.hinge.app","appName":"Hinge"
+},
+{"package":"com.okcupid.okcupid","appName":
+"OkCupid"},
+{"package":"com.ftw_and_co.happn","appName"
+:"happn"},
+{"package":"com.trulymadly.android","appNam
+e":"TrulyMadly"}
+],
+"BOOKS_READING": [
+{"package":"com.amazon.kindle","appName":"K
+indle"},
+{"package":"com.google.android.apps.books",
+"appName":"Google Play Books"},
+{"package":"com.audible.application","appNa
+me":"Audible"},
+{"package":"wp.wattpad","appName":"Wattpad"
+},
+{"package":"com.medium.reader","appName":"M
+edium"},
+{"package":"com.scribd.app.reader0","appNam
+e":"Scribd"}
+],
+"KIDS": [
+{"package":"com.google.android.apps.youtube
+.kids","appName":"YouTube Kids"},
+{"package":"com.google.android.apps.kids.fa
+milylink","appName":"Google Family Link"},
+{"package":"org.khankids.android","appName"
+:"Khan Academy Kids"}
+],
+"ART_DESIGN": [
+{"package":"com.canva.editor","appName":"Ca
+nva"},
+{"package":"com.adobe.spark.post","appName"
+:"Adobe Express"},
+{"package":"jp.ne.ibis.ibispaintx.app","app
+Name":"ibisPaint X"},
+{"package":"com.brakefield.painter","appNam
+e":"Infinite Painter"}
+],
+"LIFESTYLE": [
+{"package":"com.pinterest","appName":"Pinte
+rest"},
+{"package":"com.goodreads","appName":"Goodr
+eads"},
+{"package":"com.yelp.android","appName":"Ye
+lp"}
+]
+}
+Coverage note: this seeds ~230 of the most common apps
+for a general + India-weighted audience. Anything not in
+this list falls through to the resolver in Section 4 (package
+rules → Play category → keyword match → OTHER), so
+the launcher stays robust as new apps are installed.
+6. First-Launch Flow (implementation notes
+for Kotlin/Compose)
+1. 
+2. 
+3. 
+4. 
+On first launch, enumerate installed launchable apps via
+PackageManager (
+queryIntentActivities on
+ACTION_MAIN /
+CATEGORY_LAUNCHER ).
+Load 
+app_classification_seed.json from assets
+into an in-memory map (
+packageName -> Category )
+at app start; cache in Room so it only re-parses on
+version bump.
+Run the Section 4 resolver for every installed app, off the
+main thread (Coroutine + 
+Dispatchers.Default ).
+Group results by the Section 3 collapse map into final
+folders.
+5. Apply the "fold empty folders" rule (< 3 apps → merge
+into nearest folder or Other).
+6. Persist the generated folder structure so it becomes the
+user's editable starting layout — this seeding only ever
+runs once, on first launch (or on explicit "re-sort" from
+settings).
+7. 
+Log any package that hit the 
+OTHER /unmatched branch
+(locally) so future DB updates can absorb it.

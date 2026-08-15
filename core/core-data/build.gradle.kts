@@ -30,7 +30,9 @@ kapt {
 
 dependencies {
     api(project(":core:core-domain"))
-    
+
+    testImplementation("junit:junit:4.13.2")
+
     // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)

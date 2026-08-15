@@ -6,7 +6,9 @@ import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.os.Process
 import android.os.UserManager
+import com.unfold.core.data.local.AppDatabaseSeedData
 import com.unfold.core.data.local.dao.AppDao
+import com.unfold.core.data.local.dao.FolderDao
 import com.unfold.core.data.local.entity.AppEntity
 import com.unfold.core.domain.model.AppInfo
 import com.unfold.core.domain.repository.AppRepository
@@ -25,6 +27,7 @@ import com.unfold.core.domain.navigation.UnfoldRoute
 class AppRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val appDao: AppDao,
+    private val folderDao: FolderDao,
     private val gestureDao: com.unfold.core.data.local.dao.GestureDao
 ) : AppRepository {
 
@@ -35,15 +38,11 @@ class AppRepositoryImpl @Inject constructor(
     }
 
     override suspend fun refreshFromPackageManager() = withContext(Dispatchers.IO) {
-        // Defensively seed default gestures on startup/sync to support pre-existing databases
-        val defaultGestures = listOf(
-            GestureEntity("SWIPE_LEFT_1F", "OPEN_INTENT", targetIntentUri = "tel:"),
-            GestureEntity("SWIPE_RIGHT_1F", "LAUNCH_APP", targetPackage = "com.whatsapp"),
-            GestureEntity("SWIPE_LEFT_2F", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.HiddenSpace.route),
-            GestureEntity("SWIPE_RIGHT_2F", "OPEN_INTENT", targetIntentUri = "market://details?id="),
-            GestureEntity("SWIPE_DOWN_1F", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.UniversalSearch.route),
-            GestureEntity("SWIPE_UP_1F", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.AppDrawer.route)
-        )
+        if (folderDao.getAllFolders().isEmpty()) {
+            folderDao.insertFolders(AppDatabaseSeedData.defaultFolders())
+        }
+
+        val defaultGestures = AppDatabaseSeedData.defaultGestures()
         defaultGestures.forEach { defaultGesture ->
             if (gestureDao.getBinding(defaultGesture.gestureType) == null) {
                 gestureDao.insertBinding(defaultGesture)
@@ -147,6 +146,9 @@ class AppRepositoryImpl @Inject constructor(
                 }
             }
 
+            val category = existing?.category ?: AppDatabaseSeedData.resolveCategory(app.packageName, app.label)
+            val folderId = existing?.folderId ?: AppDatabaseSeedData.folderIdForCategory(category)
+
             AppEntity(
                 appId = app.appId,
                 packageName = app.packageName,
@@ -156,9 +158,9 @@ class AppRepositoryImpl @Inject constructor(
                 isHidden = existing?.isHidden ?: false,
                 isLocked = existing?.isLocked ?: false,
                 customLabel = existing?.customLabel,
-                folderId = existing?.folderId,
+                folderId = if (isFirstRun) folderId else existing?.folderId,
                 gridPosition = assignedPosition,
-                category = existing?.category,
+                category = if (isFirstRun) category else existing?.category,
                 installTimestamp = existing?.installTimestamp ?: System.currentTimeMillis(),
                 lastUsedTimestamp = existing?.lastUsedTimestamp ?: 0L,
                 launchCount = existing?.launchCount ?: 0L
