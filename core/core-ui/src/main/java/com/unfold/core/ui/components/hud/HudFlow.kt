@@ -70,8 +70,12 @@ fun HudFlow(
     )
 
     LaunchedEffect(Unit) {
+        val permsToRequest = mutableListOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            permsToRequest.add("android.permission.POST_NOTIFICATIONS")
+        }
         if (!hasCalendarPermission) {
-            permissionLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
+            permissionLauncher.launch(permsToRequest.toTypedArray())
         }
     }
 
@@ -88,7 +92,8 @@ fun HudFlow(
         // Mode Switcher
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy((8 * scale).dp)
+            horizontalArrangement = Arrangement.spacedBy((8 * scale).dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             FlowMode.values().forEach { mode ->
                 val isSelected = currentMode == mode
@@ -112,15 +117,31 @@ fun HudFlow(
                     )
                 }
             }
-        }
-
-        // Quick Actions
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy((6 * scale).dp)
-        ) {
-            QuickActionItem(icon = Icons.Default.Notifications, label = "Reminder", scale = scale, modifier = Modifier.weight(1f))
-            QuickActionItem(icon = Icons.Default.Event, label = "Event", scale = scale, modifier = Modifier.weight(1f))
+            // System Alarm Bell Icon
+            Box(
+                modifier = Modifier
+                    .size((30 * scale).dp)
+                    .clip(RoundedCornerShape((8 * scale).dp))
+                    .background(theme.bgPanel.copy(alpha = 0.3f))
+                    .border(1.dp, theme.panelBorder.copy(alpha = 0.2f), RoundedCornerShape((8 * scale).dp))
+                    .clickable { 
+                        try {
+                            val alarmIntent = android.content.Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)
+                            alarmIntent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                            context.startActivity(alarmIntent)
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "No alarm app found.", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Notifications,
+                    contentDescription = "Alarms",
+                    tint = theme.textSecondary,
+                    modifier = Modifier.size((16 * scale).dp)
+                )
+            }
         }
 
         // Content Area based on mode
@@ -243,10 +264,11 @@ fun FlowTimelineContent(timelineItems: List<TimelineItem>, scale: Float, onLoadM
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     
-    val shouldLoadMore = remember {
+    val shouldLoadMore = remember(listState, timelineItems.size) {
         derivedStateOf {
             val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-            lastVisibleItem != null && lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 2
+            val totalItems = listState.layoutInfo.totalItemsCount
+            lastVisibleItem != null && lastVisibleItem.index >= totalItems - 8
         }
     }
     
@@ -260,7 +282,9 @@ fun FlowTimelineContent(timelineItems: List<TimelineItem>, scale: Float, onLoadM
         val now = System.currentTimeMillis()
         val endTime = it.endTimeMillis ?: it.startTimeMillis
         it.startTimeMillis >= now || endTime >= now
-    }.sortedBy { it.startTimeMillis }.map { 
+    }.sortedBy { it.startTimeMillis }
+    .distinctBy { it.title to it.startTimeMillis }
+    .map { 
         val dateTitle = when (val diff = (it.startTimeMillis - System.currentTimeMillis()) / (1000 * 60 * 60 * 24)) {
             0L -> "TODAY"
             1L -> "TOMORROW"
@@ -290,13 +314,20 @@ fun FlowTimelineContent(timelineItems: List<TimelineItem>, scale: Float, onLoadM
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 1.sp
                 )
-                Text(
-                    text = "SYNC",
-                    color = theme.textMuted,
-                    fontSize = (10 * scale).sp,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.clickable { onRefresh() }
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape((6 * scale).dp))
+                        .background(theme.bgPanel.copy(alpha = 0.5f))
+                        .clickable { onRefresh() }
+                        .padding(horizontal = (8 * scale).dp, vertical = (4 * scale).dp)
+                ) {
+                    Text(
+                        text = "SYNC",
+                        color = theme.textMuted,
+                        fontSize = (10 * scale).sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
             }
         }
         
@@ -553,7 +584,7 @@ fun FlowNotesContent(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         textStyle = androidx.compose.ui.text.TextStyle(
-                            color = theme.textPrimary,
+                            color = theme.accentPrimary,
                             fontSize = (14 * scale).sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
@@ -561,7 +592,7 @@ fun FlowNotesContent(
                         cursorBrush = androidx.compose.ui.graphics.SolidColor(theme.accentPrimary),
                         decorationBox = { innerTextField ->
                             if (title.text.isEmpty()) {
-                                Text("Title", color = theme.textMuted, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                Text("Title", color = theme.accentPrimary, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                             }
                             innerTextField()
                         }
@@ -782,28 +813,36 @@ fun insertEventToCalendar(context: android.content.Context, title: String, start
         return
     }
     
-    // Find primary calendar
+    var calendarId = 1L // fallback
+    
     val projection = arrayOf(
         android.provider.CalendarContract.Calendars._ID,
-        android.provider.CalendarContract.Calendars.IS_PRIMARY
+        android.provider.CalendarContract.Calendars.ACCOUNT_TYPE
     )
+    val selection = "${android.provider.CalendarContract.Calendars.VISIBLE} = 1"
+    
     val cursor = context.contentResolver.query(
         android.provider.CalendarContract.Calendars.CONTENT_URI,
         projection,
-        "${android.provider.CalendarContract.Calendars.VISIBLE} = 1",
+        selection,
         null,
         null
     )
-    var calendarId = 1L // fallback
+    
     cursor?.use {
+        val idIndex = it.getColumnIndexOrThrow(android.provider.CalendarContract.Calendars._ID)
+        val accTypeIndex = it.getColumnIndexOrThrow(android.provider.CalendarContract.Calendars.ACCOUNT_TYPE)
+        
         while (it.moveToNext()) {
-            val id = it.getLong(0)
-            val isPrimary = it.getInt(1)
-            if (isPrimary == 1) {
+            val id = it.getLong(idIndex)
+            val accType = it.getString(accTypeIndex)
+            
+            // Prioritize google calendar
+            if (accType == "com.google") {
                 calendarId = id
                 break
-            } else {
-                calendarId = id // use any visible if primary not found
+            } else if (calendarId == 1L) {
+                calendarId = id
             }
         }
     }
@@ -819,21 +858,22 @@ fun insertEventToCalendar(context: android.content.Context, title: String, start
 }
 
 fun setReminder(context: android.content.Context, noteText: String, timeInMillis: Long) {
-    val alarmManager = context.getSystemService(android.content.Context.ALARM_SERVICE) as android.app.AlarmManager
-    
-    val intent = android.content.Intent(context, com.unfold.core.ui.components.hud.ReminderReceiver::class.java).apply {
-        putExtra("noteText", noteText)
-    }
-    val pendingIntent = android.app.PendingIntent.getBroadcast(
-        context, 
-        noteText.hashCode(), 
-        intent, 
-        android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-    )
-    
     try {
-        alarmManager.setExact(android.app.AlarmManager.RTC_WAKEUP, timeInMillis, pendingIntent)
-    } catch (e: SecurityException) {
-        android.widget.Toast.makeText(context, "Permission to set exact alarms is denied.", android.widget.Toast.LENGTH_LONG).show()
+        val calendar = java.util.Calendar.getInstance().apply {
+            this.timeInMillis = timeInMillis
+        }
+        val hour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+        val minute = calendar.get(java.util.Calendar.MINUTE)
+
+        val intent = android.content.Intent(android.provider.AlarmClock.ACTION_SET_ALARM).apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+            putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, noteText)
+            putExtra(android.provider.AlarmClock.EXTRA_HOUR, hour)
+            putExtra(android.provider.AlarmClock.EXTRA_MINUTES, minute)
+            putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
+        }
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        android.widget.Toast.makeText(context, "Unable to set alarm. Missing app or permission.", android.widget.Toast.LENGTH_LONG).show()
     }
 }

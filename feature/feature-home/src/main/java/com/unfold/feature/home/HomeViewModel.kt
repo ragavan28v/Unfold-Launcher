@@ -69,6 +69,40 @@ sealed interface HomeUiIntent {
     data object RefreshStats : HomeUiIntent
 }
 
+object TimelinePaging {
+    const val INITIAL_WINDOW_DAYS = 365
+    const val LOAD_MORE_WINDOW_DAYS = 30
+    const val PRELOAD_THRESHOLD = 8
+
+    fun computeInitialEndTime(startOfWindow: Long): Long {
+        val calendar = java.util.Calendar.getInstance().apply {
+            timeInMillis = startOfWindow
+            add(java.util.Calendar.DAY_OF_YEAR, INITIAL_WINDOW_DAYS)
+            set(java.util.Calendar.HOUR_OF_DAY, 23)
+            set(java.util.Calendar.MINUTE, 59)
+            set(java.util.Calendar.SECOND, 59)
+            set(java.util.Calendar.MILLISECOND, 999)
+        }
+        return calendar.timeInMillis
+    }
+
+    fun computeNextWindowEnd(currentEndTime: Long): Long {
+        val calendar = java.util.Calendar.getInstance().apply {
+            timeInMillis = currentEndTime
+            add(java.util.Calendar.DAY_OF_YEAR, LOAD_MORE_WINDOW_DAYS)
+            set(java.util.Calendar.HOUR_OF_DAY, 23)
+            set(java.util.Calendar.MINUTE, 59)
+            set(java.util.Calendar.SECOND, 59)
+            set(java.util.Calendar.MILLISECOND, 999)
+        }
+        return calendar.timeInMillis
+    }
+
+    fun shouldLoadMore(totalItems: Int, lastVisibleIndex: Int, threshold: Int = PRELOAD_THRESHOLD): Boolean {
+        return totalItems > 0 && lastVisibleIndex >= totalItems - threshold
+    }
+}
+
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val getInstalledApps: GetInstalledAppsUseCase,
@@ -88,51 +122,46 @@ class HomeViewModel @Inject constructor(
     private var timelineCurrentEndTime: Long = 0L
     private var isLoadingMoreTimeline = false
 
-    fun loadMoreTimelineEvents() {
-        if (isLoadingMoreTimeline) return
-        isLoadingMoreTimeline = true
-        
-        val newEndTime = java.util.Calendar.getInstance().apply {
-            timeInMillis = timelineCurrentEndTime
-            add(java.util.Calendar.DAY_OF_YEAR, 7)
-        }.timeInMillis
-
-        // Initial fetch: Today + 7 days
-        val startOfToday = java.util.Calendar.getInstance().apply {
+    private fun startOfToday(): Long {
+        return java.util.Calendar.getInstance().apply {
             set(java.util.Calendar.HOUR_OF_DAY, 0)
             set(java.util.Calendar.MINUTE, 0)
             set(java.util.Calendar.SECOND, 0)
             set(java.util.Calendar.MILLISECOND, 0)
         }.timeInMillis
+    }
 
-        getTimeline(startOfToday, newEndTime)
+    private fun mergeTimelineItems(existing: List<com.unfold.core.domain.model.TimelineItem>, incoming: List<com.unfold.core.domain.model.TimelineItem>): List<com.unfold.core.domain.model.TimelineItem> {
+        val merged = linkedMapOf<String, com.unfold.core.domain.model.TimelineItem>()
+        existing.forEach { merged[it.id] = it }
+        incoming.forEach { merged[it.id] = it }
+        return merged.values.sortedBy { it.startTimeMillis }
+    }
+
+    fun loadMoreTimelineEvents() {
+        if (isLoadingMoreTimeline) return
+
+        val startTime = if (timelineCurrentEndTime <= 0L) startOfToday() else timelineCurrentEndTime + 1
+        val endTime = TimelinePaging.computeNextWindowEnd(startTime.coerceAtLeast(timelineCurrentEndTime))
+        if (endTime <= startTime) return
+
+        isLoadingMoreTimeline = true
+        getTimeline(startTime, endTime)
             .onEach { items ->
-                _uiState.value = _uiState.value.copy(timelineItems = items)
-                timelineCurrentEndTime = newEndTime
+                val merged = mergeTimelineItems(_uiState.value.timelineItems, items)
+                _uiState.value = _uiState.value.copy(timelineItems = merged)
+                timelineCurrentEndTime = endTime
                 isLoadingMoreTimeline = false
             }
             .launchIn(viewModelScope)
     }
 
     fun refreshTimelineEvents() {
-        val startOfToday = java.util.Calendar.getInstance().apply {
-            set(java.util.Calendar.HOUR_OF_DAY, 0)
-            set(java.util.Calendar.MINUTE, 0)
-            set(java.util.Calendar.SECOND, 0)
-            set(java.util.Calendar.MILLISECOND, 0)
-        }.timeInMillis
-        val endOfNextWeek = java.util.Calendar.getInstance().apply {
-            timeInMillis = startOfToday
-            add(java.util.Calendar.DAY_OF_YEAR, 7)
-            set(java.util.Calendar.HOUR_OF_DAY, 23)
-            set(java.util.Calendar.MINUTE, 59)
-            set(java.util.Calendar.SECOND, 59)
-            set(java.util.Calendar.MILLISECOND, 999)
-        }.timeInMillis
-        
-        timelineCurrentEndTime = endOfNextWeek
+        val startTime = startOfToday()
+        val endTime = TimelinePaging.computeInitialEndTime(startTime)
+        timelineCurrentEndTime = endTime
 
-        getTimeline(startOfToday, endOfNextWeek)
+        getTimeline(startTime, endTime)
             .onEach { items ->
                 _uiState.value = _uiState.value.copy(timelineItems = items)
             }
@@ -196,25 +225,11 @@ class HomeViewModel @Inject constructor(
             }
             .launchIn(viewModelScope)
 
-        // Initial fetch: Today + 7 days
-        val startOfToday = java.util.Calendar.getInstance().apply {
-            set(java.util.Calendar.HOUR_OF_DAY, 0)
-            set(java.util.Calendar.MINUTE, 0)
-            set(java.util.Calendar.SECOND, 0)
-            set(java.util.Calendar.MILLISECOND, 0)
-        }.timeInMillis
-        val endOfNextWeek = java.util.Calendar.getInstance().apply {
-            timeInMillis = startOfToday
-            add(java.util.Calendar.DAY_OF_YEAR, 7)
-            set(java.util.Calendar.HOUR_OF_DAY, 23)
-            set(java.util.Calendar.MINUTE, 59)
-            set(java.util.Calendar.SECOND, 59)
-            set(java.util.Calendar.MILLISECOND, 999)
-        }.timeInMillis
-        
-        timelineCurrentEndTime = endOfNextWeek
+        val startOfToday = startOfToday()
+        val initialEndTime = TimelinePaging.computeInitialEndTime(startOfToday)
+        timelineCurrentEndTime = initialEndTime
 
-        getTimeline(startOfToday, endOfNextWeek)
+        getTimeline(startOfToday, initialEndTime)
             .onEach { items ->
                 _uiState.value = _uiState.value.copy(timelineItems = items)
             }

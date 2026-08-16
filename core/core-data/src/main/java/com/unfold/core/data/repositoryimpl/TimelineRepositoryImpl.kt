@@ -38,33 +38,36 @@ class TimelineRepositoryImpl @Inject constructor(
             }.timeInMillis
 
             val projection = arrayOf(
-                CalendarContract.Events._ID,
-                CalendarContract.Events.TITLE,
-                CalendarContract.Events.DTSTART,
-                CalendarContract.Events.DTEND,
-                CalendarContract.Events.ALL_DAY,
-                CalendarContract.Events.EVENT_LOCATION
+                CalendarContract.Instances.EVENT_ID,
+                CalendarContract.Instances.TITLE,
+                CalendarContract.Instances.BEGIN,
+                CalendarContract.Instances.END,
+                CalendarContract.Instances.ALL_DAY,
+                CalendarContract.Instances.EVENT_LOCATION
             )
 
-            val selection = "${CalendarContract.Events.DTSTART} >= ? AND ${CalendarContract.Events.DTSTART} <= ?"
-            val selectionArgs = arrayOf(startOfDay.toString(), endOfTomorrow.toString())
-            val sortOrder = "${CalendarContract.Events.DTSTART} ASC"
+            val selection = "${CalendarContract.Instances.VISIBLE} = 1"
+            val sortOrder = "${CalendarContract.Instances.BEGIN} ASC"
+
+            val builder = CalendarContract.Instances.CONTENT_URI.buildUpon()
+            android.content.ContentUris.appendId(builder, startOfDay)
+            android.content.ContentUris.appendId(builder, endOfTomorrow)
 
             val cursor: Cursor? = context.contentResolver.query(
-                CalendarContract.Events.CONTENT_URI,
+                builder.build(),
                 projection,
                 selection,
-                selectionArgs,
+                null,
                 sortOrder
             )
 
             cursor?.use {
-                val idIndex = it.getColumnIndexOrThrow(CalendarContract.Events._ID)
-                val titleIndex = it.getColumnIndexOrThrow(CalendarContract.Events.TITLE)
-                val dtStartIndex = it.getColumnIndexOrThrow(CalendarContract.Events.DTSTART)
-                val dtEndIndex = it.getColumnIndexOrThrow(CalendarContract.Events.DTEND)
-                val allDayIndex = it.getColumnIndexOrThrow(CalendarContract.Events.ALL_DAY)
-                val locationIndex = it.getColumnIndexOrThrow(CalendarContract.Events.EVENT_LOCATION)
+                val idIndex = it.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_ID)
+                val titleIndex = it.getColumnIndexOrThrow(CalendarContract.Instances.TITLE)
+                val dtStartIndex = it.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN)
+                val dtEndIndex = it.getColumnIndexOrThrow(CalendarContract.Instances.END)
+                val allDayIndex = it.getColumnIndexOrThrow(CalendarContract.Instances.ALL_DAY)
+                val locationIndex = it.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_LOCATION)
 
                 while (it.moveToNext()) {
                     val id = it.getLong(idIndex).toString()
@@ -101,33 +104,36 @@ class TimelineRepositoryImpl @Inject constructor(
         
         try {
             val projection = arrayOf(
-                CalendarContract.Events._ID,
-                CalendarContract.Events.TITLE,
-                CalendarContract.Events.DTSTART,
-                CalendarContract.Events.DTEND,
-                CalendarContract.Events.ALL_DAY,
-                CalendarContract.Events.EVENT_LOCATION
+                CalendarContract.Instances.EVENT_ID,
+                CalendarContract.Instances.TITLE,
+                CalendarContract.Instances.BEGIN,
+                CalendarContract.Instances.END,
+                CalendarContract.Instances.ALL_DAY,
+                CalendarContract.Instances.EVENT_LOCATION
             )
 
-            val selection = "${CalendarContract.Events.DTSTART} >= ? AND ${CalendarContract.Events.DTSTART} <= ?"
-            val selectionArgs = arrayOf(startTimeMillis.toString(), endTimeMillis.toString())
-            val sortOrder = "${CalendarContract.Events.DTSTART} ASC"
+            val selection = "${CalendarContract.Instances.VISIBLE} = 1"
+            val sortOrder = "${CalendarContract.Instances.BEGIN} ASC"
+
+            val builder = CalendarContract.Instances.CONTENT_URI.buildUpon()
+            android.content.ContentUris.appendId(builder, startTimeMillis)
+            android.content.ContentUris.appendId(builder, endTimeMillis)
 
             val cursor: Cursor? = context.contentResolver.query(
-                CalendarContract.Events.CONTENT_URI,
+                builder.build(),
                 projection,
                 selection,
-                selectionArgs,
+                null,
                 sortOrder
             )
 
             cursor?.use {
-                val idIndex = it.getColumnIndexOrThrow(CalendarContract.Events._ID)
-                val titleIndex = it.getColumnIndexOrThrow(CalendarContract.Events.TITLE)
-                val dtStartIndex = it.getColumnIndexOrThrow(CalendarContract.Events.DTSTART)
-                val dtEndIndex = it.getColumnIndexOrThrow(CalendarContract.Events.DTEND)
-                val allDayIndex = it.getColumnIndexOrThrow(CalendarContract.Events.ALL_DAY)
-                val locationIndex = it.getColumnIndexOrThrow(CalendarContract.Events.EVENT_LOCATION)
+                val idIndex = it.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_ID)
+                val titleIndex = it.getColumnIndexOrThrow(CalendarContract.Instances.TITLE)
+                val dtStartIndex = it.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN)
+                val dtEndIndex = it.getColumnIndexOrThrow(CalendarContract.Instances.END)
+                val allDayIndex = it.getColumnIndexOrThrow(CalendarContract.Instances.ALL_DAY)
+                val locationIndex = it.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_LOCATION)
 
                 while (it.moveToNext()) {
                     val id = it.getLong(idIndex).toString()
