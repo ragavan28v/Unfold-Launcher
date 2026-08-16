@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.FlashlightOff
+import androidx.compose.material.icons.filled.ViewStream
 import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -386,7 +387,7 @@ fun HomeScreen(
                         
                         // Widgets
                     HudRailItem(
-                        icon = Icons.Default.Dashboard,
+                        icon = Icons.Default.ViewStream,
                         isSelected = pagerState.currentPage == 4,
                         onClick = {
                             coroutineScope.launch { pagerState.animateScrollToPage(4) }
@@ -491,7 +492,17 @@ fun HomeScreen(
                                     scale = scale
                                 )
                                 3 -> HudGoogleFeed(modifier = hudPageModifier, gridRows = rows, scale = scale)
-                                4 -> HudWidgets(modifier = hudPageModifier, gridRows = rows, scale = scale)
+                                4 -> HudFlow(
+                                    timelineItems = state.timelineItems, 
+                                    notes = state.notes,
+                                    modifier = hudPageModifier, 
+                                    gridRows = rows, 
+                                    scale = scale, 
+                                    onLoadMore = { viewModel.loadMoreTimelineEvents() },
+                                    onRefreshTimeline = { viewModel.refreshTimelineEvents() },
+                                    onSaveNote = { viewModel.saveNote(it) },
+                                    onDeleteNote = { viewModel.deleteNote(it) }
+                                )
                                 5 -> HudCategories(
                                     folders = state.folders,
                                     allApps = state.installedApps,

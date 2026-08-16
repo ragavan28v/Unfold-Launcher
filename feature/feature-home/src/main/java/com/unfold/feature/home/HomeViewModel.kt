@@ -37,6 +37,8 @@ data class HomeUiState(
     val folders: List<FolderInfo> = emptyList(),
     val gestureBindings: Map<GestureType, GestureBinding> = emptyMap(),
     val systemStats: SystemStats? = null,
+    val timelineItems: List<com.unfold.core.domain.model.TimelineItem> = emptyList(),
+    val notes: List<com.unfold.core.domain.model.Note> = emptyList(),
     val isLoading: Boolean = true,
     val gridColumns: Int = 4,
     val gridRows: Int = 3,
@@ -75,11 +77,79 @@ class HomeViewModel @Inject constructor(
     private val gestureRepository: com.unfold.core.domain.repository.GestureRepository,
     private val appRepository: com.unfold.core.domain.repository.AppRepository,
     private val themeRepository: com.unfold.core.domain.repository.ThemeRepository,
-    private val folderRepository: com.unfold.core.domain.repository.FolderRepository
+    private val folderRepository: com.unfold.core.domain.repository.FolderRepository,
+    private val noteRepository: com.unfold.core.domain.repository.NoteRepository,
+    private val getTimeline: com.unfold.core.domain.usecase.GetTimelineUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    private var timelineCurrentEndTime: Long = 0L
+    private var isLoadingMoreTimeline = false
+
+    fun loadMoreTimelineEvents() {
+        if (isLoadingMoreTimeline) return
+        isLoadingMoreTimeline = true
+        
+        val newEndTime = java.util.Calendar.getInstance().apply {
+            timeInMillis = timelineCurrentEndTime
+            add(java.util.Calendar.DAY_OF_YEAR, 7)
+        }.timeInMillis
+
+        // Initial fetch: Today + 7 days
+        val startOfToday = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        getTimeline(startOfToday, newEndTime)
+            .onEach { items ->
+                _uiState.value = _uiState.value.copy(timelineItems = items)
+                timelineCurrentEndTime = newEndTime
+                isLoadingMoreTimeline = false
+            }
+            .launchIn(viewModelScope)
+    }
+
+    fun refreshTimelineEvents() {
+        val startOfToday = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val endOfNextWeek = java.util.Calendar.getInstance().apply {
+            timeInMillis = startOfToday
+            add(java.util.Calendar.DAY_OF_YEAR, 7)
+            set(java.util.Calendar.HOUR_OF_DAY, 23)
+            set(java.util.Calendar.MINUTE, 59)
+            set(java.util.Calendar.SECOND, 59)
+            set(java.util.Calendar.MILLISECOND, 999)
+        }.timeInMillis
+        
+        timelineCurrentEndTime = endOfNextWeek
+
+        getTimeline(startOfToday, endOfNextWeek)
+            .onEach { items ->
+                _uiState.value = _uiState.value.copy(timelineItems = items)
+            }
+            .launchIn(viewModelScope)
+    }
+
+    fun saveNote(note: com.unfold.core.domain.model.Note) {
+        viewModelScope.launch {
+            noteRepository.saveNote(note.copy(lastModified = System.currentTimeMillis()))
+        }
+    }
+
+    fun deleteNote(id: String) {
+        viewModelScope.launch {
+            noteRepository.deleteNote(id)
+        }
+    }
 
     init {
         // Sync package manager apps on start
@@ -123,6 +193,37 @@ class HomeViewModel @Inject constructor(
         getSystemStats(pollIntervalMs = 3000L)
             .onEach { stats ->
                 _uiState.value = _uiState.value.copy(systemStats = stats)
+            }
+            .launchIn(viewModelScope)
+
+        // Initial fetch: Today + 7 days
+        val startOfToday = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val endOfNextWeek = java.util.Calendar.getInstance().apply {
+            timeInMillis = startOfToday
+            add(java.util.Calendar.DAY_OF_YEAR, 7)
+            set(java.util.Calendar.HOUR_OF_DAY, 23)
+            set(java.util.Calendar.MINUTE, 59)
+            set(java.util.Calendar.SECOND, 59)
+            set(java.util.Calendar.MILLISECOND, 999)
+        }.timeInMillis
+        
+        timelineCurrentEndTime = endOfNextWeek
+
+        getTimeline(startOfToday, endOfNextWeek)
+            .onEach { items ->
+                _uiState.value = _uiState.value.copy(timelineItems = items)
+            }
+            .launchIn(viewModelScope)
+
+        // Observe notes
+        noteRepository.getNotes()
+            .onEach { notes ->
+                _uiState.value = _uiState.value.copy(notes = notes)
             }
             .launchIn(viewModelScope)
 

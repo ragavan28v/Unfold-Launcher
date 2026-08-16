@@ -1,4 +1,4 @@
-﻿package com.unfold.core.ui.components.hud
+package com.unfold.core.ui.components.hud
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -1781,69 +1781,6 @@ fun HudGoogleFeed(
                         fontFamily = FontFamily.Monospace
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun HudWidgets(
-    modifier: Modifier = Modifier,
-    gridRows: Int = 3,
-    scale: Float = 1f
-) {
-    val theme = LocalUnfoldTheme.current
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = when (gridRows) {
-                1 -> 18.dp
-                2 -> 14.dp
-                else -> 12.dp
-            } * scale)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy((12 * scale).dp)
-    ) {
-        Text(
-            text = "WIDGET CONTROL",
-            color = theme.accentPrimary,
-            fontSize = (14 * scale).sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 2.sp
-        )
-        Spacer(modifier = Modifier.height((12 * scale).dp))
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy((12 * scale).dp)
-        ) {
-            // Simulated memory widget
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(theme.bgPanel.copy(alpha = 0.3f), RoundedCornerShape((12 * scale).dp))
-                    .border(1.dp, theme.panelBorder.copy(alpha = 0.2f), RoundedCornerShape((12 * scale).dp))
-                    .padding((12 * scale).dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text("PING", color = theme.textSecondary, fontSize = (9 * scale).sp, fontFamily = FontFamily.Monospace)
-                Text("24 ms", color = theme.accentPrimary, fontSize = (18 * scale).sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                Text("loss: 0.0%", color = theme.textMuted, fontSize = (8 * scale).sp, fontFamily = FontFamily.Monospace)
-            }
-            
-            // Simulated clock widget
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(theme.bgPanel.copy(alpha = 0.3f), RoundedCornerShape((12 * scale).dp))
-                    .border(1.dp, theme.panelBorder.copy(alpha = 0.2f), RoundedCornerShape((12 * scale).dp))
-                    .padding((12 * scale).dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text("UPTIME", color = theme.textSecondary, fontSize = (9 * scale).sp, fontFamily = FontFamily.Monospace)
-                Text("124h", color = theme.accentPrimary, fontSize = (18 * scale).sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                Text("status: normal", color = theme.textMuted, fontSize = (8 * scale).sp, fontFamily = FontFamily.Monospace)
             }
         }
     }

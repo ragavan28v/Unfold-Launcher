@@ -13,6 +13,10 @@ import com.unfold.core.domain.repository.FolderRepository
 import com.unfold.core.domain.repository.GestureRepository
 import com.unfold.core.domain.repository.SystemStatsRepository
 import com.unfold.core.domain.repository.ThemeRepository
+import com.unfold.core.data.repositoryimpl.TimelineRepositoryImpl
+import com.unfold.core.domain.repository.TimelineRepository
+import com.unfold.core.data.repositoryimpl.NoteRepositoryImpl
+import com.unfold.core.domain.repository.NoteRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -45,6 +49,14 @@ abstract class DataModule {
     @Singleton
     abstract fun bindThemeRepository(impl: ThemeRepositoryImpl): ThemeRepository
 
+    @Binds
+    @Singleton
+    abstract fun bindTimelineRepository(impl: TimelineRepositoryImpl): TimelineRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindNoteRepository(impl: NoteRepositoryImpl): NoteRepository
+
     companion object {
         @Provides
         @Singleton
@@ -66,6 +78,9 @@ abstract class DataModule {
 
         @Provides
         fun provideLayoutSnapshotDao(database: AppDatabase): LayoutSnapshotDao = database.layoutSnapshotDao()
+
+        @Provides
+        fun provideNoteDao(database: AppDatabase): NoteDao = database.noteDao()
     }
 }
 

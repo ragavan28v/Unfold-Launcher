@@ -17,9 +17,10 @@ import kotlinx.coroutines.launch
         FolderEntity::class,
         GestureEntity::class,
         HiddenFileEntity::class,
-        LayoutSnapshotEntity::class
+        LayoutSnapshotEntity::class,
+        NoteEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,6 +29,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun gestureDao(): GestureDao
     abstract fun hiddenFileDao(): HiddenFileDao
     abstract fun layoutSnapshotDao(): LayoutSnapshotDao
+    abstract fun noteDao(): NoteDao
 
     companion object {
         @Volatile
