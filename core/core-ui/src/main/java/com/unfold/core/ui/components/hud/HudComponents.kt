@@ -1723,7 +1723,7 @@ fun HudInfoCard(
 }
 
 @Composable
-fun HudGoogleFeed(
+private fun HudGoogleFeedLegacy(
     modifier: Modifier = Modifier,
     gridRows: Int = 3,
     scale: Float = 1f
