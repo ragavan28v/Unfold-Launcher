@@ -33,6 +33,9 @@ interface AppDao {
     @Query("UPDATE apps SET folderId = NULL WHERE folderId = :folderId")
     suspend fun clearFolder(folderId: String)
 
+    @Query("DELETE FROM apps WHERE appId NOT IN (:appIds)")
+    suspend fun deleteAppsNotInList(appIds: List<String>)
+
     @Query("UPDATE apps SET launchCount = launchCount + 1, lastUsedTimestamp = :timestamp WHERE appId = :appId")
     suspend fun recordLaunch(appId: String, timestamp: Long)
 

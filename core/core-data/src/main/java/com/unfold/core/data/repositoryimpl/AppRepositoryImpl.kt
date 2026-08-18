@@ -15,6 +15,7 @@ import com.unfold.core.domain.repository.AppRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -30,6 +31,39 @@ class AppRepositoryImpl @Inject constructor(
     private val folderDao: FolderDao,
     private val gestureDao: com.unfold.core.data.local.dao.GestureDao
 ) : AppRepository {
+
+    private val launcherApps = context.getSystemService(LauncherApps::class.java)
+    
+    init {
+        launcherApps?.registerCallback(object : LauncherApps.Callback() {
+            override fun onPackageRemoved(packageName: String, user: android.os.UserHandle) {
+                // Run on a background thread
+                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                    refreshFromPackageManager()
+                }
+            }
+            override fun onPackageAdded(packageName: String, user: android.os.UserHandle) {
+                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                    refreshFromPackageManager()
+                }
+            }
+            override fun onPackageChanged(packageName: String, user: android.os.UserHandle) {
+                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                    refreshFromPackageManager()
+                }
+            }
+            override fun onPackagesAvailable(packageNames: Array<out String>, user: android.os.UserHandle, replacing: Boolean) {
+                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                    refreshFromPackageManager()
+                }
+            }
+            override fun onPackagesUnavailable(packageNames: Array<out String>, user: android.os.UserHandle, replacing: Boolean) {
+                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                    refreshFromPackageManager()
+                }
+            }
+        })
+    }
 
     override fun observeApps(includeHidden: Boolean): Flow<List<AppInfo>> {
         return appDao.observeApps(includeHidden).map { entities ->
@@ -199,6 +233,7 @@ class AppRepositoryImpl @Inject constructor(
         }
 
         appDao.insertApps(finalEntities)
+        appDao.deleteAppsNotInList(finalEntities.map { it.appId })
     }
 
     override suspend fun setHidden(appId: String, hidden: Boolean) {

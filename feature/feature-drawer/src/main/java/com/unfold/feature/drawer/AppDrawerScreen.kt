@@ -140,7 +140,6 @@ fun AppDrawerScreen(
     val sections = remember(state.filteredApps) { buildAlphabetSections(state.filteredApps) }
 
     var selectedAppForMenu by remember { mutableStateOf<AppInfo?>(null) }
-    var appToUninstall by remember { mutableStateOf<AppInfo?>(null) }
     var isSearchFocused by remember { mutableStateOf(false) }
     var showDrawerSettingsMenu by remember { mutableStateOf(false) }
 
@@ -522,46 +521,29 @@ fun AppDrawerScreen(
                         selectedAppForMenu = null
                     },
                     onUninstall = {
-                        appToUninstall = app
-                        selectedAppForMenu = null
-                    }
-                )
-            }
-        }
-
-        if (appToUninstall != null) {
-            val app = appToUninstall!!
-            AlertDialog(
-                onDismissRequest = { appToUninstall = null },
-                title = { Text("UNINSTALL APPLICATION", color = theme.textPrimary, fontWeight = FontWeight.Bold) },
-                text = { Text("Are you sure you want to uninstall ${app.label}? This action cannot be undone.", color = theme.textSecondary) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            val pkg = app.packageName
+                        val pkg = app.packageName
+                        try {
+                            val intent = Intent(Intent.ACTION_DELETE).apply {
+                                data = Uri.fromParts("package", pkg, null)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            android.util.Log.e("AppDrawer", "Failed to uninstall app: $pkg", e)
                             try {
-                                val intent = Intent(Intent.ACTION_DELETE).apply {
+                                val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
                                     data = Uri.fromParts("package", pkg, null)
                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
                                 context.startActivity(intent)
-                            } catch (e: Exception) {
-                                android.util.Log.e("AppDrawer", "Failed to uninstall app: $pkg", e)
+                            } catch (ex: Exception) {
+                                android.util.Log.e("AppDrawer", "Final uninstall fallback failed", ex)
                             }
-                            appToUninstall = null
                         }
-                    ) {
-                        Text("UNINSTALL", color = theme.accentDanger, fontWeight = FontWeight.Bold)
+                        selectedAppForMenu = null
                     }
-                },
-                dismissButton = {
-                    TextButton(onClick = { appToUninstall = null }) {
-                        Text("CANCEL", color = theme.textPrimary)
-                    }
-                },
-                containerColor = theme.bgPanel,
-                shape = RoundedCornerShape(24.dp)
-            )
+                )
+            }
         }
     }
 }
@@ -1215,13 +1197,13 @@ fun CompactAppActionSheet(
     onUninstall: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
-    Box(
+    com.unfold.core.ui.components.GlassPanel(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
-            .clip(RoundedCornerShape(32.dp))
-            .background(theme.bgPanel)
-            .border(1.dp, theme.panelBorder.copy(alpha = 0.3f), RoundedCornerShape(32.dp))
+            .padding(16.dp),
+        cornerRadius = 32.dp,
+        opacity = 0.94f, // Much higher opacity for solid frozen look
+        blurRadius = 20.dp
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
