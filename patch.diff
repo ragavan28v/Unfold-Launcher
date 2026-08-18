@@ -1,0 +1,404 @@
+warning: in the working copy of 'feature/feature-home/src/main/java/com/unfold/feature/home/HomeScreen.kt', LF will be replaced by CRLF the next time Git touches it
+diff --git a/feature/feature-home/src/main/java/com/unfold/feature/home/HomeScreen.kt b/feature/feature-home/src/main/java/com/unfold/feature/home/HomeScreen.kt
+index db986bd..1d35aa1 100644
+--- a/feature/feature-home/src/main/java/com/unfold/feature/home/HomeScreen.kt
++++ b/feature/feature-home/src/main/java/com/unfold/feature/home/HomeScreen.kt
+@@ -104,7 +104,8 @@ fun HomeScreen(
+     viewModel: HomeViewModel,
+     onNavigateToSearch: () -> Unit,
+     onNavigateToDrawer: () -> Unit,
+-    onNavigateToSettings: () -> Unit
++    onNavigateToSettings: () -> Unit,
++    onNavigateToHiddenSpace: () -> Unit
+ ) {
+     val state by viewModel.uiState.collectAsState()
+     val theme = LocalUnfoldTheme.current
+@@ -456,6 +457,201 @@ fun HomeScreen(
+                         }
+                     }
+ 
++                    // Main HUD content page
++                    Box(
++                        modifier = Modifier
++                            .weight(1f)
++                            .fillMaxHeight()
++                    ) {
++                        HorizontalPager(
++                            state = pagerState,
++                            modifier = Modifier.fillMaxSize()
++                        ) { page ->
++                            val hudPageModifier = Modifier
++                                .fillMaxSize()
++                                .padding(
++                                    top = (2 * scale).dp,
++                                    bottom = (4 * scale).dp,
++                                    start = 12.dp,
++                                    end = 12.dp
++                                )
++
++                            when (page) {
++                                0 -> HudHome(modifier = hudPageModifier, gridRows = rows, scale = scale)
++                                1 -> HudMusic(modifier = hudPageModifier, gridRows = rows, scale = scale)
++                                2 -> HudSystem(
++                                    batteryPercent = state.systemStats?.batteryPercent ?: 0.5f,
++                                    batteryText = state.systemStats?.batteryText ?: "50%",
++                                    ramUsedText = state.systemStats?.ramUsedText ?: "4.2 GB / 8.0 GB",
++                                    ramUsedPercent = state.systemStats?.ramUsedPercent ?: 0.5f,
++                                    storageUsedText = state.systemStats?.storageUsedText ?: "64 GB / 128 GB",
++                                    storageUsedPercent = state.systemStats?.storageUsedPercent ?: 0.5f,
++                                    cpuTempText = state.systemStats?.cpuTempText ?: "36°C",
++                                    cpuTemp = state.systemStats?.cpuTemp ?: 36f,
++                                    modifier = hudPageModifier,
++                                    gridRows = rows,
++                                    scale = scale
++                                )
++                                3 -> HudGoogleFeed(modifier = hudPageModifier, gridRows = rows, scale = scale)
++                                4 -> HudFlow(
++                                    timelineItems = state.timelineItems, 
++                                    notes = state.notes,
++                                    modifier = hudPageModifier, 
++                                    gridRows = rows, 
++                                    scale = scale, 
++                                    onLoadMore = { viewModel.loadMoreTimelineEvents() },
++                                    onRefreshTimeline = { viewModel.refreshTimelineEvents() },
++                                    onSaveNote = { viewModel.saveNote(it) },
++                                    onDeleteNote = { viewModel.deleteNote(it) }
++                                )
++                                5 -> HudCategories(
++                                    folders = state.folders,
++                                    allApps = state.installedApps,
++                                    modifier = hudPageModifier,
++                                    gridRows = rows,
++                                    scale = scale,
++                                    onCreateFolder = { name, appIds -> viewModel.createFolder(name, appIds) },
++                                    onRenameFolder = { folderId, name -> viewModel.renameFolder(folderId, name) },
++                                    onDeleteFolder = { folderId -> viewModel.deleteFolder(folderId) },
++                                    onUpdateFolderApps = { folderId, appIds -> viewModel.updateFolderApps(folderId, appIds) },
++                                    onReorderFolders = { folderIds -> viewModel.reorderFolders(folderIds) }
++                                )
++                            }
++                    HudRailItem(
++                        icon = if (flashlightEnabled) Icons.Default.FlashlightOn else Icons.Default.FlashlightOff,
++                        isSelected = flashlightEnabled,
++                        onClick = {
++                            flashlightEnabled = !flashlightEnabled
++                            try {
++                                val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? android.hardware.camera2.CameraManager
++                                val cameraId = cameraManager?.cameraIdList?.firstOrNull()
++                                if (cameraId != null) {
++                                    cameraManager.setTorchMode(cameraId, flashlightEnabled)
++                                }
++                            } catch (e: Exception) {
++                                Log.e("Flashlight", "Error toggling flashlight: ${e.message}")
++                            }
++                        },
++                        sizeMultiplier = scale
++                    )
++                    
++                    HudTrace(horizontal = true, length = (12 * scale).dp)
++                    HudConnectorNode(modifier = Modifier.size((16 * scale).dp))
++                    
++                    Spacer(modifier = Modifier.weight(1f))
++                    
++                    // SILENT / GENERAL Chip
++                    StatusChip(
++                        text = ringerLabel,
++                        isActive = soundMode != SoundMode.GENERAL,
++                        modifier = Modifier.clickable { cycleSoundMode() },
++                        scale = scale
++                    )
++                }
++
++                Spacer(modifier = Modifier.height((3 * scale).dp))
++
++                // Bottom Content + Left Rail
++                Row(
++                    modifier = Modifier
++                        .fillMaxWidth()
++                        .weight(1f),
++                    verticalAlignment = Alignment.Top
++                ) {
++                    // Left Vertical Rail
++                    Column(
++                        modifier = Modifier
++                            .width((46 * scale).dp)
++                            .fillMaxHeight(),
++                        horizontalAlignment = Alignment.CenterHorizontally,
++                        verticalArrangement = Arrangement.spacedBy((4 * scale).dp)
++                    ) {
++                        val context = LocalContext.current
++                        
++                        HudTrace(horizontal = false, length = (8 * scale).dp)
++                        
++                        // Google Feed / Intel
++                        HudRailItem(
++                            icon = Icons.Default.Search,
++                            isSelected = pagerState.currentPage == 3,
++                            onClick = {
++                                coroutineScope.launch { pagerState.animateScrollToPage(3) }
++                            },
++                            sizeMultiplier = scale
++                        )
++                        HudTrace(horizontal = false, length = (8 * scale).dp)
++                        
++                        // Widgets
++                    HudRailItem(
++                        icon = Icons.Default.ViewStream,
++                        isSelected = pagerState.currentPage == 4,
++                        onClick = {
++                            coroutineScope.launch { pagerState.animateScrollToPage(4) }
++                            },
++                            sizeMultiplier = scale
++                        )
++                        HudTrace(horizontal = false, length = (8 * scale).dp)
++                        
++                        // Folders / Category Org
++                    HudRailItem(
++                        icon = Icons.Default.GridView,
++                        isSelected = pagerState.currentPage == 5,
++                        onClick = {
++                            coroutineScope.launch { pagerState.animateScrollToPage(5) }
++                            },
++                            sizeMultiplier = scale
++                        )
++                        HudTrace(horizontal = false, length = (8 * scale).dp)
++                        
++                        HudConnectorNode(modifier = Modifier.size((16 * scale).dp))
++                        
++                        // Battery display (text rotated)
++                        Spacer(modifier = Modifier.height((8 * scale).dp))
++                        Text(
++                            text = (state.systemStats?.batteryText ?: "100%").uppercase(),
++                            color = theme.accentPrimary,
++                            fontSize = (10 * scale).sp,
++                            fontWeight = FontWeight.Bold,
++                            fontFamily = FontFamily.Monospace
++                        )
++                        Spacer(modifier = Modifier.height((8 * scale).dp))
++                        
++                        HudConnectorNode(modifier = Modifier.size((16 * scale).dp))
++                        
++                        // Flexible vertical trace that expands and shrinks with the screen
++                        Box(
++                            modifier = Modifier
++                                .width((46 * scale).dp)
++                                .weight(1f),
++                            contentAlignment = Alignment.Center
++                        ) {
++                            val traceColor = theme.accentPrimary.copy(alpha = 0.4f)
++                            Canvas(modifier = Modifier.fillMaxHeight().width((8 * scale).dp)) {
++                                drawLine(
++                                    color = traceColor,
++                                    start = Offset(size.width / 2f, 0f),
++                                    end = Offset(size.width / 2f, size.height),
++                                    strokeWidth = 1.5.dp.toPx() * scale
++                                )
++                            }
++                        }
++                        
++                        // Settings Row with horizontal trace extending to the right
++                        Row(
++                            verticalAlignment = Alignment.CenterVertically,
++                            modifier = Modifier.wrapContentWidth(align = Alignment.Start, unbounded = true)
++                        ) {
++                            HudRailItem(
++                                icon = Icons.Default.Settings,
++                                isSelected = false,
++                                onClick = onNavigateToSettings,
++                                sizeMultiplier = scale
++                            )
++                            HudTrace(horizontal = true, length = (36 * scale).dp)
++                            HudConnectorNode(modifier = Modifier.size((16 * scale).dp))
++                        }
++                    }
++
+                     // Main HUD content page
+                     Box(
+                         modifier = Modifier
+@@ -628,14 +824,6 @@ fun HomeScreen(
+                                                         Log.e("UnfoldDrag", "Error in drag loop", e)
+                                                         draggedApp = null
+                                                     }
+-                                                } else {
+-                                                    Log.d("UnfoldDrag", "Long press returned null (cancelled/tapped)")
+-                                                    // Released before long press: click!
+-                                                    try {
+-                                                        launchApp(context, app)
+-                                                    } catch (e: Exception) {
+-                                                        // ignored
+-                                                    }
+                                                 }
+                                             }
+                                         }
+@@ -645,7 +833,7 @@ fun HomeScreen(
+                                         iconSize = gridIconSize,
+                                         showLabel = state.homeLabelsEnabled,
+                                         iconBitmap = iconBitmap,
+-                                        onClick = {}
++                                        onClick = { launchApp(context, app) }
+                                     )
+ 
+                                     if (showContextMenu) {
+@@ -693,14 +881,46 @@ fun HomeScreen(
+                 else -> 88.dp
+             }
+ 
+-            val dockContent: @Composable () -> Unit = {
++            val dockBody: @Composable () -> Unit = {
+                 val calculatedSize = state.dockIconSize.dp.coerceAtMost(56.dp).coerceAtLeast(36.dp)
+-                Column(
++                Box(
+                     modifier = Modifier
+                         .fillMaxSize()
+-                        .padding(horizontal = 8.dp),
+-                    verticalArrangement = Arrangement.Center
++                        .pointerInput(onNavigateToHiddenSpace) {
++                            awaitEachGesture {
++                                val down = awaitFirstDown(requireUnconsumed = false)
++                                val longPress = awaitLongPressOrCancellation(down.id)
++                                if (longPress != null) {
++                                    var totalDx = 0f
++                                    var totalDy = 0f
++                                    while (true) {
++                                        val event = awaitPointerEvent()
++                                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
++                                        if (!change.pressed) {
++                                            break
++                                        }
++                                        if (change.isConsumed) {
++                                            break
++                                        }
++                                        val delta = change.position - change.previousPosition
++                                        totalDx += delta.x
++                                        totalDy += delta.y
++                                        if (totalDx < -96f && kotlin.math.abs(totalDy) < 48f) {
++                                            change.consume()
++                                            onNavigateToHiddenSpace()
++                                            break
++                                        }
++                                    }
++                                }
++                            }
++                        }
+                 ) {
++                    Column(
++                        modifier = Modifier
++                            .fillMaxSize()
++                            .padding(horizontal = 8.dp),
++                        verticalArrangement = Arrangement.Center
++                    ) {
+                     repeat(dockRows) { rowIndex ->
+                         if (dockRows == 1) {
+                             val sortedDockApps = dockApps.sortedBy { it.gridPosition }.take(dockVisibleCount)
+@@ -803,12 +1023,6 @@ fun HomeScreen(
+                                                                 dragPosition += dragAmount
+                                                                 dragDistance += dragAmount.getDistance()
+                                                             }
+-                                                        } else {
+-                                                            try {
+-                                                                launchApp(context, app)
+-                                                            } catch (e: Exception) {
+-                                                                // ignored
+-                                                            }
+                                                         }
+                                                     }
+                                                 }
+@@ -832,7 +1046,7 @@ fun HomeScreen(
+                                                     }
+                                                 },
+                                                 contentDescription = app.label,
+-                                                onClick = {}
++                                                onClick = { launchApp(context, app) }
+                                             )
+ 
+                                             if (showDockMenu) {
+@@ -968,12 +1182,6 @@ fun HomeScreen(
+                                                                     dragPosition += dragAmount
+                                                                     dragDistance += dragAmount.getDistance()
+                                                                 }
+-                                                            } else {
+-                                                                try {
+-                                                                    launchApp(context, app)
+-                                                                } catch (e: Exception) {
+-                                                                    // ignored
+-                                                                }
+                                                             }
+                                                         }
+                                                     }
+@@ -997,7 +1205,7 @@ fun HomeScreen(
+                                                         }
+                                                     },
+                                                     contentDescription = app.label,
+-                                                    onClick = {}
++                                                    onClick = { launchApp(context, app) }
+                                                 )
+ 
+                                                 if (showDockMenu) {
+@@ -1041,6 +1249,8 @@ fun HomeScreen(
+                         }
+                     }
+                 }
++
++            }
+             }
+ 
+             when (state.dockBackgroundMode) {
+@@ -1051,7 +1261,7 @@ fun HomeScreen(
+                             .height(dockHeight)
+                             .padding(horizontal = 16.dp)
+                     ) {
+-                        dockContent()
++                        dockBody()
+                     }
+                 }
+                 DockBackgroundMode.SOLID -> {
+@@ -1063,7 +1273,7 @@ fun HomeScreen(
+                             .background(dockSolidColor.copy(alpha = 0.96f), RoundedCornerShape(24.dp))
+                             .border(1.dp, theme.panelBorder, RoundedCornerShape(24.dp))
+                     ) {
+-                        dockContent()
++                        dockBody()
+                     }
+                 }
+                 DockBackgroundMode.BLUR -> {
+@@ -1075,7 +1285,7 @@ fun HomeScreen(
+                         cornerRadius = 24.dp,
+                         opacity = 0.52f
+                     ) {
+-                        dockContent()
++                        dockBody()
+                     }
+                 }
+                 DockBackgroundMode.DEFAULT -> {
+@@ -1086,20 +1296,13 @@ fun HomeScreen(
+                             .padding(horizontal = 16.dp),
+                         cornerRadius = 24.dp
+                     ) {
+-                        dockContent()
++                        dockBody()
+                     }
+                 }
+             }
+ 
+             Spacer(modifier = Modifier.height(16.dp))
+         }
+-
+-        // Floating drag preview overlay
+-        draggedApp?.let { app ->
+-            val density = androidx.compose.ui.platform.LocalDensity.current
+-            val statusBarHeight = WindowInsets.statusBars.getTop(density)
+-            
+-            val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
+                 value = withContext(Dispatchers.IO) {
+                     try {
+                         val drawable = context.packageManager.getApplicationIcon(app.packageName)
+@@ -1162,9 +1365,6 @@ fun HomeScreen(
+         }
+     }
+ }
+-}
+-
+-
+ @Composable
+ private fun LauncherWallpaperBackdrop(
+     modifier: Modifier = Modifier,

@@ -25,6 +25,7 @@ fun GestureDetectorOverlay(
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
                 var fingerCount = 1
+                val startPosition = down.position
                 var totalDrag = Offset.Zero
                 var gestureRecognized = false
                 var childConsumed = false
@@ -40,9 +41,11 @@ fun GestureDetectorOverlay(
                     }
                     
                     fingerCount = maxOf(fingerCount, event.changes.size)
-                    totalDrag += change.positionChange()
+                    totalDrag = change.position - startPosition
                     
-                    if (totalDrag.getDistance() > SWIPE_THRESHOLD_PX) {
+                    if (totalDrag.getDistance() > SWIPE_THRESHOLD_PX &&
+                        abs(totalDrag.x) > abs(totalDrag.y) * DIRECTION_RATIO
+                    ) {
                         gestureRecognized = true
                     }
                     
@@ -60,11 +63,12 @@ fun GestureDetectorOverlay(
     ) { content() }
 }
 
-private const val SWIPE_THRESHOLD_PX = 120f
+private const val SWIPE_THRESHOLD_PX = 160f
+private const val DIRECTION_RATIO = 1.15f
 
 private fun classifyGesture(drag: Offset, fingerCount: Int): GestureType? {
     if (drag.getDistance() < SWIPE_THRESHOLD_PX) return null
-    val isHorizontal = abs(drag.x) > abs(drag.y)
+    val isHorizontal = abs(drag.x) > abs(drag.y) * DIRECTION_RATIO
     return when {
         isHorizontal && drag.x < 0 && fingerCount == 1 -> GestureType.SWIPE_LEFT_1F
         isHorizontal && drag.x > 0 && fingerCount == 1 -> GestureType.SWIPE_RIGHT_1F

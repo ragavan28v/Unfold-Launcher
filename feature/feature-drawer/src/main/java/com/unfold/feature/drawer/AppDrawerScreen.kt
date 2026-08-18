@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -63,6 +64,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -98,29 +101,27 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.rememberAsyncImagePainter
-import com.unfold.core.domain.model.AppDrawerSearchBarPosition
-import com.unfold.core.domain.model.AppDrawerSortingMode
-import com.unfold.core.domain.model.AppDrawerStyleMode
-import com.unfold.core.domain.model.AppDrawerViewMode
 import com.unfold.core.domain.model.AppInfo
 import com.unfold.core.domain.model.WallpaperMode
 import com.unfold.core.domain.model.WallpaperPatternMode
+import com.unfold.core.domain.model.AppDrawerViewMode
+import com.unfold.core.domain.model.AppDrawerSearchBarPosition
+import com.unfold.core.domain.model.AppDrawerStyleMode
 import com.unfold.core.ui.components.CarvedIcon
-import com.unfold.core.ui.components.PillBadge
 import com.unfold.core.ui.theme.LocalUnfoldTheme
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
+import androidx.compose.ui.graphics.vector.ImageVector
 
-private data class AppAlphabetSection(
+class AppAlphabetSection(
     val letter: Char,
     val apps: List<AppInfo>
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AppDrawerScreen(
     modifier: Modifier = Modifier,
@@ -137,6 +138,12 @@ fun AppDrawerScreen(
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
     val sections = remember(state.filteredApps) { buildAlphabetSections(state.filteredApps) }
+
+    var selectedAppForMenu by remember { mutableStateOf<AppInfo?>(null) }
+    var appToUninstall by remember { mutableStateOf<AppInfo?>(null) }
+    var isSearchFocused by remember { mutableStateOf(false) }
+    var showDrawerSettingsMenu by remember { mutableStateOf(false) }
+
     val currentAlphabet = remember(
         state.viewMode,
         state.filteredApps,
@@ -186,9 +193,6 @@ fun AppDrawerScreen(
         }
     }
 
-    var selectedAppForMenu by remember { mutableStateOf<AppInfo?>(null) }
-    var showDrawerSettingsMenu by remember { mutableStateOf(false) }
-    var isSearchFocused by remember { mutableStateOf(false) }
     val closeThresholdPx = remember(density) { with(density) { 72.dp.toPx() } }
 
     LaunchedEffect(state.showKeyboardOnOpen) {
@@ -518,14 +522,46 @@ fun AppDrawerScreen(
                         selectedAppForMenu = null
                     },
                     onUninstall = {
-                        val intent = Intent(Intent.ACTION_DELETE).apply {
-                            data = Uri.fromParts("package", app.packageName, null)
-                        }
-                        context.startActivity(intent)
+                        appToUninstall = app
                         selectedAppForMenu = null
                     }
                 )
             }
+        }
+
+        if (appToUninstall != null) {
+            val app = appToUninstall!!
+            AlertDialog(
+                onDismissRequest = { appToUninstall = null },
+                title = { Text("UNINSTALL APPLICATION", color = theme.textPrimary, fontWeight = FontWeight.Bold) },
+                text = { Text("Are you sure you want to uninstall ${app.label}? This action cannot be undone.", color = theme.textSecondary) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val pkg = app.packageName
+                            try {
+                                val intent = Intent(Intent.ACTION_DELETE).apply {
+                                    data = Uri.fromParts("package", pkg, null)
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                android.util.Log.e("AppDrawer", "Failed to uninstall app: $pkg", e)
+                            }
+                            appToUninstall = null
+                        }
+                    ) {
+                        Text("UNINSTALL", color = theme.accentDanger, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { appToUninstall = null }) {
+                        Text("CANCEL", color = theme.textPrimary)
+                    }
+                },
+                containerColor = theme.bgPanel,
+                shape = RoundedCornerShape(24.dp)
+            )
         }
     }
 }
@@ -589,24 +625,41 @@ private fun DrawerHeaderControls(
     onChangeSearchBarPosition: (AppDrawerSearchBarPosition) -> Unit,
     theme: com.unfold.core.ui.theme.UnfoldThemeColors
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         DrawerViewModeSelector(
-            modifier = Modifier.height(54.dp),
-            currentMode = viewMode,
-            onModeSelected = onViewModeChange
+            viewMode = viewMode,
+            onViewModeChange = onViewModeChange
         )
 
-        Spacer(modifier = Modifier.width(8.dp))
+        Box {
+            IconButton(
+                onClick = onToggleSettingsMenu,
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(theme.bgPanel.copy(alpha = 0.5f), CircleShape)
+                    .border(1.dp, theme.panelBorder.copy(alpha = 0.2f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Drawer Settings",
+                    tint = theme.accentPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
 
-        DrawerSettingsMenu(
-            showDrawerSettingsMenu = showDrawerSettingsMenu,
-            onToggleSettingsMenu = onToggleSettingsMenu,
-            searchBarPosition = searchBarPosition,
-            showKeyboardOnOpen = showKeyboardOnOpen,
-            onToggleKeyboardOnOpen = onToggleKeyboardOnOpen,
-            onChangeSearchBarPosition = onChangeSearchBarPosition,
-            theme = theme
-        )
+            DrawerSettingsMenu(
+                expanded = showDrawerSettingsMenu,
+                onDismiss = onToggleSettingsMenu,
+                searchBarPosition = searchBarPosition,
+                showKeyboardOnOpen = showKeyboardOnOpen,
+                onToggleKeyboardOnOpen = onToggleKeyboardOnOpen,
+                onChangeSearchBarPosition = onChangeSearchBarPosition,
+                theme = theme
+            )
+        }
     }
 }
 
@@ -620,106 +673,109 @@ private fun DrawerSearchField(
     modifier: Modifier = Modifier,
     theme: com.unfold.core.ui.theme.UnfoldThemeColors
 ) {
-    TextField(
+    androidx.compose.foundation.text.BasicTextField(
         value = searchQuery,
         onValueChange = onSearchChange,
-        placeholder = { Text("Search apps", color = theme.textSecondary) },
         modifier = modifier
-            .height(54.dp)
+            .height(44.dp)
             .focusRequester(searchFocusRequester)
-            .onFocusChanged { onSearchFocusedChange(it.isFocused) },
-        shape = RoundedCornerShape(20.dp),
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = theme.bgPanel.copy(alpha = 0.76f),
-            unfocusedContainerColor = theme.bgPanel.copy(alpha = 0.58f),
-            focusedTextColor = theme.textPrimary,
-            unfocusedTextColor = theme.textPrimary,
-            cursorColor = theme.accentPrimary,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent
-        ),
-        singleLine = true
+            .onFocusChanged { onSearchFocusedChange(it.isFocused) }
+            .background(theme.bgPanel.copy(alpha = if (isSearchFocused) 0.6f else 0.4f), CircleShape)
+            .border(
+                1.dp,
+                if (isSearchFocused) theme.accentPrimary.copy(alpha = 0.5f) else theme.panelBorder.copy(alpha = 0.2f),
+                CircleShape
+            ),
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = theme.textPrimary, fontSize = 14.sp),
+        cursorBrush = androidx.compose.ui.graphics.SolidColor(theme.accentPrimary),
+        decorationBox = { innerTextField ->
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = theme.accentPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Box(modifier = Modifier.weight(1f)) {
+                    if (searchQuery.isEmpty()) {
+                        Text(
+                            text = "Search system apps...",
+                            color = theme.textSecondary.copy(alpha = 0.6f),
+                            fontSize = 14.sp
+                        )
+                    }
+                    innerTextField()
+                }
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(
+                        onClick = { onSearchChange("") },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Clear",
+                            tint = theme.textSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
     )
 }
 
 @Composable
 private fun DrawerSettingsMenu(
-    showDrawerSettingsMenu: Boolean,
-    onToggleSettingsMenu: () -> Unit,
+    expanded: Boolean,
+    onDismiss: () -> Unit,
     searchBarPosition: AppDrawerSearchBarPosition,
     showKeyboardOnOpen: Boolean,
     onToggleKeyboardOnOpen: (Boolean) -> Unit,
     onChangeSearchBarPosition: (AppDrawerSearchBarPosition) -> Unit,
     theme: com.unfold.core.ui.theme.UnfoldThemeColors
 ) {
-    Box {
-        IconButton(
-            onClick = onToggleSettingsMenu,
-            modifier = Modifier.size(54.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Settings,
-                contentDescription = "Drawer settings",
-                tint = if (showDrawerSettingsMenu) theme.accentPrimary else theme.textSecondary
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        modifier = Modifier
+            .width(220.dp)
+            .background(theme.bgPanel.copy(alpha = 0.95f))
+            .border(1.dp, theme.panelBorder.copy(alpha = 0.2f), RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "DRAWER SETTINGS",
+                color = theme.accentPrimary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
             )
-        }
 
-        DropdownMenu(
-            expanded = showDrawerSettingsMenu,
-            onDismissRequest = onToggleSettingsMenu,
-            shape = RoundedCornerShape(18.dp),
-            containerColor = theme.bgPanel.copy(alpha = 0.94f),
-            tonalElevation = 0.dp,
-            shadowElevation = 16.dp,
-            modifier = Modifier.border(
-                1.dp,
-                theme.panelBorder.copy(alpha = 0.72f),
-                RoundedCornerShape(18.dp)
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Show keyboard on open",
-                    color = theme.textPrimary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
+                Text("Auto-Keyboard", color = theme.textPrimary, fontSize = 13.sp)
+                Switch(
+                    checked = showKeyboardOnOpen,
+                    onCheckedChange = onToggleKeyboardOnOpen,
+                    modifier = Modifier.size(32.dp, 20.dp)
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Focus search when the drawer opens",
-                    color = theme.textSecondary,
-                    fontSize = 10.sp
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = if (showKeyboardOnOpen) "Enabled" else "Disabled",
-                        color = theme.textSecondary,
-                        fontSize = 10.sp
-                    )
-                    Switch(
-                        checked = showKeyboardOnOpen,
-                        onCheckedChange = onToggleKeyboardOnOpen
-                    )
-                }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = theme.panelBorder.copy(alpha = 0.45f))
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("SEARCH BAR POSITION", color = theme.textSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = "Search bar position",
-                    color = theme.textPrimary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(6.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 DrawerPositionItem(
                     label = "Top",
                     selected = searchBarPosition == AppDrawerSearchBarPosition.TOP,
@@ -747,238 +803,125 @@ private fun DrawerPositionItem(
     onClick: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            color = if (selected) theme.textPrimary else theme.textSecondary,
-            fontSize = 11.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-        )
-        if (selected) {
-            PillBadge(text = "Active", tint = theme.accentPrimary)
-        }
-    }
-}
-
-private enum class SectionMode {
-    LIST,
-    GRID
-}
-
-@Composable
-private fun DrawerViewModeSelector(
-    modifier: Modifier = Modifier,
-    currentMode: AppDrawerViewMode,
-    onModeSelected: (AppDrawerViewMode) -> Unit
-) {
-    val theme = LocalUnfoldTheme.current
     Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(999.dp),
-        color = theme.bgPanel.copy(alpha = 0.16f),
-        border = BorderStroke(1.dp, theme.panelBorder.copy(alpha = 0.45f)),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
+        onClick = onClick,
+        color = if (selected) theme.accentPrimary.copy(alpha = 0.15f) else Color.Transparent,
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            modifier = Modifier.padding(vertical = 8.dp, horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ViewModePill(
-                glyph = ViewModeGlyph.GRID,
-                contentDescription = "Grid view",
-                selected = currentMode == AppDrawerViewMode.GRID,
-                modifier = Modifier.size(32.dp),
-                onClick = { onModeSelected(AppDrawerViewMode.GRID) },
-                theme = theme
-            )
-            ViewModePill(
-                glyph = ViewModeGlyph.LIST,
-                contentDescription = "List view",
-                selected = currentMode == AppDrawerViewMode.LIST,
-                modifier = Modifier.size(32.dp),
-                onClick = { onModeSelected(AppDrawerViewMode.LIST) },
-                theme = theme
-            )
-            ViewModePill(
-                glyph = ViewModeGlyph.LISTED_GRID,
-                contentDescription = "Listed grid view",
-                selected = currentMode == AppDrawerViewMode.LISTED_GRID,
-                modifier = Modifier.size(32.dp),
-                onClick = { onModeSelected(AppDrawerViewMode.LISTED_GRID) },
-                theme = theme
+            Text(
+                text = label,
+                color = if (selected) theme.accentPrimary else theme.textPrimary,
+                fontSize = 13.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
             )
         }
     }
 }
 
+enum class SectionMode {
+    LIST, GRID
+}
+
 @Composable
-private fun ViewModePill(
+fun DrawerViewModeSelector(
+    modifier: Modifier = Modifier,
+    viewMode: AppDrawerViewMode,
+    onViewModeChange: (AppDrawerViewMode) -> Unit
+) {
+    val theme = LocalUnfoldTheme.current
+    Row(
+        modifier = modifier
+            .height(44.dp)
+            .background(theme.bgPanel.copy(alpha = 0.5f), CircleShape)
+            .border(1.dp, theme.panelBorder.copy(alpha = 0.2f), CircleShape)
+            .padding(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ViewModePill(
+            glyph = ViewModeGlyph.GRID,
+            label = "Grid",
+            selected = viewMode == AppDrawerViewMode.GRID,
+            onClick = { onViewModeChange(AppDrawerViewMode.GRID) },
+            theme = theme
+        )
+        ViewModePill(
+            glyph = ViewModeGlyph.LIST,
+            label = "List",
+            selected = viewMode == AppDrawerViewMode.LIST,
+            onClick = { onViewModeChange(AppDrawerViewMode.LIST) },
+            theme = theme
+        )
+        ViewModePill(
+            glyph = ViewModeGlyph.LISTED_GRID,
+            label = "Hybrid",
+            selected = viewMode == AppDrawerViewMode.LISTED_GRID,
+            onClick = { onViewModeChange(AppDrawerViewMode.LISTED_GRID) },
+            theme = theme
+        )
+    }
+}
+
+@Composable
+fun ViewModePill(
     glyph: ViewModeGlyph,
-    contentDescription: String,
+    label: String,
     selected: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     theme: com.unfold.core.ui.theme.UnfoldThemeColors
 ) {
     Box(
-        modifier = modifier,
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(CircleShape)
+            .background(if (selected) theme.accentPrimary else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        if (selected) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .background(theme.accentPrimary.copy(alpha = 0.96f), CircleShape)
-                    .border(BorderStroke(1.dp, theme.panelBorder.copy(alpha = 0.2f)), CircleShape)
-                    .clickable(onClick = onClick),
-                contentAlignment = Alignment.Center
-            ) {
-                ModeGlyphIcon(
-                    glyph = glyph,
-                    contentDescription = contentDescription,
-                    tint = theme.bgVoid,
-                    modifier = Modifier.size(14.dp)
-                )
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clickable(onClick = onClick),
-                contentAlignment = Alignment.Center
-            ) {
-                ModeGlyphIcon(
-                    glyph = glyph,
-                    contentDescription = contentDescription,
-                    tint = theme.textSecondary,
-                    modifier = Modifier.size(14.dp)
-                )
-            }
-        }
+        ModeGlyphIcon(
+            glyph = glyph,
+            label = label,
+            tint = if (selected) theme.bgVoid else theme.textSecondary
+        )
     }
 }
 
-private enum class ViewModeGlyph {
-    GRID,
-    LIST,
-    LISTED_GRID
+enum class ViewModeGlyph {
+    GRID, LIST, LISTED_GRID
 }
 
 @Composable
-private fun ModeGlyphIcon(
+fun ModeGlyphIcon(
     glyph: ViewModeGlyph,
-    contentDescription: String,
+    label: String,
     tint: Color,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .background(Color.Transparent)
-    ) {
-        when (glyph) {
-            ViewModeGlyph.GRID -> GridGlyph(
-                tint = tint,
-                contentDescription = contentDescription
-            )
-            ViewModeGlyph.LIST -> ListGlyph(
-                tint = tint,
-                contentDescription = contentDescription
-            )
-            ViewModeGlyph.LISTED_GRID -> ListedGridGlyph(
-                tint = tint,
-                contentDescription = contentDescription
-            )
-        }
+    when (glyph) {
+        ViewModeGlyph.GRID -> GridGlyph(tint, label)
+        ViewModeGlyph.LIST -> ListGlyph(tint, label)
+        ViewModeGlyph.LISTED_GRID -> ListedGridGridGlyph(tint, label)
     }
 }
 
 @Composable
-private fun GridGlyph(
-    tint: Color,
-    contentDescription: String
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Transparent)
-            .padding(2.dp),
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        repeat(2) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                repeat(2) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .background(tint, RoundedCornerShape(2.dp))
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ListGlyph(
-    tint: Color,
-    contentDescription: String
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(vertical = 2.dp),
-        verticalArrangement = Arrangement.SpaceEvenly
-    ) {
-        repeat(3) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp)
-                    .background(tint, RoundedCornerShape(999.dp))
-            )
-        }
-    }
-}
-
-@Composable
-private fun ListedGridGlyph(
-    tint: Color,
-    contentDescription: String
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(vertical = 1.dp),
-        verticalArrangement = Arrangement.spacedBy(1.5.dp)
-    ) {
-        repeat(3) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(2.dp)
-                        .background(tint, RoundedCornerShape(2.dp))
-                )
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(1.5.dp)
-                        .background(tint, RoundedCornerShape(999.dp))
+fun GridGlyph(color: Color, label: String) {
+    Canvas(modifier = Modifier.size(14.dp)) {
+        val s = size.width / 3f
+        val gap = 1.5.dp.toPx()
+        val cellSize = s - gap
+        for (i in 0..2) {
+            for (j in 0..2) {
+                drawRect(
+                    color = color,
+                    topLeft = Offset(i * s, j * s),
+                    size = androidx.compose.ui.geometry.Size(cellSize, cellSize)
                 )
             }
         }
@@ -986,18 +929,44 @@ private fun ListedGridGlyph(
 }
 
 @Composable
-private fun AppSectionBlock(
+fun ListGlyph(color: Color, label: String) {
+    Column(modifier = Modifier.width(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        repeat(3) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                Box(modifier = Modifier.size(3.dp).background(color, CircleShape))
+                Box(modifier = Modifier.height(1.5.dp).weight(1f).background(color))
+            }
+        }
+    }
+}
+
+@Composable
+fun ListedGridGridGlyph(color: Color, label: String) {
+    Column(modifier = Modifier.width(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Box(modifier = Modifier.size(6.dp).background(color))
+            Box(modifier = Modifier.size(6.dp).background(color))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Box(modifier = Modifier.size(3.dp).background(color, CircleShape))
+            Box(modifier = Modifier.height(1.5.dp).weight(1f).background(color))
+        }
+    }
+}
+
+@Composable
+fun AppSectionBlock(
     section: AppAlphabetSection,
     sectionMode: SectionMode,
-    gridColumns: Int = 4,
-    iconSize: Dp = 64.dp,
-    drawerItemAlpha: Float = 0.72f,
+    gridColumns: Int,
+    iconSize: Dp,
+    drawerItemAlpha: Float,
     onAppClick: (AppInfo) -> Unit,
     onAppLongPress: (AppInfo) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionHeader(letter = section.letter, count = section.apps.size)
-
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SectionHeader(section.letter, section.apps.size)
+        Spacer(modifier = Modifier.height(8.dp))
         when (sectionMode) {
             SectionMode.LIST -> {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1012,11 +981,10 @@ private fun AppSectionBlock(
                     }
                 }
             }
-
             SectionMode.GRID -> {
                 SectionGrid(
                     apps = section.apps,
-                    gridColumns = gridColumns,
+                    columns = gridColumns,
                     iconSize = iconSize,
                     drawerItemAlpha = drawerItemAlpha,
                     onAppClick = onAppClick,
@@ -1028,67 +996,61 @@ private fun AppSectionBlock(
 }
 
 @Composable
-private fun SectionHeader(
-    letter: Char,
-    count: Int
-) {
+fun SectionHeader(letter: Char, count: Int) {
     val theme = LocalUnfoldTheme.current
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        @OptIn(ExperimentalFoundationApi::class)
         Text(
             text = letter.toString(),
             color = theme.accentPrimary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 2.sp
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.width(8.dp))
         HorizontalDivider(
             modifier = Modifier.weight(1f),
-            color = theme.panelBorder.copy(alpha = 0.65f),
-            thickness = 0.5.dp
+            color = theme.panelBorder.copy(alpha = 0.2f),
+            thickness = 1.dp
         )
-        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = count.toString(),
-            color = theme.textSecondary,
-            fontSize = 10.sp,
+            color = theme.textSecondary.copy(alpha = 0.5f),
+            fontSize = 11.sp,
             fontWeight = FontWeight.Bold
         )
     }
 }
 
 @Composable
-private fun SectionGrid(
+fun SectionGrid(
     apps: List<AppInfo>,
-    gridColumns: Int,
+    columns: Int,
     iconSize: Dp,
     drawerItemAlpha: Float,
     onAppClick: (AppInfo) -> Unit,
     onAppLongPress: (AppInfo) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        apps.chunked(gridColumns).forEach { rowApps ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                rowApps.forEach { app ->
-                    Box(modifier = Modifier.weight(1f)) {
-                        AppGridItem(
-                            app = app,
-                            iconSize = iconSize,
-                            drawerItemAlpha = drawerItemAlpha,
-                            onClick = { onAppClick(app) },
-                            onLongPress = { onAppLongPress(app) }
-                        )
+    val rows = (apps.size + columns - 1) / columns
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        repeat(rows) { rowIndex ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(columns) { colIndex ->
+                    val appIndex = rowIndex * columns + colIndex
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        if (appIndex < apps.size) {
+                            val app = apps[appIndex]
+                            AppGridItem(
+                                app = app,
+                                iconSize = iconSize,
+                                drawerItemAlpha = drawerItemAlpha,
+                                onClick = { onAppClick(app) },
+                                onLongPress = { onAppLongPress(app) }
+                            )
+                        }
                     }
-                }
-
-                repeat(gridColumns - rowApps.size) {
-                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -1097,7 +1059,7 @@ private fun SectionGrid(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AppGridItem(
+fun AppGridItem(
     app: AppInfo,
     iconSize: Dp,
     drawerItemAlpha: Float,
@@ -1118,23 +1080,21 @@ private fun AppGridItem(
     }
 
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .alpha(drawerItemAlpha)
+            .width(iconSize + 24.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongPress
             )
-            .padding(8.dp)
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         CarvedIcon(
-            size = iconSize.coerceIn(32.dp, 72.dp),
-            contentDescription = app.label,
-            onClick = onClick,
-            onLongPress = onLongPress,
+            size = iconSize,
             icon = {
                 if (iconBitmap != null) {
-                    androidx.compose.foundation.Image(
+                    Image(
                         bitmap = iconBitmap!!,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize().clip(CircleShape)
@@ -1143,26 +1103,30 @@ private fun AppGridItem(
                     Text(
                         text = app.label.take(2).uppercase(),
                         color = theme.accentPrimary,
-                        fontSize = 14.sp,
+                        fontSize = (iconSize.value * 0.25f).sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
-            }
+            },
+            contentDescription = app.label,
+            onClick = onClick,
+            onLongPress = onLongPress
         )
         Text(
             text = app.label,
-            color = theme.textSecondary,
-            fontSize = 10.sp,
+            color = theme.textPrimary,
+            fontSize = 11.sp,
             textAlign = TextAlign.Center,
             maxLines = 1,
-            modifier = Modifier.padding(top = 4.dp)
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.alpha(drawerItemAlpha)
         )
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AppListItem(
+fun AppListItem(
     app: AppInfo,
     iconSize: Dp,
     drawerItemAlpha: Float,
@@ -1182,60 +1146,66 @@ private fun AppListItem(
         }
     }
 
-    Surface(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongPress
-            ),
-        shape = RoundedCornerShape(20.dp),
-        color = theme.bgPanel.copy(alpha = drawerItemAlpha),
-        tonalElevation = 0.dp
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            CarvedIcon(
-                size = iconSize.coerceIn(36.dp, 72.dp),
-                contentDescription = app.label,
-                onClick = onClick,
-                onLongPress = onLongPress,
-                icon = {
-                    if (iconBitmap != null) {
-                        androidx.compose.foundation.Image(
-                            bitmap = iconBitmap!!,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape)
-                        )
-                    } else {
-                        Text(
-                            text = app.label.take(2).uppercase(),
-                            color = theme.accentPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
             )
-
-            Column(modifier = Modifier.weight(1f)) {
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        CarvedIcon(
+            size = iconSize.coerceAtMost(48.dp),
+            icon = {
+                if (iconBitmap != null) {
+                    Image(
+                        bitmap = iconBitmap!!,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                    )
+                } else {
+                    Text(
+                        text = app.label.take(2).uppercase(),
+                        color = theme.accentPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            contentDescription = app.label,
+            onClick = onClick,
+            onLongPress = onLongPress
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = app.label,
+                color = theme.textPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.alpha(drawerItemAlpha)
+            )
+            if (app.customLabel != null) {
                 Text(
-                    text = app.label,
-                    color = theme.textPrimary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1
+                    text = "System tag: ${app.label}",
+                    color = theme.textSecondary.copy(alpha = 0.5f),
+                    fontSize = 10.sp
                 )
             }
         }
+        Icon(
+            imageVector = Icons.Default.Info,
+            contentDescription = null,
+            tint = theme.textSecondary.copy(alpha = 0.3f),
+            modifier = Modifier.size(16.dp)
+        )
     }
 }
 
 @Composable
-private fun CompactAppActionSheet(
+fun CompactAppActionSheet(
     app: AppInfo,
     onDismiss: () -> Unit,
     onPinToHome: () -> Unit,
@@ -1245,96 +1215,86 @@ private fun CompactAppActionSheet(
     onUninstall: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 20.dp),
-        contentAlignment = Alignment.BottomCenter
+            .padding(16.dp)
+            .clip(RoundedCornerShape(32.dp))
+            .background(theme.bgPanel)
+            .border(1.dp, theme.panelBorder.copy(alpha = 0.3f), RoundedCornerShape(32.dp))
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 360.dp)
-                .heightIn(min = 0.dp, max = 420.dp),
-            shape = RoundedCornerShape(28.dp),
-            color = theme.bgPanel.copy(alpha = 0.96f),
-            tonalElevation = 8.dp,
-            shadowElevation = 20.dp
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Box(
+                modifier = Modifier
+                    .width(40.dp)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(theme.textSecondary.copy(alpha = 0.2f))
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = app.label.uppercase(),
+                color = theme.textPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .padding(bottom = 12.dp)
-                        .size(38.dp, 4.dp)
-                        .background(theme.panelBorder, CircleShape)
+                DrawerContextMenuItem(
+                    text = "PIN TO HOME",
+                    icon = Icons.Default.Home,
+                    iconColor = theme.accentPrimary,
+                    onClick = onPinToHome
                 )
-
-                Text(
-                    text = app.label.uppercase(),
-                    color = theme.textPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
-                    maxLines = 1
+                HorizontalDivider(color = theme.panelBorder, thickness = 0.5.dp)
+                DrawerContextMenuItem(
+                    text = "PIN TO DOCK",
+                    icon = Icons.Default.Build,
+                    iconColor = theme.accentPrimary,
+                    onClick = onPinToDock
                 )
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp)
-                ) {
-                    DrawerContextMenuItem(
-                        text = "PIN TO HOME",
-                        icon = Icons.Default.Home,
-                        iconColor = theme.accentPrimary,
-                        onClick = onPinToHome
-                    )
-                    HorizontalDivider(color = theme.panelBorder, thickness = 0.5.dp)
-                    DrawerContextMenuItem(
-                        text = "PIN TO DOCK",
-                        icon = Icons.Default.Build,
-                        iconColor = theme.accentPrimary,
-                        onClick = onPinToDock
-                    )
-                    HorizontalDivider(color = theme.panelBorder, thickness = 0.5.dp)
-                    DrawerContextMenuItem(
-                        text = "HIDE SYSTEM",
-                        icon = Icons.Default.Close,
-                        iconColor = theme.accentDanger,
-                        onClick = onHideSystem
-                    )
-                    HorizontalDivider(color = theme.panelBorder, thickness = 0.5.dp)
-                    DrawerContextMenuItem(
-                        text = "SYSTEM INFO",
-                        icon = Icons.Default.Info,
-                        iconColor = theme.accentPrimary,
-                        onClick = onSystemInfo
-                    )
-                    HorizontalDivider(color = theme.panelBorder, thickness = 0.5.dp)
-                    DrawerContextMenuItem(
-                        text = "UNINSTALL SYSTEM",
-                        icon = Icons.Default.Delete,
-                        iconColor = theme.accentDanger,
-                        onClick = onUninstall
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "TAP OUTSIDE TO DISMISS",
-                    color = theme.textSecondary,
-                    fontSize = 9.sp,
-                    letterSpacing = 1.sp,
-                    modifier = Modifier
-                        .clickable(onClick = onDismiss)
-                        .padding(vertical = 8.dp)
+                HorizontalDivider(color = theme.panelBorder, thickness = 0.5.dp)
+                DrawerContextMenuItem(
+                    text = "HIDE SYSTEM",
+                    icon = Icons.Default.Close,
+                    iconColor = theme.accentDanger,
+                    onClick = onHideSystem
+                )
+                HorizontalDivider(color = theme.panelBorder, thickness = 0.5.dp)
+                DrawerContextMenuItem(
+                    text = "SYSTEM INFO",
+                    icon = Icons.Default.Info,
+                    iconColor = theme.accentPrimary,
+                    onClick = onSystemInfo
+                )
+                HorizontalDivider(color = theme.panelBorder, thickness = 0.5.dp)
+                DrawerContextMenuItem(
+                    text = "UNINSTALL APP",
+                    icon = Icons.Default.Delete,
+                    iconColor = theme.accentDanger,
+                    onClick = onUninstall
                 )
             }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "TAP OUTSIDE TO DISMISS",
+                color = theme.textSecondary,
+                fontSize = 9.sp,
+                letterSpacing = 1.sp,
+                modifier = Modifier
+                    .clickable(onClick = onDismiss)
+                    .padding(vertical = 8.dp)
+            )
         }
     }
 }
@@ -1349,31 +1309,26 @@ fun AlphabetFastScroll(
     val theme = LocalUnfoldTheme.current
     Column(
         modifier = modifier
-            .fillMaxHeight()
-            .width(28.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .width(24.dp)
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceEvenly
     ) {
-        letters.forEach { letter ->
-            val active = letter == selectedLetter
-            Box(
+        letters.forEach { char ->
+            val isSelected = char == selectedLetter
+            Text(
+                text = char.toString(),
+                color = if (isSelected) theme.accentPrimary else theme.textSecondary.copy(alpha = 0.4f),
+                fontSize = if (isSelected) 11.sp else 9.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                 modifier = Modifier
-                    .size(if (active) 28.dp else 20.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (active) theme.accentPrimary else Color.Transparent
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null,
+                        onClick = { onLetterSelected(char) }
                     )
-                    .clickable { onLetterSelected(letter) },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = letter.toString(),
-                    color = if (active) theme.bgVoid else theme.textSecondary,
-                    fontSize = if (active) 12.sp else 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-            }
+                    .padding(vertical = 2.dp)
+            )
         }
     }
 }
@@ -1381,7 +1336,7 @@ fun AlphabetFastScroll(
 @Composable
 fun DrawerContextMenuItem(
     text: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     iconColor: Color,
     onClick: () -> Unit
 ) {
@@ -1398,6 +1353,7 @@ fun DrawerContextMenuItem(
             size = 38.dp,
             accentTint = theme.panelBorder,
             contentDescription = text,
+            onClick = onClick,
             icon = {
                 Icon(
                     imageVector = icon,
@@ -1439,7 +1395,6 @@ private fun LauncherWallpaperBackdrop(
                         .background(baseColor)
                 )
             }
-
             WallpaperMode.PATTERN -> {
                 Box(
                     modifier = Modifier
@@ -1451,35 +1406,33 @@ private fun LauncherWallpaperBackdrop(
                         when (pattern) {
                             WallpaperPatternMode.GEOMETRIC -> {
                                 repeat(7) { index ->
-                                    val radius = 48f + index * 12f
+                                    val size = (40 + index * 18).dp.toPx()
                                     drawCircle(
                                         color = tint,
-                                        radius = radius,
-                                        center = Offset((index * 130f) % size.width, (index * 170f) % size.height)
+                                        radius = size,
+                                        center = Offset(size * 1.8f, size * 0.9f + index * 110f)
                                     )
                                 }
                             }
-
                             WallpaperPatternMode.ABSTRACT -> {
                                 repeat(6) { index ->
-                                    val y = 90f + index * 150f
+                                    val y = 120f + index * 160f
                                     drawLine(
                                         color = tint,
                                         start = Offset(0f, y),
-                                        end = Offset(size.width, y + 32f),
-                                        strokeWidth = 12f
+                                        end = Offset(size.width, y + 24f),
+                                        strokeWidth = 10f
                                     )
                                 }
                             }
-
                             WallpaperPatternMode.MINIMAL -> {
-                                repeat(24) { index ->
+                                repeat(22) { index ->
                                     drawCircle(
                                         color = tint.copy(alpha = 0.03f),
-                                        radius = 14f + (index % 4) * 3f,
+                                        radius = 18f + (index % 4) * 3f,
                                         center = Offset(
-                                            (index * 61f) % size.width,
-                                            (index * 97f) % size.height
+                                            (index * 67f) % size.width,
+                                            (index * 103f) % size.height
                                         )
                                     )
                                 }
@@ -1488,12 +1441,11 @@ private fun LauncherWallpaperBackdrop(
                     }
                 }
             }
-
             WallpaperMode.PRESET,
             WallpaperMode.CUSTOM -> {
                 if (imageUri.isNotBlank()) {
                     Image(
-                        painter = rememberAsyncImagePainter(imageUri),
+                        painter = coil.compose.rememberAsyncImagePainter(imageUri),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -1510,21 +1462,13 @@ private fun LauncherWallpaperBackdrop(
     }
 }
 
-private fun buildAlphabetSections(apps: List<AppInfo>): List<AppAlphabetSection> {
-    return apps
-        .groupBy { app ->
-            app.label.firstOrNull()
-                ?.takeIf { it.isLetter() }
-                ?.uppercaseChar()
-                ?: '#'
-        }
-        .toSortedMap()
-        .map { (letter, groupedApps) ->
-            AppAlphabetSection(letter = letter, apps = groupedApps)
-        }
+fun buildAlphabetSections(apps: List<AppInfo>): List<AppAlphabetSection> {
+    return apps.groupBy { it.label.firstOrNull()?.uppercaseChar() ?: '#' }
+        .map { (letter, sectionApps) -> AppAlphabetSection(letter, sectionApps.sortedBy { it.label.lowercase() }) }
+        .sortedBy { if (it.letter == '#') '{' else it.letter }
 }
 
-private fun launchApp(context: Context, app: com.unfold.core.domain.model.AppInfo) {
+private fun launchApp(context: Context, app: AppInfo) {
     try {
         val launcherApps = context.getSystemService(LauncherApps::class.java)
         val userManager = context.getSystemService(UserManager::class.java)
@@ -1542,41 +1486,18 @@ private fun launchApp(context: Context, app: com.unfold.core.domain.model.AppInf
         val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        if (launchIntent != null) {
-            context.startActivity(launchIntent)
-        }
+        launchIntent?.let { context.startActivity(it) }
     } catch (_: Exception) {
-        // Ignored
     }
 }
 
-private fun drawerIconSize(
-    rawSize: Int,
-    columns: Int,
-    viewMode: AppDrawerViewMode
-): Dp {
-    val snappedSize = ((rawSize / 5f).roundToInt() * 5).coerceIn(30, 100)
-    val maxForLayout = when (viewMode) {
-        AppDrawerViewMode.LIST -> 58
-        AppDrawerViewMode.GRID,
-        AppDrawerViewMode.LISTED_GRID -> when (columns.coerceIn(3, 6)) {
-            3 -> 58
-            4 -> 52
-            5 -> 46
-            else -> 40
-        }
+private fun drawerIconSize(rawSize: Int, columns: Int, viewMode: AppDrawerViewMode): Dp {
+    val base = rawSize.coerceIn(36, 96).dp
+    return when (viewMode) {
+        AppDrawerViewMode.GRID -> base
+        AppDrawerViewMode.LIST -> 42.dp
+        AppDrawerViewMode.LISTED_GRID -> base.coerceAtMost(48.dp)
     }
-    val minForLayout = when (viewMode) {
-        AppDrawerViewMode.LIST -> 42
-        AppDrawerViewMode.GRID,
-        AppDrawerViewMode.LISTED_GRID -> when (columns.coerceIn(3, 6)) {
-            3 -> 36
-            4 -> 34
-            5 -> 32
-            else -> 30
-        }
-    }
-    return snappedSize.coerceIn(minForLayout, maxForLayout).dp
 }
 
 private fun drawableToImageBitmap(drawable: android.graphics.drawable.Drawable): ImageBitmap? {
@@ -1648,5 +1569,3 @@ private fun drawableToImageBitmap(drawable: android.graphics.drawable.Drawable):
         null
     }
 }
-
-

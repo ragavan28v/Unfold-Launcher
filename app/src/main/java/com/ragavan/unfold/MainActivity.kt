@@ -3,10 +3,23 @@ package com.ragavan.unfold
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -26,7 +39,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : androidx.fragment.app.FragmentActivity() {
 
     @javax.inject.Inject
     lateinit var gestureActionResolver: com.unfold.feature.gestures.GestureActionResolver
@@ -60,6 +73,9 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onNavigateToSettings = {
                                         navController.navigate(UnfoldRoute.Settings.route)
+                                    },
+                                    onNavigateToHiddenSpace = {
+                                        navController.navigate(UnfoldRoute.HiddenSpace.route)
                                     }
                                 )
                             }
@@ -103,22 +119,70 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    if (currentRoute == UnfoldRoute.Home.route) {
-                        com.unfold.feature.gestures.GestureDetectorOverlay(
-                            onGestureDetected = { gestureType ->
-                                scope.launch {
-                                    gestureActionResolver.execute(gestureType, navController)
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        if (currentRoute == UnfoldRoute.Home.route) {
+                            com.unfold.feature.gestures.GestureDetectorOverlay(
+                                onGestureDetected = { gestureType ->
+                                    scope.launch {
+                                        gestureActionResolver.execute(gestureType, navController)
+                                    }
                                 }
+                            ) {
+                                launcherContent()
                             }
-                        ) {
+                        } else {
                             launcherContent()
+                            BottomEdgeHomeSwipeOverlay(
+                                onSwipeHome = {
+                                    navController.popBackStack(UnfoldRoute.Home.route, false)
+                                }
+                            )
                         }
-                    } else {
-                        launcherContent()
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BottomEdgeHomeSwipeOverlay(
+    onSwipeHome: () -> Unit
+) {
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .height(48.dp)
+                .pointerInput(onSwipeHome) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        var totalDx = 0f
+                        var totalDy = 0f
+
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) {
+                                break
+                            }
+                            val delta = change.positionChange()
+                            totalDx += delta.x
+                            totalDy += delta.y
+
+                            if (totalDy < -96f && kotlin.math.abs(totalDx) < 72f) {
+                                change.consume()
+                                onSwipeHome()
+                                break
+                            }
+                        }
+                    }
+                }
+        )
     }
 }
 

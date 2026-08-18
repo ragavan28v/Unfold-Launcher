@@ -1,5 +1,6 @@
 package com.unfold.feature.home
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.ComponentName
 import android.content.BroadcastReceiver
@@ -97,6 +98,7 @@ private enum class SoundMode {
     SILENT
 }
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
@@ -104,7 +106,8 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToSearch: () -> Unit,
     onNavigateToDrawer: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToHiddenSpace: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
     val theme = LocalUnfoldTheme.current
@@ -145,6 +148,17 @@ fun HomeScreen(
         modifier = modifier
             .fillMaxSize()
             .background(theme.bgVoid)
+            .pointerInput(pagerState.currentPage) {
+                if (pagerState.currentPage != 5) {
+                    detectVerticalDragGestures { change, dragAmount ->
+                        if (kotlin.math.abs(dragAmount) > 12f) {
+                            if (dragAmount > 0) onNavigateToSearch()
+                            else onNavigateToDrawer()
+                            change.consume()
+                        }
+                    }
+                }
+            }
             .combinedClickable(
                 enabled = pagerState.currentPage != 5,
                 onClick = {},
@@ -628,14 +642,6 @@ fun HomeScreen(
                                                         Log.e("UnfoldDrag", "Error in drag loop", e)
                                                         draggedApp = null
                                                     }
-                                                } else {
-                                                    Log.d("UnfoldDrag", "Long press returned null (cancelled/tapped)")
-                                                    // Released before long press: click!
-                                                    try {
-                                                        launchApp(context, app)
-                                                    } catch (e: Exception) {
-                                                        // ignored
-                                                    }
                                                 }
                                             }
                                         }
@@ -645,7 +651,7 @@ fun HomeScreen(
                                         iconSize = gridIconSize,
                                         showLabel = state.homeLabelsEnabled,
                                         iconBitmap = iconBitmap,
-                                        onClick = {}
+                                        onClick = { launchApp(context, app) }
                                     )
 
                                     if (showContextMenu) {
@@ -693,14 +699,49 @@ fun HomeScreen(
                 else -> 88.dp
             }
 
-            val dockContent: @Composable () -> Unit = {
+            val dockBody: @Composable () -> Unit = {
                 val calculatedSize = state.dockIconSize.dp.coerceAtMost(56.dp).coerceAtLeast(36.dp)
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 8.dp),
-                    verticalArrangement = Arrangement.Center
+                        .pointerInput(onNavigateToHiddenSpace) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                var totalDx = 0f
+                                var totalDy = 0f
+                                var isHiddenSpaceTriggered = false
+                                val startTimestamp = System.currentTimeMillis()
+                                
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    
+                                    if (!change.pressed) break
+                                    
+                                    val delta = change.position - change.previousPosition
+                                    totalDx += delta.x
+                                    totalDy += delta.y
+
+                                    // Trigger: Swiped left and held for 500ms
+                                    if (totalDx < -100f && (System.currentTimeMillis() - startTimestamp) > 500 && !isHiddenSpaceTriggered) {
+                                        change.consume()
+                                        isHiddenSpaceTriggered = true
+                                        onNavigateToHiddenSpace()
+                                        break
+                                    }
+                                    
+                                    // If user swipes up/down too much, break the gesture to allow other interactions
+                                    if (kotlin.math.abs(totalDy) > 80f) break
+                                }
+                            }
+                        }
                 ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        verticalArrangement = Arrangement.Center
+                    ) {
                     repeat(dockRows) { rowIndex ->
                         if (dockRows == 1) {
                             val sortedDockApps = dockApps.sortedBy { it.gridPosition }.take(dockVisibleCount)
@@ -803,12 +844,6 @@ fun HomeScreen(
                                                                 dragPosition += dragAmount
                                                                 dragDistance += dragAmount.getDistance()
                                                             }
-                                                        } else {
-                                                            try {
-                                                                launchApp(context, app)
-                                                            } catch (e: Exception) {
-                                                                // ignored
-                                                            }
                                                         }
                                                     }
                                                 }
@@ -832,7 +867,7 @@ fun HomeScreen(
                                                     }
                                                 },
                                                 contentDescription = app.label,
-                                                onClick = {}
+                                                onClick = { launchApp(context, app) }
                                             )
 
                                             if (showDockMenu) {
@@ -968,12 +1003,6 @@ fun HomeScreen(
                                                                     dragPosition += dragAmount
                                                                     dragDistance += dragAmount.getDistance()
                                                                 }
-                                                            } else {
-                                                                try {
-                                                                    launchApp(context, app)
-                                                                } catch (e: Exception) {
-                                                                    // ignored
-                                                                }
                                                             }
                                                         }
                                                     }
@@ -997,7 +1026,7 @@ fun HomeScreen(
                                                         }
                                                     },
                                                     contentDescription = app.label,
-                                                    onClick = {}
+                                                    onClick = { launchApp(context, app) }
                                                 )
 
                                                 if (showDockMenu) {
@@ -1041,6 +1070,8 @@ fun HomeScreen(
                         }
                     }
                 }
+
+            }
             }
 
             when (state.dockBackgroundMode) {
@@ -1051,7 +1082,7 @@ fun HomeScreen(
                             .height(dockHeight)
                             .padding(horizontal = 16.dp)
                     ) {
-                        dockContent()
+                        dockBody()
                     }
                 }
                 DockBackgroundMode.SOLID -> {
@@ -1063,7 +1094,7 @@ fun HomeScreen(
                             .background(dockSolidColor.copy(alpha = 0.96f), RoundedCornerShape(24.dp))
                             .border(1.dp, theme.panelBorder, RoundedCornerShape(24.dp))
                     ) {
-                        dockContent()
+                        dockBody()
                     }
                 }
                 DockBackgroundMode.BLUR -> {
@@ -1075,7 +1106,7 @@ fun HomeScreen(
                         cornerRadius = 24.dp,
                         opacity = 0.52f
                     ) {
-                        dockContent()
+                        dockBody()
                     }
                 }
                 DockBackgroundMode.DEFAULT -> {
@@ -1086,85 +1117,85 @@ fun HomeScreen(
                             .padding(horizontal = 16.dp),
                         cornerRadius = 24.dp
                     ) {
-                        dockContent()
+                        dockBody()
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
 
-        // Floating drag preview overlay
-        draggedApp?.let { app ->
-            val density = androidx.compose.ui.platform.LocalDensity.current
-            val statusBarHeight = WindowInsets.statusBars.getTop(density)
-            
-            val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
-                value = withContext(Dispatchers.IO) {
-                    try {
-                        val drawable = context.packageManager.getApplicationIcon(app.packageName)
-                        drawableToImageBitmap(drawable)
-                    } catch (e: Exception) {
-                        null
-                    }
+    if (draggedApp != null) {
+        val app = draggedApp!!
+        val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
+            value = withContext(Dispatchers.IO) {
+                try {
+                    val drawable = context.packageManager.getApplicationIcon(app.packageName)
+                    drawableToImageBitmap(drawable)
+                } catch (e: Exception) {
+                    null
                 }
             }
+        }
 
-            androidx.compose.ui.window.Popup(
-                alignment = Alignment.TopStart,
-                offset = androidx.compose.ui.unit.IntOffset(
-                    dragPosition.x.toInt(),
-                    (dragPosition.y - statusBarHeight).toInt()
-                ),
-                properties = androidx.compose.ui.window.PopupProperties(
-                    focusable = false,
-                    dismissOnBackPress = false,
-                    dismissOnClickOutside = false,
-                    excludeFromSystemGesture = true
-                )
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val statusBarHeight = with(density) {
+            androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(this).toFloat()
+        }
+
+        androidx.compose.ui.window.Popup(
+            alignment = Alignment.TopStart,
+            offset = androidx.compose.ui.unit.IntOffset(
+                dragPosition.x.toInt(),
+                (dragPosition.y - statusBarHeight).toInt()
+            ),
+            properties = androidx.compose.ui.window.PopupProperties(
+                focusable = false,
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+                excludeFromSystemGesture = true
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp, 72.dp)
+                    .alpha(0.8f),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(64.dp, 72.dp)
-                        .alpha(0.8f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CarvedIcon(
-                            size = gridIconSize,
-                            icon = {
-                                if (iconBitmap != null) {
-                                    Image(
-                                        bitmap = iconBitmap!!,
-                                        contentDescription = null,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                } else {
-                                    Text(
-                                        text = app.label.take(2).uppercase(),
-                                        color = theme.accentPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            },
-                            contentDescription = app.label
-                        )
-                        Text(
-                            text = app.label,
-                            color = theme.textSecondary,
-                            fontSize = 9.sp,
-                            maxLines = 1
-                        )
-                    }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CarvedIcon(
+                        size = gridIconSize,
+                        icon = {
+                            if (iconBitmap != null) {
+                                Image(
+                                    bitmap = iconBitmap!!,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Text(
+                                    text = app.label.take(2).uppercase(),
+                                    color = theme.accentPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        },
+                        contentDescription = app.label
+                    )
+                    Text(
+                        text = app.label,
+                        color = theme.textSecondary,
+                        fontSize = 9.sp,
+                        maxLines = 1
+                    )
                 }
             }
         }
     }
 }
 }
-
-
 @Composable
 private fun LauncherWallpaperBackdrop(
     modifier: Modifier = Modifier,
