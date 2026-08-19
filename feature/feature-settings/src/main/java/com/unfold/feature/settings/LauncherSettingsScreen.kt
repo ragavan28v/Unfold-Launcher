@@ -41,6 +41,18 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.ViewModule
+import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -139,6 +151,8 @@ private enum class LauncherSettingsPage {
 fun LauncherSettingsScreen(
     onBack: () -> Unit,
     onOpenGestureControl: () -> Unit,
+    onOpenSearch: () -> Unit,
+    onOpenHiddenSpace: () -> Unit,
     viewModel: LauncherSettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -173,23 +187,23 @@ fun LauncherSettingsScreen(
             SettingsSectionInfo(
                 title = "Home",
                 subtitle = "Grid rows 1-3, columns 3-6, icon size 30-100, labels on/off, app placement, wallpaper behavior, and pages.",
-                badge = "Live",
-                icon = Icons.Default.KeyboardArrowUp,
+                badge = "",
+                icon = Icons.Default.Home,
                 clickable = true,
                 onClick = { selectedPage = LauncherSettingsPage.HOME }
             ),
             SettingsSectionInfo(
                 title = "Dock",
                 subtitle = "Dock rows 1-2 or hidden, 0-6 icons, icon size 30-100, background style, gestures, and dock pages.",
-                badge = "Live",
-                icon = Icons.Default.KeyboardArrowDown,
+                badge = "",
+                icon = Icons.Default.ViewModule,
                 clickable = true,
                 onClick = { selectedPage = LauncherSettingsPage.DOCK }
             ),
             SettingsSectionInfo(
                 title = "App Drawer",
                 subtitle = "Vertical list, horizontal pages, alphabetic grid, icon columns, icon size, sorting, drawer style, search, and categories.",
-                badge = "Live",
+                badge = "",
                 icon = Icons.Default.Menu,
                 clickable = true,
                 onClick = { selectedPage = LauncherSettingsPage.APP_DRAWER }
@@ -197,71 +211,82 @@ fun LauncherSettingsScreen(
             SettingsSectionInfo(
                 title = "Wallpapers",
                 subtitle = "Home and drawer wallpaper modes, colors, patterns, custom images, and sync behavior.",
-                badge = "Live",
-                icon = Icons.Default.Settings,
+                badge = "",
+                icon = Icons.Default.Image,
                 clickable = true,
                 onClick = { selectedPage = LauncherSettingsPage.WALLPAPERS }
             ),
             SettingsSectionInfo(
                 title = "Restore Defaults",
                 subtitle = "Reset launcher theme, gestures, drawer preferences, and layout tuning back to the app defaults.",
-                badge = "Reset",
-                icon = Icons.Default.Settings,
+                badge = "",
+                icon = Icons.Default.Restore,
                 clickable = true,
                 onClick = { showResetDialog = true }
             ),
             SettingsSectionInfo(
                 title = "Icons",
                 subtitle = "Icon pack, adaptive icons, shape, labels, badges, icon size, and shadow or glow styling.",
-                badge = "Live",
-                icon = Icons.Default.Settings,
+                badge = "",
+                icon = Icons.Default.Apps,
                 clickable = true,
                 onClick = { selectedPage = LauncherSettingsPage.ICONS }
             ),
             SettingsSectionInfo(
                 title = "Gestures",
                 subtitle = "Swipe up, swipe down, swipe left, swipe right, double tap, pinch, and two-finger actions.",
-                badge = "Open",
-                icon = Icons.Default.KeyboardArrowRight,
-                clickable = true
+                badge = "",
+                icon = Icons.Default.TouchApp,
+                clickable = true,
+                onClick = onOpenGestureControl
             ),
             SettingsSectionInfo(
                 title = "Search",
-                subtitle = "Instant search, app suggestions, and search bar position. Drawer search bar position is wired already.",
-                badge = "Soon",
-                icon = Icons.Default.Search
+                subtitle = "Instant search, app suggestions, and search bar position.",
+                badge = "",
+                icon = Icons.Default.Search,
+                clickable = true,
+                onClick = onOpenSearch
+            ),
+            SettingsSectionInfo(
+                title = "Hidden Apps",
+                subtitle = "Open the secured cabinet for apps removed from the main launcher.",
+                badge = "",
+                icon = Icons.Default.Lock,
+                clickable = true,
+                onClick = onOpenHiddenSpace
             ),
             SettingsSectionInfo(
                 title = "Folders",
                 subtitle = "Folder style, shape, preview, behavior, and background treatment.",
                 badge = "Soon",
-                icon = Icons.Default.KeyboardArrowLeft
+                icon = Icons.Default.Folder
             ),
             SettingsSectionInfo(
                 title = "Notifications and Badges",
                 subtitle = "Choose one global dot color and optionally show unread counts inside it.",
-                badge = "Live",
-                icon = Icons.Default.Build
-                ,clickable = true,
+                badge = "",
+                icon = Icons.Default.Notifications,
+                clickable = true,
                 onClick = { selectedPage = LauncherSettingsPage.NOTIFICATIONS }
             ),
             SettingsSectionInfo(
                 title = "Appearance",
                 subtitle = "Theme, transparency, animation speed, font choices, and system bar styling.",
                 badge = "Soon",
-                icon = Icons.Default.Settings
+                icon = Icons.Default.Palette
             ),
             SettingsSectionInfo(
                 title = "Desktop Extras",
                 subtitle = "Widgets, hidden apps, app lock, backup and restore, and launcher import.",
                 badge = "Soon",
-                icon = Icons.Default.Build
+                icon = Icons.Default.Widgets
             ),
             SettingsSectionInfo(
                 title = "Advanced",
                 subtitle = "Custom gestures, app shortcuts, backup format, drawer options, and icon normalization.",
                 badge = "Soon",
-                icon = Icons.Default.Build
+                icon = Icons.Default.Tune
             )
         )
     }
@@ -2146,6 +2171,15 @@ fun GestureControlSettingsScreen(
                     )
                 }
                 item {
+                    GestureStaticRow(
+                        title = "Swipe left + long press on dock",
+                        subtitle = "Open the secured hidden apps cabinet",
+                        value = "Cabinet",
+                        icon = Icons.Default.Lock,
+                        theme = theme
+                    )
+                }
+                item {
                     SectionHeader(
                         title = "Custom gestures",
                         subtitle = "Pick an app or shortcut for the side gestures."
@@ -2315,10 +2349,12 @@ private fun SettingsEntryCard(
                 )
             }
 
-            PillBadge(
-                text = badge,
-                tint = theme.accentSecondary
-            )
+            if (badge.isNotBlank()) {
+                PillBadge(
+                    text = badge,
+                    tint = theme.accentSecondary
+                )
+            }
         }
     }
 }

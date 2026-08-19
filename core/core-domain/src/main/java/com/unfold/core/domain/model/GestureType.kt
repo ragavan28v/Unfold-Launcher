@@ -10,6 +10,7 @@ enum class GestureType {
     SWIPE_DOWN_1F,
     PINCH,
     LONG_PRESS_HOLD,
+    DOCK_SWIPE_HOLD,
     DOUBLE_TAP_BG,
     EDGE_SWIPE
 }

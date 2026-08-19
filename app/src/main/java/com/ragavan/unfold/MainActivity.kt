@@ -50,6 +50,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.unfold.core.domain.navigation.UnfoldRoute
+import com.unfold.core.domain.model.GestureType
 import com.unfold.core.ui.theme.UnfoldTheme
 import com.unfold.feature.drawer.AppDrawerScreen
 import com.unfold.feature.drawer.AppDrawerViewModel
@@ -131,8 +132,10 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                     onNavigateToSettings = {
                                         navController.navigate(UnfoldRoute.Settings.route)
                                     },
-                                    onNavigateToHiddenSpace = {
-                                        navController.navigate(UnfoldRoute.HiddenSpace.route)
+                                    onDockSwipeHold = {
+                                        scope.launch {
+                                            gestureActionResolver.execute(GestureType.DOCK_SWIPE_HOLD, navController)
+                                        }
                                     }
                                 )
                             }
@@ -158,6 +161,12 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                     onBack = { navController.popBackStack() },
                                     onOpenGestureControl = {
                                         navController.navigate(UnfoldRoute.GestureSettings.route)
+                                    },
+                                    onOpenSearch = {
+                                        navController.navigate(UnfoldRoute.UniversalSearch.route)
+                                    },
+                                    onOpenHiddenSpace = {
+                                        navController.navigate(UnfoldRoute.HiddenSpace.route)
                                     }
                                 )
                             }

@@ -108,7 +108,7 @@ fun HomeScreen(
     onNavigateToSearch: () -> Unit,
     onNavigateToDrawer: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToHiddenSpace: () -> Unit
+    onDockSwipeHold: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
     val theme = LocalUnfoldTheme.current
@@ -729,7 +729,7 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(onNavigateToHiddenSpace) {
+                        .pointerInput(onDockSwipeHold) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
                                 var totalDx = 0f
@@ -751,7 +751,7 @@ fun HomeScreen(
                                     if (totalDx < -100f && (System.currentTimeMillis() - startTimestamp) > 500 && !isHiddenSpaceTriggered) {
                                         change.consume()
                                         isHiddenSpaceTriggered = true
-                                        onNavigateToHiddenSpace()
+                                        onDockSwipeHold()
                                         break
                                     }
                                     
