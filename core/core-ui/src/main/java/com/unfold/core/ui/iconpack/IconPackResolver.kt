@@ -1,6 +1,9 @@
 package com.unfold.core.ui.iconpack
 
 import android.content.Context
+import android.content.BroadcastReceiver
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.graphics.drawable.Drawable
@@ -14,7 +17,8 @@ import java.util.Locale
 data class IconPackInfo(
     val packageName: String,
     val label: String,
-    val drawableCount: Int
+    val drawableCount: Int,
+    val previewPackageName: String = ""
 )
 
 class IconPackResolver private constructor() {
@@ -22,6 +26,80 @@ class IconPackResolver private constructor() {
         private val iconCache = LruCache<String, Drawable>(200)
         private val filterCache = mutableMapOf<String, Map<String, String>>()
         private var lastIconPack = ""
+        private const val CACHE_PREFS = "icon_pack_cache"
+        private const val CACHE_JSON = "packs"
+        private var receiverRegistered = false
+        private var cachedRingEnabled: Boolean? = null
+
+        fun getCachedIconPacks(context: Context): List<IconPackInfo> {
+            ensurePackageReceiver(context)
+            val json = context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE)
+                .getString(CACHE_JSON, null) ?: return emptyList()
+            return runCatching {
+                val array = org.json.JSONArray(json)
+                (0 until array.length()).map { index ->
+                    val item = array.getJSONObject(index)
+                    IconPackInfo(
+                        packageName = item.getString("package"),
+                        label = item.getString("label"),
+                        drawableCount = item.optInt("count", 0),
+                        previewPackageName = item.optString("preview", "")
+                    )
+                }
+            }.getOrDefault(emptyList())
+        }
+
+        fun refreshInstalledIconPacks(context: Context): List<IconPackInfo> {
+            ensurePackageReceiver(context)
+            val packs = detectInstalledIconPacks(context)
+            val array = org.json.JSONArray().apply {
+                packs.forEach { pack ->
+                    put(org.json.JSONObject().apply {
+                        put("package", pack.packageName)
+                        put("label", pack.label)
+                        put("count", pack.drawableCount)
+                        put("preview", pack.previewPackageName)
+                    })
+                }
+            }
+            context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE)
+                .edit().putString(CACHE_JSON, array.toString()).apply()
+            return packs
+        }
+
+        fun isLauncherRingEnabled(context: Context): Boolean {
+            cachedRingEnabled?.let { return it }
+            val themeFile = File(context.filesDir, "datastore/theme_config.json")
+            return runCatching {
+                JSONObject(themeFile.readText()).optBoolean("apply_icon_pack_ring", false)
+            }.getOrDefault(false).also { cachedRingEnabled = it }
+        }
+
+        fun setLauncherRingEnabled(enabled: Boolean) {
+            cachedRingEnabled = enabled
+        }
+
+        private fun ensurePackageReceiver(context: Context) {
+            if (receiverRegistered) return
+            synchronized(this) {
+                if (receiverRegistered) return
+                context.applicationContext.registerReceiver(object : BroadcastReceiver() {
+                    override fun onReceive(receiverContext: Context, intent: Intent) {
+                        if (intent.action == Intent.ACTION_PACKAGE_ADDED ||
+                            intent.action == Intent.ACTION_PACKAGE_REMOVED ||
+                            intent.action == Intent.ACTION_PACKAGE_CHANGED) {
+                            refreshInstalledIconPacks(receiverContext)
+                        }
+                    }
+                }, IntentFilter().apply {
+                    addAction(Intent.ACTION_PACKAGE_ADDED)
+                    addAction(Intent.ACTION_PACKAGE_REMOVED)
+                    addAction(Intent.ACTION_PACKAGE_CHANGED)
+                    addDataScheme("package")
+                })
+                receiverRegistered = true
+            }
+        }
 
         fun detectInstalledIconPacks(context: Context): List<IconPackInfo> {
             val pm = context.packageManager
@@ -44,7 +122,8 @@ class IconPackResolver private constructor() {
                     IconPackInfo(
                         packageName = applicationInfo.packageName,
                         label = label,
-                        drawableCount = mapping.size
+                        drawableCount = mapping.size,
+                        previewPackageName = mapping.keys.firstOrNull().orEmpty()
                     )
                 }
                 .sortedBy { it.label.lowercase() }

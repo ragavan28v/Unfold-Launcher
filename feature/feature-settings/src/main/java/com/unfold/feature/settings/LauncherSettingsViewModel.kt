@@ -153,6 +153,14 @@ class LauncherSettingsViewModel @Inject constructor(
         }
     }
 
+    fun setIconPackRing(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = _uiState.value.themeConfig
+            com.unfold.core.ui.iconpack.IconPackResolver.setLauncherRingEnabled(enabled)
+            updateThemeConfig(current.copy(applyIconPackRing = enabled))
+        }
+    }
+
     private suspend fun normalizeHomeApps(config: ThemeConfig) {
         if (config.homeAppPlacementMode != HomeAppPlacementMode.AUTO_ARRANGE) return
 

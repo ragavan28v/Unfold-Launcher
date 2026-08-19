@@ -416,7 +416,8 @@ private fun itemResult(
         title = app.label,
         subtitle = "",
         glyph = null,
-        rawIcon = iconPackPackage.isNotBlank(),
+        rawIcon = iconPackPackage.isNotBlank() &&
+            !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
         onClick = onClick
     ) {
         val bitmap = iconBitmap
@@ -489,6 +490,7 @@ private fun ResultSurface(
     iconContent: (@Composable () -> Unit)? = null
 ) {
     val theme = LocalUnfoldTheme.current
+    val context = LocalContext.current
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -503,7 +505,7 @@ private fun ResultSurface(
         ) {
             CarvedIcon(
                 size = 42.dp,
-                raw = rawIcon,
+                raw = rawIcon && !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
                 contentDescription = title,
                 icon = {
                     if (iconContent != null) {

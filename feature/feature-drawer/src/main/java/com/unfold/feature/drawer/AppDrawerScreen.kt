@@ -1091,7 +1091,8 @@ fun AppGridItem(
     ) {
         CarvedIcon(
             size = iconSize,
-            raw = iconPackPackage.isNotBlank(),
+            raw = iconPackPackage.isNotBlank() &&
+                !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
             icon = {
                 val bitmap = iconBitmap
                 if (bitmap != null) {
@@ -1169,7 +1170,8 @@ fun AppListItem(
     ) {
         CarvedIcon(
             size = iconSize.coerceAtMost(48.dp),
-            raw = iconPackPackage.isNotBlank(),
+            raw = iconPackPackage.isNotBlank() &&
+                !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
             icon = {
                 val bitmap = iconBitmap
                 if (bitmap != null) {

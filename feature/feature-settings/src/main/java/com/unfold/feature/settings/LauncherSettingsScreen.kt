@@ -330,7 +330,6 @@ fun LauncherSettingsScreen(
                 )
                 LauncherSettingsPage.ICONS -> {
                     IconPackPickerScreen(
-                        onBack = { selectedPage = null },
                         viewModel = viewModel
                     )
                 }

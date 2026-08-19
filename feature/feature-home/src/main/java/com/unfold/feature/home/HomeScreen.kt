@@ -657,6 +657,8 @@ fun HomeScreen(
                                         iconSize = gridIconSize,
                                         showLabel = state.homeLabelsEnabled,
                                         iconBitmap = iconBitmap,
+                                        rawIcon = state.iconPackPackage.isNotBlank() &&
+                                            !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
                                         onClick = { launchApp(context, app) }
                                     )
 
@@ -860,7 +862,8 @@ fun HomeScreen(
                                         ) {
                                             CarvedIcon(
                                                 size = dockIconDiameter,
-                                                raw = state.iconPackPackage.isNotBlank(),
+                                                raw = state.iconPackPackage.isNotBlank() &&
+                                                    !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
                                                 icon = {
                                                     if (iconBitmap != null) {
                                                         Image(
@@ -1024,7 +1027,8 @@ fun HomeScreen(
                                             ) {
                                                 CarvedIcon(
                                                     size = dockIconDiameter,
-                                                    raw = state.iconPackPackage.isNotBlank(),
+                                                    raw = state.iconPackPackage.isNotBlank() &&
+                                                        !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
                                                     icon = {
                                                         if (iconBitmap != null) {
                                                             Image(
@@ -1186,7 +1190,8 @@ fun HomeScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CarvedIcon(
                         size = gridIconSize,
-                        raw = state.iconPackPackage.isNotBlank(),
+                        raw = state.iconPackPackage.isNotBlank() &&
+                            !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
                         icon = {
                             if (iconBitmap != null) {
                                 Image(
@@ -1312,6 +1317,7 @@ fun HomeAppGridItem(
     iconSize: Dp,
     showLabel: Boolean,
     iconBitmap: ImageBitmap? = null,
+    rawIcon: Boolean = false,
     onClick: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
@@ -1326,6 +1332,7 @@ fun HomeAppGridItem(
     ) {
         CarvedIcon(
             size = iconSize,
+            raw = rawIcon,
             icon = {
                 if (iconBitmap != null) {
                     Image(

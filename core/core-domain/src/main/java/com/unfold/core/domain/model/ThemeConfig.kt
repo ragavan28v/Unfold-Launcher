@@ -87,6 +87,7 @@ data class ThemeConfig(
     val appDrawerSortingMode: AppDrawerSortingMode = AppDrawerSortingMode.ALPHABETICAL,
     val appDrawerStyleMode: AppDrawerStyleMode = AppDrawerStyleMode.CARD,
     val iconPackPackage: String = "",
+    val applyIconPackRing: Boolean = false,
     val soundFeedbackEnabled: Boolean = false
 )
 

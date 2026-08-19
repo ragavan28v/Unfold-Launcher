@@ -2294,7 +2294,8 @@ private fun HudFolderAppCell(
     ) {
         CarvedIcon(
             size = (52 * scale).dp,
-            raw = iconPackPackage.isNotBlank(),
+            raw = iconPackPackage.isNotBlank() &&
+                !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
             icon = {
                 if (iconBitmap != null) {
                     Image(
@@ -2527,7 +2528,8 @@ private fun HudFolderManageAppsDialog(
                             ) {
                                 CarvedIcon(
                                     size = 34.dp,
-                                    raw = iconPackPackage.isNotBlank(),
+                                    raw = iconPackPackage.isNotBlank() &&
+                                        !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
                                     icon = {
                                         if (iconBitmap != null) {
                                             Image(

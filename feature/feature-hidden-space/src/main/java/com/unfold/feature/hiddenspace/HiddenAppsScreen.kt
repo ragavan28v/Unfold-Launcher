@@ -315,7 +315,8 @@ private fun HiddenAppIcon(
     ) {
         CarvedIcon(
             size = 56.dp,
-            raw = iconPackPackage.isNotBlank(),
+            raw = iconPackPackage.isNotBlank() &&
+                !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
             icon = {
                 val bitmap = iconBitmap
                 if (bitmap != null) {
