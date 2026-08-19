@@ -89,6 +89,7 @@ import com.unfold.core.domain.model.WallpaperPatternMode
 import com.unfold.core.ui.components.*
 import com.unfold.core.ui.components.hud.*
 import com.unfold.core.ui.theme.LocalUnfoldTheme
+import com.unfold.core.ui.notification.NotificationBadgeStore
 import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.launch
 
@@ -112,6 +113,12 @@ fun HomeScreen(
     val state by viewModel.uiState.collectAsState()
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
+    NotificationBadgeStore.initialize(context)
+    val notificationBadges by NotificationBadgeStore.counts.collectAsState()
+    val badgeColor = remember(state.badgeColorHex) {
+        runCatching { Color(android.graphics.Color.parseColor(state.badgeColorHex)) }
+            .getOrElse { Color(0xFFF44336) }
+    }
     val coroutineScope = rememberCoroutineScope()
 
     val pagerState = rememberPagerState(pageCount = { 6 })
@@ -659,7 +666,17 @@ fun HomeScreen(
                                         iconBitmap = iconBitmap,
                                         rawIcon = state.iconPackPackage.isNotBlank() &&
                                             !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
-                                        onClick = { launchApp(context, app) }
+                                        badgeCount = notificationBadges[
+                                            NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
+                                        ],
+                                        badgeColor = badgeColor,
+                                        showBadgeCount = state.showBadgeCount,
+                                        onClick = {
+                                            NotificationBadgeStore.clearInstance(
+                                                NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
+                                            )
+                                            launchApp(context, app)
+                                        }
                                     )
 
                                     if (showContextMenu) {
@@ -881,7 +898,17 @@ fun HomeScreen(
                                                     }
                                                 },
                                                 contentDescription = app.label,
-                                                onClick = { launchApp(context, app) }
+                                                badgeCount = notificationBadges[
+                                                    NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
+                                                ],
+                                                badgeColor = badgeColor,
+                                                showBadgeCount = state.showBadgeCount,
+                                                onClick = {
+                                                    NotificationBadgeStore.clearInstance(
+                                                        NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
+                                                    )
+                                                    launchApp(context, app)
+                                                }
                                             )
 
                                             if (showDockMenu) {
@@ -1046,7 +1073,17 @@ fun HomeScreen(
                                                         }
                                                     },
                                                     contentDescription = app.label,
-                                                    onClick = { launchApp(context, app) }
+                                                    badgeCount = notificationBadges[
+                                                        NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
+                                                    ],
+                                                    badgeColor = badgeColor,
+                                                    showBadgeCount = state.showBadgeCount,
+                                                    onClick = {
+                                                        NotificationBadgeStore.clearInstance(
+                                                            NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
+                                                        )
+                                                        launchApp(context, app)
+                                                    }
                                                 )
 
                                                 if (showDockMenu) {
@@ -1318,6 +1355,9 @@ fun HomeAppGridItem(
     showLabel: Boolean,
     iconBitmap: ImageBitmap? = null,
     rawIcon: Boolean = false,
+    badgeCount: Int? = null,
+    badgeColor: Color = Color(0xFFF44336),
+    showBadgeCount: Boolean = false,
     onClick: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
@@ -1350,6 +1390,9 @@ fun HomeAppGridItem(
                 }
             },
             contentDescription = app.label,
+            badgeCount = badgeCount,
+            badgeColor = badgeColor,
+            showBadgeCount = showBadgeCount,
             onClick = onClick
         )
         if (showLabel) {

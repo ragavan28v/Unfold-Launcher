@@ -53,7 +53,9 @@ data class AppDrawerUiState(
     val drawerWallpaperHex: String = "#0B1020",
     val drawerWallpaperPattern: WallpaperPatternMode = WallpaperPatternMode.MINIMAL,
     val drawerWallpaperImageUri: String = "",
-    val iconPackPackage: String = ""
+    val iconPackPackage: String = "",
+    val badgeColorHex: String = "#F44336",
+    val showBadgeCount: Boolean = false
 )
 
 sealed interface AppDrawerUiIntent {
@@ -110,6 +112,8 @@ class AppDrawerViewModel @Inject constructor(
                     drawerWallpaperPattern = config.drawerWallpaperPattern,
                     drawerWallpaperImageUri = config.drawerWallpaperImageUri,
                     iconPackPackage = config.iconPackPackage,
+                    badgeColorHex = config.badgeColorHex,
+                    showBadgeCount = config.showBadgeCount,
                     filteredApps = filterApps(
                         _uiState.value.apps,
                         _uiState.value.searchQuery,

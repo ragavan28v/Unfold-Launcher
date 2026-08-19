@@ -1,5 +1,7 @@
 package com.unfold.core.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -7,14 +9,17 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
@@ -23,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.unfold.core.ui.theme.LocalUnfoldTheme
 import com.unfold.core.ui.util.drawCarvedBevel
 
@@ -37,6 +43,8 @@ fun CarvedIcon(
     accentTint: Color = LocalUnfoldTheme.current.accentPrimary,
     bevelIntensity: Float = LocalUnfoldTheme.current.bevelIntensity,
     badgeCount: Int? = null,
+    badgeColor: Color = Color(0xFFF44336),
+    showBadgeCount: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
     contentDescription: String
@@ -45,15 +53,10 @@ fun CarvedIcon(
     val pressedState = interactionSource.collectIsPressedAsState()
     val activePressed = isPressed || pressedState.value
 
-    val theme = LocalUnfoldTheme.current
-
     Box(
         modifier = modifier
             .size(size)
             .semantics { this.contentDescription = contentDescription }
-            .let { baseModifier ->
-                if (raw) baseModifier else baseModifier.clip(CircleShape)
-            }
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -88,28 +91,41 @@ fun CarvedIcon(
             icon()
         }
 
-        // Notification badge
-        if (badgeCount != null && badgeCount > 0) {
+        val badgeVisible = badgeCount != null && badgeCount > 0
+        val badgeAlpha by animateFloatAsState(
+            targetValue = if (badgeVisible) 1f else 0f,
+            label = "badge visibility"
+        )
+        val animatedBadgeColor by animateColorAsState(
+            targetValue = badgeColor,
+            label = "badge color"
+        )
+
+        if (badgeVisible) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(4.dp)
+                    .offset(x = (-1).dp, y = 1.dp)
+                    .alpha(badgeAlpha)
+                    .zIndex(1f)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(if (showBadgeCount) 20.dp else 14.dp)
                         .clip(CircleShape)
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        drawCircle(color = theme.accentWarn)
+                        drawCircle(color = animatedBadgeColor)
                     }
-                    Text(
-                        text = if (badgeCount > 99) "99+" else badgeCount.toString(),
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                    if (showBadgeCount) {
+                        Text(
+                            text = if (badgeCount!! > 99) "99+" else badgeCount.toString(),
+                            color = Color.White,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
                 }
             }
         }

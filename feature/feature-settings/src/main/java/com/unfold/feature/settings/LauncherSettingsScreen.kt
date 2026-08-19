@@ -30,6 +30,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -75,6 +76,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
@@ -128,7 +130,8 @@ private enum class LauncherSettingsPage {
     DOCK,
     APP_DRAWER,
     WALLPAPERS,
-    ICONS
+    ICONS,
+    NOTIFICATIONS
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -148,6 +151,7 @@ fun LauncherSettingsScreen(
         LauncherSettingsPage.APP_DRAWER -> "APP DRAWER"
         LauncherSettingsPage.WALLPAPERS -> "WALLPAPERS"
         LauncherSettingsPage.ICONS -> "CUSTOMIZE ICONS"
+        LauncherSettingsPage.NOTIFICATIONS -> "NOTIFICATIONS & BADGES"
         null -> "LAUNCHER SETTINGS"
     }
     val pageSubtitle = when (selectedPage) {
@@ -156,6 +160,7 @@ fun LauncherSettingsScreen(
         LauncherSettingsPage.APP_DRAWER -> "Adjust drawer layout, grid, sorting, search position and keyboard behavior."
         LauncherSettingsPage.WALLPAPERS -> "Manage wallpapers for the home screen and app drawer."
         LauncherSettingsPage.ICONS -> "Select an installed icon pack or use defaults."
+        LauncherSettingsPage.NOTIFICATIONS -> "Customize the global notification dot and count display."
         null -> "Manage launcher preferences and controls."
     }
     val pageBackAction: () -> Unit = when (selectedPage) {
@@ -234,9 +239,11 @@ fun LauncherSettingsScreen(
             ),
             SettingsSectionInfo(
                 title = "Notifications and Badges",
-                subtitle = "Badge style, per-app badges, notification dots, and unread count source.",
-                badge = "Soon",
+                subtitle = "Choose one global dot color and optionally show unread counts inside it.",
+                badge = "Live",
                 icon = Icons.Default.Build
+                ,clickable = true,
+                onClick = { selectedPage = LauncherSettingsPage.NOTIFICATIONS }
             ),
             SettingsSectionInfo(
                 title = "Appearance",
@@ -333,6 +340,15 @@ fun LauncherSettingsScreen(
                         viewModel = viewModel
                     )
                 }
+                LauncherSettingsPage.NOTIFICATIONS -> LauncherSettingsPageScaffold(
+                    modifier = Modifier.weight(1f),
+                    content = {
+                        NotificationBadgeSettingsPanel(
+                            config = state.themeConfig,
+                            onUpdate = viewModel::updateThemeConfig
+                        )
+                    }
+                )
                 null -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
@@ -459,6 +475,103 @@ private fun LauncherSettingsPageScaffold(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         content()
+    }
+}
+
+@Composable
+private fun NotificationBadgeSettingsPanel(
+    config: com.unfold.core.domain.model.ThemeConfig,
+    onUpdate: (com.unfold.core.domain.model.ThemeConfig) -> Unit
+) {
+    val theme = LocalUnfoldTheme.current
+    val presets = listOf(
+        "Red" to "#F44336",
+        "Blue" to "#2196F3",
+        "Cyan" to "#00BCD4",
+        "Green" to "#4CAF50",
+        "Orange" to "#FF9800",
+        "Purple" to "#9C27B0",
+        "Yellow" to "#FFEB3B",
+        "Pink" to "#E91E63",
+        "White" to "#FFFFFF",
+        "Black" to "#000000"
+    )
+
+    GlassPanel(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = 18.dp
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = "DOT BADGE",
+                color = theme.accentSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "A single top-right dot marks apps with active notifications.",
+                color = theme.textSecondary,
+                fontSize = 11.sp
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "BADGE COLOR",
+                color = theme.textPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                presets.chunked(5).forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        row.forEach { (name, hex) ->
+                            val color = runCatching {
+                                Color(android.graphics.Color.parseColor(hex))
+                            }.getOrDefault(Color.Red)
+                            val selected = config.badgeColorHex.equals(hex, ignoreCase = true)
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        onUpdate(config.copy(badgeColorHex = hex))
+                                    },
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                        .border(
+                                            width = if (selected) 3.dp else 1.dp,
+                                            color = if (selected) theme.accentPrimary else theme.panelBorder,
+                                            shape = CircleShape
+                                        )
+                                )
+                                Text(
+                                    text = name,
+                                    color = if (selected) theme.accentPrimary else theme.textSecondary,
+                                    fontSize = 9.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            ToggleSettingRow(
+                label = "Show count inside dot",
+                checked = config.showBadgeCount,
+                onCheckedChange = { onUpdate(config.copy(showBadgeCount = it)) }
+            )
+        }
     }
 }
 

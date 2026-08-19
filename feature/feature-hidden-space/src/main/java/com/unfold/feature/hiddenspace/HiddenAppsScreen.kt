@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.unfold.core.ui.notification.NotificationBadgeStore
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -204,6 +205,12 @@ fun HiddenAppsScreen(
                                     HiddenAppIcon(
                                         app = app,
                                         onClick = { 
+                                            NotificationBadgeStore.clearInstance(
+                                                NotificationBadgeStore.instanceKey(
+                                                    app.packageName,
+                                                    app.userSerial
+                                                )
+                                            )
                                             launchApp(context, app)
                                             onBack()
                                         },

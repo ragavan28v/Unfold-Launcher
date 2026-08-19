@@ -88,6 +88,8 @@ data class ThemeConfig(
     val appDrawerStyleMode: AppDrawerStyleMode = AppDrawerStyleMode.CARD,
     val iconPackPackage: String = "",
     val applyIconPackRing: Boolean = false,
+    val badgeColorHex: String = "#F44336",
+    val showBadgeCount: Boolean = false,
     val soundFeedbackEnabled: Boolean = false
 )
 

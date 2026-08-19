@@ -2249,6 +2249,12 @@ private fun HudFolderPopupDialog(
                                     scale = scale,
                                     iconPackPackage = iconPackPackage,
                                     onClick = {
+                                        com.unfold.core.ui.notification.NotificationBadgeStore.clearInstance(
+                                            com.unfold.core.ui.notification.NotificationBadgeStore.instanceKey(
+                                                app.packageName,
+                                                app.userSerial
+                                            )
+                                        )
                                         launchApp(context, app)
                                     }
                                 )

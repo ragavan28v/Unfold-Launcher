@@ -70,6 +70,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.unfold.core.ui.notification.NotificationBadgeStore
 import coil.compose.rememberAsyncImagePainter
 import com.unfold.core.domain.model.AppInfo
 import com.unfold.core.ui.components.CarvedIcon
@@ -235,6 +236,12 @@ fun UniversalSearchScreen(
                                 iconPackPackage = state.iconPackPackage,
                                 onClick = {
                                     viewModel.onIntent(UniversalSearchUiIntent.QuerySubmitted(state.query))
+                                    NotificationBadgeStore.clearInstance(
+                                        NotificationBadgeStore.instanceKey(
+                                            app.packageName,
+                                            app.userSerial
+                                        )
+                                    )
                                     launchApp(context, app)
                                 }
                             )

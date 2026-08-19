@@ -21,6 +21,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
+
     <application
         android:name=".UnfoldApp"
         android:allowBackup="true"
@@ -46,7 +47,7 @@
 
         <service
             android:name=".UnfoldNotificationListenerService"
-            android:label="Unfold HUD Media Session Control"
+            android:label="Unfold Notification Badges and Media Control"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true">
             <intent-filter>

@@ -92,6 +92,8 @@ object ThemeConfigSerializer : Serializer<ThemeConfig> {
                 }.getOrDefault(AppDrawerStyleMode.CARD),
                 iconPackPackage = json.optString("icon_pack_package", ""),
                 applyIconPackRing = json.optBoolean("apply_icon_pack_ring", false),
+                badgeColorHex = json.optString("badge_color_hex", "#F44336"),
+                showBadgeCount = json.optBoolean("show_badge_count", false),
                 soundFeedbackEnabled = json.optBoolean("sound_feedback_enabled", false)
             )
         } catch (e: Exception) {
@@ -136,6 +138,8 @@ object ThemeConfigSerializer : Serializer<ThemeConfig> {
             put("app_drawer_style_mode", t.appDrawerStyleMode.name)
             put("icon_pack_package", t.iconPackPackage)
             put("apply_icon_pack_ring", t.applyIconPackRing)
+            put("badge_color_hex", t.badgeColorHex)
+            put("show_badge_count", t.showBadgeCount)
             put("sound_feedback_enabled", t.soundFeedbackEnabled)
         }
         withContext(Dispatchers.IO) {

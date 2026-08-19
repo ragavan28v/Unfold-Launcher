@@ -98,6 +98,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import com.unfold.core.ui.notification.NotificationBadgeStore
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -131,6 +132,12 @@ fun AppDrawerScreen(
     val state by viewModel.uiState.collectAsState()
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
+    NotificationBadgeStore.initialize(context)
+    val notificationBadges by NotificationBadgeStore.counts.collectAsState()
+    val badgeColor = remember(state.badgeColorHex) {
+        runCatching { Color(android.graphics.Color.parseColor(state.badgeColorHex)) }
+            .getOrElse { Color(0xFFF44336) }
+    }
     val coroutineScope = rememberCoroutineScope()
     val searchFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -339,8 +346,16 @@ fun AppDrawerScreen(
                                         iconSize = renderedIconSize,
                                         drawerItemAlpha = drawerItemAlpha,
                                         iconPackPackage = state.iconPackPackage,
+                                        badgeCount = notificationBadges[
+                                            NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
+                                        ],
+                                        badgeColor = badgeColor,
+                                        showBadgeCount = state.showBadgeCount,
                                         onClick = {
                                             viewModel.onIntent(AppDrawerUiIntent.OpenApp(app.appId))
+                                            NotificationBadgeStore.clearInstance(
+                                                NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
+                                            )
                                             launchApp(context, app)
                                         },
                                         onLongPress = {
@@ -369,8 +384,14 @@ fun AppDrawerScreen(
                                         iconSize = renderedIconSize,
                                         drawerItemAlpha = drawerItemAlpha,
                                         iconPackPackage = state.iconPackPackage,
+                                        badgeCounts = notificationBadges,
+                                        badgeColor = badgeColor,
+                                        showBadgeCount = state.showBadgeCount,
                                         onAppClick = { app ->
                                             viewModel.onIntent(AppDrawerUiIntent.OpenApp(app.appId))
+                                            NotificationBadgeStore.clearInstance(
+                                                NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
+                                            )
                                             launchApp(context, app)
                                         },
                                         onAppLongPress = { app -> selectedAppForMenu = app }
@@ -399,6 +420,9 @@ fun AppDrawerScreen(
                                         iconPackPackage = state.iconPackPackage,
                                         onAppClick = { app ->
                                             viewModel.onIntent(AppDrawerUiIntent.OpenApp(app.appId))
+                                            NotificationBadgeStore.clearInstance(
+                                                NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
+                                            )
                                             launchApp(context, app)
                                         },
                                         onAppLongPress = { app -> selectedAppForMenu = app }
@@ -947,6 +971,9 @@ fun AppSectionBlock(
     iconSize: Dp,
     drawerItemAlpha: Float,
     iconPackPackage: String = "",
+    badgeCounts: Map<String, Int> = emptyMap(),
+    badgeColor: Color = Color(0xFFF44336),
+    showBadgeCount: Boolean = false,
     onAppClick: (AppInfo) -> Unit,
     onAppLongPress: (AppInfo) -> Unit
 ) {
@@ -962,6 +989,11 @@ fun AppSectionBlock(
                             iconSize = iconSize,
                             drawerItemAlpha = drawerItemAlpha,
                             iconPackPackage = iconPackPackage,
+                            badgeCount = badgeCounts[
+                                NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
+                            ],
+                            badgeColor = badgeColor,
+                            showBadgeCount = showBadgeCount,
                             onClick = { onAppClick(app) },
                             onLongPress = { onAppLongPress(app) }
                         )
@@ -975,6 +1007,9 @@ fun AppSectionBlock(
                     iconSize = iconSize,
                     drawerItemAlpha = drawerItemAlpha,
                     iconPackPackage = iconPackPackage,
+                    badgeCounts = badgeCounts,
+                    badgeColor = badgeColor,
+                    showBadgeCount = showBadgeCount,
                     onAppClick = onAppClick,
                     onAppLongPress = onAppLongPress
                 )
@@ -1019,6 +1054,9 @@ fun SectionGrid(
     iconSize: Dp,
     drawerItemAlpha: Float,
     iconPackPackage: String = "",
+    badgeCounts: Map<String, Int> = emptyMap(),
+    badgeColor: Color = Color(0xFFF44336),
+    showBadgeCount: Boolean = false,
     onAppClick: (AppInfo) -> Unit,
     onAppLongPress: (AppInfo) -> Unit
 ) {
@@ -1036,6 +1074,11 @@ fun SectionGrid(
                                 iconSize = iconSize,
                                 drawerItemAlpha = drawerItemAlpha,
                                 iconPackPackage = iconPackPackage,
+                                badgeCount = badgeCounts[
+                                    NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
+                                ],
+                                badgeColor = badgeColor,
+                                showBadgeCount = showBadgeCount,
                                 onClick = { onAppClick(app) },
                                 onLongPress = { onAppLongPress(app) }
                             )
@@ -1054,6 +1097,9 @@ fun AppGridItem(
     iconSize: Dp,
     drawerItemAlpha: Float,
     iconPackPackage: String = "",
+    badgeCount: Int? = null,
+    badgeColor: Color = Color(0xFFF44336),
+    showBadgeCount: Boolean = false,
     onClick: () -> Unit,
     onLongPress: () -> Unit
 ) {
@@ -1111,6 +1157,9 @@ fun AppGridItem(
                 }
             },
             contentDescription = app.label,
+            badgeCount = badgeCount,
+            badgeColor = badgeColor,
+            showBadgeCount = showBadgeCount,
             onClick = onClick,
             onLongPress = onLongPress
         )
@@ -1133,6 +1182,9 @@ fun AppListItem(
     iconSize: Dp,
     drawerItemAlpha: Float,
     iconPackPackage: String = "",
+    badgeCount: Int? = null,
+    badgeColor: Color = Color(0xFFF44336),
+    showBadgeCount: Boolean = false,
     onClick: () -> Unit,
     onLongPress: () -> Unit
 ) {
@@ -1190,6 +1242,9 @@ fun AppListItem(
                 }
             },
             contentDescription = app.label,
+            badgeCount = badgeCount,
+            badgeColor = badgeColor,
+            showBadgeCount = showBadgeCount,
             onClick = onClick,
             onLongPress = onLongPress
         )

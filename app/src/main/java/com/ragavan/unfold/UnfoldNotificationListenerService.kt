@@ -8,8 +8,11 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
+import android.os.UserManager
 import android.service.notification.NotificationListenerService
+import android.service.notification.StatusBarNotification
 import com.unfold.core.ui.components.hud.HudMediaManager
+import com.unfold.core.ui.notification.NotificationBadgeStore
 import androidx.compose.ui.graphics.asImageBitmap
 
 class UnfoldNotificationListenerService : NotificationListenerService() {
@@ -55,6 +58,8 @@ class UnfoldNotificationListenerService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         try {
+            NotificationBadgeStore.initialize(this)
+            refreshNotificationBadges()
             val component = ComponentName(this, UnfoldNotificationListenerService::class.java)
             mediaSessionManager.addOnActiveSessionsChangedListener(sessionListener, component)
             val controllers = mediaSessionManager.getActiveSessions(component)
@@ -63,6 +68,43 @@ class UnfoldNotificationListenerService : NotificationListenerService() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    override fun onNotificationPosted(sbn: StatusBarNotification) {
+        if (sbn.packageName != packageName) {
+            NotificationBadgeStore.recordNotification(
+                notificationKey = sbn.key,
+                instanceKey = NotificationBadgeStore.instanceKey(
+                    sbn.packageName,
+                    userSerial(sbn)
+                )
+            )
+        }
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        // Keep the record: clearing the tray does not mean the app item was opened.
+    }
+
+    private fun refreshNotificationBadges() {
+        activeNotifications
+            .asSequence()
+            .filter { it.packageName != packageName }
+            .forEach { sbn ->
+                NotificationBadgeStore.recordNotification(
+                    notificationKey = sbn.key,
+                    instanceKey = NotificationBadgeStore.instanceKey(
+                        sbn.packageName,
+                        userSerial(sbn)
+                    )
+                )
+            }
+    }
+
+    private fun userSerial(sbn: StatusBarNotification): Long {
+        val userManager = getSystemService(UserManager::class.java)
+        return runCatching { userManager?.getSerialNumberForUser(sbn.user) ?: 0L }
+            .getOrDefault(0L)
     }
 
     override fun onListenerDisconnected() {
