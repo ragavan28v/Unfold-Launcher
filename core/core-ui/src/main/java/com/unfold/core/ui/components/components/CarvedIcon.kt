@@ -32,6 +32,7 @@ fun CarvedIcon(
     modifier: Modifier = Modifier,
     size: Dp = 56.dp,
     icon: @Composable () -> Unit,
+    raw: Boolean = false,
     isPressed: Boolean = false,
     accentTint: Color = LocalUnfoldTheme.current.accentPrimary,
     bevelIntensity: Float = LocalUnfoldTheme.current.bevelIntensity,
@@ -50,7 +51,9 @@ fun CarvedIcon(
         modifier = modifier
             .size(size)
             .semantics { this.contentDescription = contentDescription }
-            .clip(CircleShape)
+            .let { baseModifier ->
+                if (raw) baseModifier else baseModifier.clip(CircleShape)
+            }
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -59,26 +62,27 @@ fun CarvedIcon(
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Draw the neumorphic background and bevel
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val radius = size.toPx() / 2f
-            // 1. Draw flat base
-            drawCircle(color = Color.Transparent, radius = radius)
-            // 2 & 3. Inner shadow and highlight & 4. 1px rim stroke
-            drawCarvedBevel(
-                radius = radius,
-                intensity = bevelIntensity,
-                isInverted = activePressed,
-                accentColor = accentTint
-            )
+        if (!raw) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val radius = size.toPx() / 2f
+                drawCircle(color = Color.Transparent, radius = radius)
+                drawCarvedBevel(
+                    radius = radius,
+                    intensity = bevelIntensity,
+                    isInverted = activePressed,
+                    accentColor = accentTint
+                )
+            }
         }
 
-        // 5. App icon / foreground glyph centered, slightly inset (~14% padding)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding((size.value * 0.14f).dp)
-                .clip(CircleShape),
+                .let { baseModifier ->
+                    if (raw) baseModifier else baseModifier
+                        .padding((size.value * 0.14f).dp)
+                        .clip(CircleShape)
+                },
             contentAlignment = Alignment.Center
         ) {
             icon()

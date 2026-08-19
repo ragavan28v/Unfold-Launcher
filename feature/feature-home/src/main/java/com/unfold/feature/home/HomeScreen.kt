@@ -490,8 +490,8 @@ fun HomeScreen(
                                 )
 
                             when (page) {
-                                0 -> HudHome(modifier = hudPageModifier, gridRows = rows, scale = scale)
-                                1 -> HudMusic(modifier = hudPageModifier, gridRows = rows, scale = scale)
+                                0 -> HudHome(modifier = hudPageModifier, gridRows = rows, scale = scale, iconPackPackage = state.iconPackPackage)
+                                1 -> HudMusic(modifier = hudPageModifier, gridRows = rows, scale = scale, iconPackPackage = state.iconPackPackage)
                                 2 -> HudSystem(
                                     batteryPercent = state.systemStats?.batteryPercent ?: 0.5f,
                                     batteryText = state.systemStats?.batteryText ?: "50%",
@@ -503,7 +503,8 @@ fun HomeScreen(
                                     cpuTemp = state.systemStats?.cpuTemp ?: 36f,
                                     modifier = hudPageModifier,
                                     gridRows = rows,
-                                    scale = scale
+                                    scale = scale,
+                                    iconPackPackage = state.iconPackPackage
                                 )
                                 3 -> HudGoogleFeed(modifier = hudPageModifier, gridRows = rows, scale = scale)
                                 4 -> HudFlow(
@@ -523,6 +524,7 @@ fun HomeScreen(
                                     modifier = hudPageModifier,
                                     gridRows = rows,
                                     scale = scale,
+                                    iconPackPackage = state.iconPackPackage,
                                     onCreateFolder = { name, appIds -> viewModel.createFolder(name, appIds) },
                                     onRenameFolder = { folderId, name -> viewModel.renameFolder(folderId, name) },
                                     onDeleteFolder = { folderId -> viewModel.deleteFolder(folderId) },
@@ -571,11 +573,15 @@ fun HomeScreen(
                                 var showContextMenu by remember(app.appId) { mutableStateOf(false) }
                                 var dragDistance by remember(app.appId) { mutableStateOf(0f) }
                                 
-                                val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
+                                val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId, state.iconPackPackage) {
                                     value = withContext(Dispatchers.IO) {
                                         try {
-                                            val drawable = context.packageManager.getApplicationIcon(app.packageName)
-                                            drawableToImageBitmap(drawable)
+                                            val drawable = com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(
+                                                context,
+                                                app.packageName,
+                                                state.iconPackPackage.takeIf { it.isNotBlank() }
+                                            )
+                                            if (drawable != null) drawableToImageBitmap(drawable) else null
                                         } catch (e: Exception) {
                                             null
                                         }
@@ -778,11 +784,15 @@ fun HomeScreen(
                                     sortedDockApps.forEach { app ->
                                         val isDraggingThisApp = draggedApp?.appId == app.appId
                                         
-                                        val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
+                                        val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId, state.iconPackPackage) {
                                             value = withContext(Dispatchers.IO) {
                                                 try {
-                                                    val drawable = context.packageManager.getApplicationIcon(app.packageName)
-                                                    drawableToImageBitmap(drawable)
+                                                    val drawable = com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(
+                                                        context,
+                                                        app.packageName,
+                                                        state.iconPackPackage.takeIf { it.isNotBlank() }
+                                                    )
+                                                    if (drawable != null) drawableToImageBitmap(drawable) else null
                                                 } catch (e: Exception) {
                                                     null
                                                 }
@@ -850,6 +860,7 @@ fun HomeScreen(
                                         ) {
                                             CarvedIcon(
                                                 size = dockIconDiameter,
+                                                raw = state.iconPackPackage.isNotBlank(),
                                                 icon = {
                                                     if (iconBitmap != null) {
                                                         Image(
@@ -937,11 +948,15 @@ fun HomeScreen(
                                         if (app != null) {
                                             val isDraggingThisApp = draggedApp?.appId == app.appId
                                             
-                                            val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
+                                            val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId, state.iconPackPackage) {
                                                 value = withContext(Dispatchers.IO) {
                                                     try {
-                                                        val drawable = context.packageManager.getApplicationIcon(app.packageName)
-                                                        drawableToImageBitmap(drawable)
+                                                        val drawable = com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(
+                                                            context,
+                                                            app.packageName,
+                                                            state.iconPackPackage.takeIf { it.isNotBlank() }
+                                                        )
+                                                        if (drawable != null) drawableToImageBitmap(drawable) else null
                                                     } catch (e: Exception) {
                                                         null
                                                     }
@@ -1009,6 +1024,7 @@ fun HomeScreen(
                                             ) {
                                                 CarvedIcon(
                                                     size = dockIconDiameter,
+                                                    raw = state.iconPackPackage.isNotBlank(),
                                                     icon = {
                                                         if (iconBitmap != null) {
                                                             Image(
@@ -1128,11 +1144,15 @@ fun HomeScreen(
 
     if (draggedApp != null) {
         val app = draggedApp!!
-        val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
+        val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId, state.iconPackPackage) {
             value = withContext(Dispatchers.IO) {
                 try {
-                    val drawable = context.packageManager.getApplicationIcon(app.packageName)
-                    drawableToImageBitmap(drawable)
+                    val drawable = com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(
+                        context,
+                        app.packageName,
+                        state.iconPackPackage.takeIf { it.isNotBlank() }
+                    )
+                    if (drawable != null) drawableToImageBitmap(drawable) else null
                 } catch (e: Exception) {
                     null
                 }
@@ -1166,6 +1186,7 @@ fun HomeScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CarvedIcon(
                         size = gridIconSize,
+                        raw = state.iconPackPackage.isNotBlank(),
                         icon = {
                             if (iconBitmap != null) {
                                 Image(
@@ -1310,7 +1331,7 @@ fun HomeAppGridItem(
                     Image(
                         bitmap = iconBitmap,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     Text(

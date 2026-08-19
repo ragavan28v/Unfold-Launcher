@@ -58,7 +58,15 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.ui.graphics.asImageBitmap
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -224,6 +232,7 @@ fun UniversalSearchScreen(
                         state.filteredApps.forEach { app ->
                             itemResult(
                                 app = app,
+                                iconPackPackage = state.iconPackPackage,
                                 onClick = {
                                     viewModel.onIntent(UniversalSearchUiIntent.QuerySubmitted(state.query))
                                     launchApp(context, app)
@@ -382,15 +391,24 @@ private fun RecentSearchChip(
 @Composable
 private fun itemResult(
     app: AppInfo,
+    iconPackPackage: String = "",
     onClick: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
-    val iconDrawable = remember(app.appId) {
-        try {
-            context.packageManager.getApplicationIcon(app.packageName)
-        } catch (_: Exception) {
-            null
+    
+    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId, iconPackPackage) {
+        value = withContext(Dispatchers.IO) {
+            try {
+                val drawable = com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(
+                    context,
+                    app.packageName,
+                    iconPackPackage.takeIf { it.isNotBlank() }
+                )
+                if (drawable != null) drawableToImageBitmap(drawable) else null
+            } catch (_: Exception) {
+                null
+            }
         }
     }
 
@@ -398,11 +416,13 @@ private fun itemResult(
         title = app.label,
         subtitle = "",
         glyph = null,
+        rawIcon = iconPackPackage.isNotBlank(),
         onClick = onClick
     ) {
-        if (iconDrawable != null) {
+        val bitmap = iconBitmap
+        if (bitmap != null) {
             Image(
-                painter = rememberAsyncImagePainter(iconDrawable),
+                bitmap = bitmap,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize()
             )
@@ -414,6 +434,20 @@ private fun itemResult(
                 fontWeight = FontWeight.Bold
             )
         }
+    }
+}
+
+private fun drawableToImageBitmap(drawable: android.graphics.drawable.Drawable): ImageBitmap? {
+    return try {
+        val width = drawable.intrinsicWidth.coerceAtLeast(1)
+        val height = drawable.intrinsicHeight.coerceAtLeast(1)
+        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        drawable.setBounds(0, 0, width, height)
+        drawable.draw(canvas)
+        bitmap.asImageBitmap()
+    } catch (_: Exception) {
+        null
     }
 }
 
@@ -450,6 +484,7 @@ private fun ResultSurface(
     title: String,
     subtitle: String,
     glyph: String?,
+    rawIcon: Boolean = false,
     onClick: () -> Unit,
     iconContent: (@Composable () -> Unit)? = null
 ) {
@@ -468,6 +503,7 @@ private fun ResultSurface(
         ) {
             CarvedIcon(
                 size = 42.dp,
+                raw = rawIcon,
                 contentDescription = title,
                 icon = {
                     if (iconContent != null) {

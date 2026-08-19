@@ -17,13 +17,15 @@ import javax.inject.Inject
 data class HiddenSpaceUiState(
     val allApps: List<AppInfo> = emptyList(),
     val hiddenApps: List<AppInfo> = emptyList(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val iconPackPackage: String = ""
 )
 
 @HiltViewModel
 class HiddenSpaceViewModel @Inject constructor(
     getInstalledAppsUseCase: GetInstalledAppsUseCase,
-    private val toggleHiddenAppUseCase: ToggleHiddenAppUseCase
+    private val toggleHiddenAppUseCase: ToggleHiddenAppUseCase,
+    private val themeRepository: com.unfold.core.domain.repository.ThemeRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HiddenSpaceUiState())
@@ -35,7 +37,16 @@ class HiddenSpaceViewModel @Inject constructor(
                 _uiState.value = HiddenSpaceUiState(
                     allApps = apps.sortedBy { it.label.lowercase() },
                     hiddenApps = apps.filter { it.isHidden }.sortedBy { it.label.lowercase() },
-                    isLoading = false
+                    isLoading = false,
+                    iconPackPackage = _uiState.value.iconPackPackage
+                )
+            }
+            .launchIn(viewModelScope)
+
+        themeRepository.observeTheme()
+            .onEach { themeConfig ->
+                _uiState.value = _uiState.value.copy(
+                    iconPackPackage = themeConfig.iconPackPackage
                 )
             }
             .launchIn(viewModelScope)

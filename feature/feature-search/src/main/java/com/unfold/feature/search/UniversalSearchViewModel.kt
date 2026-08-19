@@ -49,7 +49,8 @@ data class UniversalSearchUiState(
     val files: List<UniversalSearchFile> = emptyList(),
     val folders: List<UniversalSearchFolder> = emptyList(),
     val recentSearches: List<String> = emptyList(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val iconPackPackage: String = ""
 ) {
     val filteredApps: List<AppInfo>
         get() = filterApps(apps, query)
@@ -121,7 +122,8 @@ sealed interface UniversalSearchUiIntent {
 @HiltViewModel
 class UniversalSearchViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val getInstalledApps: GetInstalledAppsUseCase
+    private val getInstalledApps: GetInstalledAppsUseCase,
+    private val themeRepository: com.unfold.core.domain.repository.ThemeRepository
 ) : ViewModel() {
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -138,6 +140,14 @@ class UniversalSearchViewModel @Inject constructor(
                     apps = apps,
                     recentSearches = loadRecentSearches(),
                     isLoading = false
+                )
+            }
+            .launchIn(viewModelScope)
+
+        themeRepository.observeTheme()
+            .onEach { config ->
+                _uiState.value = _uiState.value.copy(
+                    iconPackPackage = config.iconPackPackage
                 )
             }
             .launchIn(viewModelScope)

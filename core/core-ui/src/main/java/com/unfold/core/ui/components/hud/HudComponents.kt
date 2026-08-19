@@ -357,7 +357,8 @@ fun TelemetryLabel(
 fun HudHome(
     modifier: Modifier = Modifier,
     gridRows: Int = 3,
-    scale: Float = 1f
+    scale: Float = 1f,
+    iconPackPackage: String = ""
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
@@ -733,7 +734,8 @@ private fun formatTime(ms: Long): String {
 fun HudMusic(
     modifier: Modifier = Modifier,
     gridRows: Int = 3,
-    scale: Float = 1f
+    scale: Float = 1f,
+    iconPackPackage: String = ""
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
@@ -771,11 +773,15 @@ fun HudMusic(
         "com.pandora.android"
     )
 
-    val installedMusicApps = remember(context) {
+    val installedMusicApps = remember(context, iconPackPackage) {
         musicAppPackages.mapNotNull { pkg ->
             try {
                 val appInfo = context.packageManager.getApplicationInfo(pkg, 0)
-                val drawable = context.packageManager.getApplicationIcon(appInfo)
+                val drawable = com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(
+                    context,
+                    pkg,
+                    iconPackPackage.takeIf { it.isNotBlank() }
+                ) ?: context.packageManager.getApplicationIcon(appInfo)
                 val width = drawable.intrinsicWidth.coerceAtLeast(1)
                 val height = drawable.intrinsicHeight.coerceAtLeast(1)
                 val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
@@ -1303,7 +1309,8 @@ fun HudSystem(
     cpuTemp: Float,
     modifier: Modifier = Modifier,
     gridRows: Int = 3,
-    scale: Float = 1f
+    scale: Float = 1f,
+    iconPackPackage: String = ""
 ) {
     val theme = LocalUnfoldTheme.current
     val outerPadding = when (gridRows) {
@@ -1793,6 +1800,7 @@ fun HudCategories(
     modifier: Modifier = Modifier,
     gridRows: Int = 3,
     scale: Float = 1f,
+    iconPackPackage: String = "",
     onCreateFolder: (String, List<String>) -> Unit,
     onRenameFolder: (String, String) -> Unit,
     onDeleteFolder: (String) -> Unit,
@@ -1915,6 +1923,7 @@ fun HudCategories(
             HudFolderPopupDialog(
                 folder = folder,
                 scale = scale,
+                iconPackPackage = iconPackPackage,
                 onDismiss = { selectedFolderId = null }
             )
         } else {
@@ -1963,7 +1972,8 @@ fun HudCategories(
                 onSave = { appIds ->
                     onUpdateFolderApps(folder.id, appIds)
                     managingFolderId = null
-                }
+                },
+                iconPackPackage = iconPackPackage
             )
         } else {
             managingFolderId = null
@@ -1994,7 +2004,8 @@ fun HudCategories(
             onCreate = { name, selectedAppIds ->
                 onCreateFolder(name, selectedAppIds)
                 creatingFolder = false
-            }
+            },
+            iconPackPackage = iconPackPackage
         )
     }
 }
@@ -2175,6 +2186,7 @@ private fun HudFolderAddButton(
 private fun HudFolderPopupDialog(
     folder: FolderInfo,
     scale: Float,
+    iconPackPackage: String = "",
     onDismiss: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
@@ -2235,6 +2247,7 @@ private fun HudFolderPopupDialog(
                                 HudFolderAppCell(
                                     app = app,
                                     scale = scale,
+                                    iconPackPackage = iconPackPackage,
                                     onClick = {
                                         launchApp(context, app)
                                     }
@@ -2252,15 +2265,20 @@ private fun HudFolderPopupDialog(
 private fun HudFolderAppCell(
     app: AppInfo,
     scale: Float,
+    iconPackPackage: String = "",
     onClick: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
-    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
+    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId, iconPackPackage) {
         value = withContext(Dispatchers.IO) {
             try {
-                val drawable = context.packageManager.getApplicationIcon(app.packageName)
-                drawableToImageBitmap(drawable)
+                val drawable = com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(
+                    context,
+                    app.packageName,
+                    iconPackPackage.takeIf { it.isNotBlank() }
+                )
+                if (drawable != null) drawableToImageBitmap(drawable) else null
             } catch (_: Exception) {
                 null
             }
@@ -2276,12 +2294,13 @@ private fun HudFolderAppCell(
     ) {
         CarvedIcon(
             size = (52 * scale).dp,
+            raw = iconPackPackage.isNotBlank(),
             icon = {
                 if (iconBitmap != null) {
                     Image(
                         bitmap = iconBitmap!!,
                         contentDescription = app.label,
-                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     Text(
@@ -2432,7 +2451,8 @@ private fun HudFolderManageAppsDialog(
     folder: FolderInfo,
     allApps: List<AppInfo>,
     onDismiss: () -> Unit,
-    onSave: (List<String>) -> Unit
+    onSave: (List<String>) -> Unit,
+    iconPackPackage: String = ""
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
@@ -2473,8 +2493,12 @@ private fun HudFolderManageAppsDialog(
                         val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
                             value = withContext(Dispatchers.IO) {
                                 try {
-                                    val drawable = context.packageManager.getApplicationIcon(app.packageName)
-                                    drawableToImageBitmap(drawable)
+                                    val drawable = com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(
+                                        context,
+                                        app.packageName,
+                                        iconPackPackage.takeIf { it.isNotBlank() }
+                                    )
+                                    if (drawable != null) drawableToImageBitmap(drawable) else null
                                 } catch (_: Exception) {
                                     null
                                 }
@@ -2503,12 +2527,13 @@ private fun HudFolderManageAppsDialog(
                             ) {
                                 CarvedIcon(
                                     size = 34.dp,
+                                    raw = iconPackPackage.isNotBlank(),
                                     icon = {
                                         if (iconBitmap != null) {
                                             Image(
                                                 bitmap = iconBitmap!!,
                                                 contentDescription = app.label,
-                                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                                modifier = Modifier.fillMaxSize()
                                             )
                                         } else {
                                             Text(
@@ -2562,7 +2587,8 @@ private fun HudFolderManageAppsDialog(
 private fun HudFolderCreateDialog(
     allApps: List<AppInfo>,
     onDismiss: () -> Unit,
-    onCreate: (String, List<String>) -> Unit
+    onCreate: (String, List<String>) -> Unit,
+    iconPackPackage: String = ""
 ) {
     val theme = LocalUnfoldTheme.current
     var name by remember { mutableStateOf("") }
@@ -2582,7 +2608,8 @@ private fun HudFolderCreateDialog(
             onSave = { ids ->
                 selectedIds = ids.toSet()
                 showAppSelector = false
-            }
+            },
+            iconPackPackage = iconPackPackage
         )
         return
     }

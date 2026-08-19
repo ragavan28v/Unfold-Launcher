@@ -127,7 +127,8 @@ private enum class LauncherSettingsPage {
     HOME,
     DOCK,
     APP_DRAWER,
-    WALLPAPERS
+    WALLPAPERS,
+    ICONS
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -146,6 +147,7 @@ fun LauncherSettingsScreen(
         LauncherSettingsPage.DOCK -> "DOCK"
         LauncherSettingsPage.APP_DRAWER -> "APP DRAWER"
         LauncherSettingsPage.WALLPAPERS -> "WALLPAPERS"
+        LauncherSettingsPage.ICONS -> "CUSTOMIZE ICONS"
         null -> "LAUNCHER SETTINGS"
     }
     val pageSubtitle = when (selectedPage) {
@@ -153,6 +155,7 @@ fun LauncherSettingsScreen(
         LauncherSettingsPage.DOCK -> "Adjust dock rows, icon count, icon sizing, and background behavior."
         LauncherSettingsPage.APP_DRAWER -> "Adjust drawer layout, grid, sorting, search position and keyboard behavior."
         LauncherSettingsPage.WALLPAPERS -> "Manage wallpapers for the home screen and app drawer."
+        LauncherSettingsPage.ICONS -> "Select an installed icon pack or use defaults."
         null -> "Manage launcher preferences and controls."
     }
     val pageBackAction: () -> Unit = when (selectedPage) {
@@ -205,8 +208,10 @@ fun LauncherSettingsScreen(
             SettingsSectionInfo(
                 title = "Icons",
                 subtitle = "Icon pack, adaptive icons, shape, labels, badges, icon size, and shadow or glow styling.",
-                badge = "Soon",
-                icon = Icons.Default.Settings
+                badge = "Live",
+                icon = Icons.Default.Settings,
+                clickable = true,
+                onClick = { selectedPage = LauncherSettingsPage.ICONS }
             ),
             SettingsSectionInfo(
                 title = "Gestures",
@@ -323,6 +328,12 @@ fun LauncherSettingsScreen(
                         )
                     }
                 )
+                LauncherSettingsPage.ICONS -> {
+                    IconPackPickerScreen(
+                        onBack = { selectedPage = null },
+                        viewModel = viewModel
+                    )
+                }
                 null -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),

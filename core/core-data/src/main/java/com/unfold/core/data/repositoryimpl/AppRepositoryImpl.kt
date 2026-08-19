@@ -12,7 +12,9 @@ import com.unfold.core.data.local.dao.FolderDao
 import com.unfold.core.data.local.entity.AppEntity
 import com.unfold.core.domain.model.AppInfo
 import com.unfold.core.domain.repository.AppRepository
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -33,32 +35,32 @@ class AppRepositoryImpl @Inject constructor(
 ) : AppRepository {
 
     private val launcherApps = context.getSystemService(LauncherApps::class.java)
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     
     init {
         launcherApps?.registerCallback(object : LauncherApps.Callback() {
             override fun onPackageRemoved(packageName: String, user: android.os.UserHandle) {
-                // Run on a background thread
-                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                repositoryScope.launch {
                     refreshFromPackageManager()
                 }
             }
             override fun onPackageAdded(packageName: String, user: android.os.UserHandle) {
-                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                repositoryScope.launch {
                     refreshFromPackageManager()
                 }
             }
             override fun onPackageChanged(packageName: String, user: android.os.UserHandle) {
-                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                repositoryScope.launch {
                     refreshFromPackageManager()
                 }
             }
             override fun onPackagesAvailable(packageNames: Array<out String>, user: android.os.UserHandle, replacing: Boolean) {
-                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                repositoryScope.launch {
                     refreshFromPackageManager()
                 }
             }
             override fun onPackagesUnavailable(packageNames: Array<out String>, user: android.os.UserHandle, replacing: Boolean) {
-                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                repositoryScope.launch {
                     refreshFromPackageManager()
                 }
             }

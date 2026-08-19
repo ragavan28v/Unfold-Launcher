@@ -338,6 +338,7 @@ fun AppDrawerScreen(
                                         app = app,
                                         iconSize = renderedIconSize,
                                         drawerItemAlpha = drawerItemAlpha,
+                                        iconPackPackage = state.iconPackPackage,
                                         onClick = {
                                             viewModel.onIntent(AppDrawerUiIntent.OpenApp(app.appId))
                                             launchApp(context, app)
@@ -367,6 +368,7 @@ fun AppDrawerScreen(
                                         gridColumns = state.gridColumns,
                                         iconSize = renderedIconSize,
                                         drawerItemAlpha = drawerItemAlpha,
+                                        iconPackPackage = state.iconPackPackage,
                                         onAppClick = { app ->
                                             viewModel.onIntent(AppDrawerUiIntent.OpenApp(app.appId))
                                             launchApp(context, app)
@@ -394,6 +396,7 @@ fun AppDrawerScreen(
                                         gridColumns = state.gridColumns,
                                         iconSize = renderedIconSize,
                                         drawerItemAlpha = drawerItemAlpha,
+                                        iconPackPackage = state.iconPackPackage,
                                         onAppClick = { app ->
                                             viewModel.onIntent(AppDrawerUiIntent.OpenApp(app.appId))
                                             launchApp(context, app)
@@ -943,6 +946,7 @@ fun AppSectionBlock(
     gridColumns: Int,
     iconSize: Dp,
     drawerItemAlpha: Float,
+    iconPackPackage: String = "",
     onAppClick: (AppInfo) -> Unit,
     onAppLongPress: (AppInfo) -> Unit
 ) {
@@ -957,6 +961,7 @@ fun AppSectionBlock(
                             app = app,
                             iconSize = iconSize,
                             drawerItemAlpha = drawerItemAlpha,
+                            iconPackPackage = iconPackPackage,
                             onClick = { onAppClick(app) },
                             onLongPress = { onAppLongPress(app) }
                         )
@@ -969,6 +974,7 @@ fun AppSectionBlock(
                     columns = gridColumns,
                     iconSize = iconSize,
                     drawerItemAlpha = drawerItemAlpha,
+                    iconPackPackage = iconPackPackage,
                     onAppClick = onAppClick,
                     onAppLongPress = onAppLongPress
                 )
@@ -1012,6 +1018,7 @@ fun SectionGrid(
     columns: Int,
     iconSize: Dp,
     drawerItemAlpha: Float,
+    iconPackPackage: String = "",
     onAppClick: (AppInfo) -> Unit,
     onAppLongPress: (AppInfo) -> Unit
 ) {
@@ -1028,6 +1035,7 @@ fun SectionGrid(
                                 app = app,
                                 iconSize = iconSize,
                                 drawerItemAlpha = drawerItemAlpha,
+                                iconPackPackage = iconPackPackage,
                                 onClick = { onAppClick(app) },
                                 onLongPress = { onAppLongPress(app) }
                             )
@@ -1045,16 +1053,25 @@ fun AppGridItem(
     app: AppInfo,
     iconSize: Dp,
     drawerItemAlpha: Float,
+    iconPackPackage: String = "",
     onClick: () -> Unit,
     onLongPress: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
-    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
+    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId, iconPackPackage) {
         value = withContext(Dispatchers.IO) {
             try {
-                val drawable = context.packageManager.getApplicationIcon(app.packageName)
-                drawableToImageBitmap(drawable)
+                val drawable = com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(
+                    context,
+                    app.packageName,
+                    iconPackPackage.takeIf { it.isNotBlank() }
+                )
+                if (drawable != null) {
+                    drawableToImageBitmap(drawable)
+                } else {
+                    null
+                }
             } catch (e: Exception) {
                 null
             }
@@ -1074,12 +1091,14 @@ fun AppGridItem(
     ) {
         CarvedIcon(
             size = iconSize,
+            raw = iconPackPackage.isNotBlank(),
             icon = {
-                if (iconBitmap != null) {
+                val bitmap = iconBitmap
+                if (bitmap != null) {
                     Image(
-                        bitmap = iconBitmap!!,
+                        bitmap = bitmap,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     Text(
@@ -1112,16 +1131,25 @@ fun AppListItem(
     app: AppInfo,
     iconSize: Dp,
     drawerItemAlpha: Float,
+    iconPackPackage: String = "",
     onClick: () -> Unit,
     onLongPress: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
-    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
+    val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId, iconPackPackage) {
         value = withContext(Dispatchers.IO) {
             try {
-                val drawable = context.packageManager.getApplicationIcon(app.packageName)
-                drawableToImageBitmap(drawable)
+                val drawable = com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(
+                    context,
+                    app.packageName,
+                    iconPackPackage.takeIf { it.isNotBlank() }
+                )
+                if (drawable != null) {
+                    drawableToImageBitmap(drawable)
+                } else {
+                    null
+                }
             } catch (e: Exception) {
                 null
             }
@@ -1141,12 +1169,14 @@ fun AppListItem(
     ) {
         CarvedIcon(
             size = iconSize.coerceAtMost(48.dp),
+            raw = iconPackPackage.isNotBlank(),
             icon = {
-                if (iconBitmap != null) {
+                val bitmap = iconBitmap
+                if (bitmap != null) {
                     Image(
-                        bitmap = iconBitmap!!,
+                        bitmap = bitmap,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     Text(

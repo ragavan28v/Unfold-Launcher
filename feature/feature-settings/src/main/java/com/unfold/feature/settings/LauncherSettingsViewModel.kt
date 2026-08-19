@@ -146,6 +146,13 @@ class LauncherSettingsViewModel @Inject constructor(
         drawerPrefs.edit().putBoolean(KEY_DRAWER_SHOW_KEYBOARD, enabled).apply()
     }
 
+    fun setIconPack(iconPackPackage: String) {
+        viewModelScope.launch {
+            val current = _uiState.value.themeConfig
+            updateThemeConfig(current.copy(iconPackPackage = iconPackPackage))
+        }
+    }
+
     private suspend fun normalizeHomeApps(config: ThemeConfig) {
         if (config.homeAppPlacementMode != HomeAppPlacementMode.AUTO_ARRANGE) return
 

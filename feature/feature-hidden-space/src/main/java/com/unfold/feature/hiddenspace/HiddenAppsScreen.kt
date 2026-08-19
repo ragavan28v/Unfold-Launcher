@@ -207,7 +207,8 @@ fun HiddenAppsScreen(
                                             launchApp(context, app)
                                             onBack()
                                         },
-                                        theme = theme
+                                        theme = theme,
+                                        iconPackPackage = uiState.iconPackPackage
                                     )
                                 }
                             }
@@ -271,7 +272,8 @@ fun HiddenAppsScreen(
                                 onToggleHidden = { hidden ->
                                     viewModel.setHidden(app.appId, hidden)
                                 },
-                                theme = theme
+                                theme = theme,
+                                iconPackPackage = uiState.iconPackPackage
                             )
                         }
                     }
@@ -285,14 +287,19 @@ fun HiddenAppsScreen(
 private fun HiddenAppIcon(
     app: AppInfo,
     onClick: () -> Unit,
-    theme: UnfoldThemeColors
+    theme: UnfoldThemeColors,
+    iconPackPackage: String = ""
 ) {
     val context = LocalContext.current
     val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
         value = withContext(Dispatchers.IO) {
             try {
-                val drawable = context.packageManager.getApplicationIcon(app.packageName)
-                drawableToImageBitmap(drawable)
+                val drawable = com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(
+                    context,
+                    app.packageName,
+                    iconPackPackage.takeIf { it.isNotBlank() }
+                )
+                if (drawable != null) drawableToImageBitmap(drawable) else null
             } catch (e: Exception) {
                 null
             }
@@ -308,12 +315,14 @@ private fun HiddenAppIcon(
     ) {
         CarvedIcon(
             size = 56.dp,
+            raw = iconPackPackage.isNotBlank(),
             icon = {
-                if (iconBitmap != null) {
+                val bitmap = iconBitmap
+                if (bitmap != null) {
                     Image(
-                        bitmap = iconBitmap!!,
+                        bitmap = bitmap,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     Text(
@@ -467,14 +476,19 @@ private fun HiddenAppRow(
     app: AppInfo,
     isHidden: Boolean,
     onToggleHidden: (Boolean) -> Unit,
-    theme: UnfoldThemeColors
+    theme: UnfoldThemeColors,
+    iconPackPackage: String = ""
 ) {
     val context = LocalContext.current
     val iconBitmap by produceState<ImageBitmap?>(initialValue = null, app.appId) {
         value = withContext(Dispatchers.IO) {
             try {
-                val drawable = context.packageManager.getApplicationIcon(app.packageName)
-                drawableToImageBitmap(drawable)
+                val drawable = com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(
+                    context,
+                    app.packageName,
+                    iconPackPackage.takeIf { it.isNotBlank() }
+                )
+                if (drawable != null) drawableToImageBitmap(drawable) else null
             } catch (e: Exception) {
                 null
             }
@@ -502,8 +516,9 @@ private fun HiddenAppRow(
                     .border(1.dp, theme.accentPrimary.copy(alpha = 0.4f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                if (iconBitmap != null) {
-                    Image(bitmap = iconBitmap!!, contentDescription = null, modifier = Modifier.fillMaxSize())
+                val bitmap = iconBitmap
+                if (bitmap != null) {
+                    Image(bitmap = bitmap, contentDescription = null, modifier = Modifier.fillMaxSize())
                 } else {
                     Text(
                         text = app.label.take(2).uppercase(),

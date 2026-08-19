@@ -8,6 +8,7 @@ import android.graphics.drawable.Drawable
 import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import com.unfold.core.ui.iconpack.IconPackResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -18,15 +19,16 @@ private val appIconBitmapCache = object : LruCache<String, ImageBitmap>(96) {}
 suspend fun loadCircularAppIconBitmap(
     context: Context,
     packageName: String,
-    outputSize: Int = DEFAULT_ICON_BITMAP_SIZE
+    outputSize: Int = DEFAULT_ICON_BITMAP_SIZE,
+    iconPackPackage: String? = null
 ): ImageBitmap? = withContext(Dispatchers.IO) {
-    val cacheKey = "$packageName#$outputSize"
+    val cacheKey = "$packageName#$outputSize#${iconPackPackage.orEmpty()}"
     synchronized(appIconBitmapCache) {
         appIconBitmapCache.get(cacheKey)
     }?.let { return@withContext it }
 
     val drawable = runCatching {
-        context.packageManager.getApplicationIcon(packageName)
+        IconPackResolver.resolveAppIconDrawable(context, packageName, iconPackPackage)
     }.getOrNull() ?: return@withContext null
 
     val bitmap = drawableToCircularImageBitmap(drawable, outputSize) ?: return@withContext null
