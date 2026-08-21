@@ -10,6 +10,9 @@ sealed class UnfoldRoute(val route: String) {
     data object HiddenFiles : UnfoldRoute("hidden_files")
     data object WidgetPicker : UnfoldRoute("widget_picker")
     data object Settings : UnfoldRoute("settings")
+    data object About : UnfoldRoute("settings/about")
+    data object License : UnfoldRoute("settings/about/license")
+    data object ThirdPartyNotices : UnfoldRoute("settings/about/notices")
     data object ThemeEditor : UnfoldRoute("settings/theme")
     data object GestureSettings : UnfoldRoute("settings/gestures")
     data object GestureTrainer : UnfoldRoute("settings/gestures/train/{gestureType}") {

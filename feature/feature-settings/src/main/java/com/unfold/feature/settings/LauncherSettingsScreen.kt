@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
@@ -156,6 +157,7 @@ fun LauncherSettingsScreen(
     onOpenSearch: () -> Unit,
     onOpenHiddenSpace: () -> Unit,
     onOpenDefaultLauncherSettings: () -> Unit,
+    onOpenAbout: () -> Unit,
     viewModel: LauncherSettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -292,6 +294,14 @@ fun LauncherSettingsScreen(
                 subtitle = "Custom gestures, app shortcuts, backup format, drawer options, and icon normalization.",
                 badge = "Soon",
                 icon = Icons.Default.Tune
+            ),
+            SettingsSectionInfo(
+                title = "About Unfold",
+                subtitle = "Project purpose, philosophy, attribution, development, and legal information.",
+                badge = "",
+                icon = Icons.Default.Info,
+                clickable = true,
+                onClick = onOpenAbout
             )
         )
     }

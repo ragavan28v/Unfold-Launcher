@@ -79,6 +79,9 @@ import com.unfold.feature.hiddenspace.HiddenAppsScreen
 import com.unfold.feature.search.UniversalSearchScreen
 import com.unfold.feature.search.UniversalSearchViewModel
 import com.unfold.feature.settings.LauncherSettingsScreen
+import com.unfold.feature.settings.AboutScreen
+import com.unfold.feature.settings.LicenseScreen
+import com.unfold.feature.settings.ThirdPartyNoticesScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -235,8 +238,27 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                     },
                                     onOpenDefaultLauncherSettings = {
                                         openDefaultLauncherSettings()
+                                    },
+                                    onOpenAbout = {
+                                        navController.navigate(UnfoldRoute.About.route)
                                     }
                                 )
+                            }
+
+                            composable(UnfoldRoute.About.route) {
+                                AboutScreen(
+                                    onBack = { navController.popBackStack() },
+                                    onOpenLicense = { navController.navigate(UnfoldRoute.License.route) },
+                                    onOpenThirdPartyNotices = { navController.navigate(UnfoldRoute.ThirdPartyNotices.route) }
+                                )
+                            }
+
+                            composable(UnfoldRoute.License.route) {
+                                LicenseScreen(onBack = { navController.popBackStack() })
+                            }
+
+                            composable(UnfoldRoute.ThirdPartyNotices.route) {
+                                ThirdPartyNoticesScreen(onBack = { navController.popBackStack() })
                             }
 
                             composable(UnfoldRoute.GestureSettings.route) {
