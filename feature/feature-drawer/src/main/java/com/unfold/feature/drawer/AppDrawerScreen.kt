@@ -113,6 +113,7 @@ import com.unfold.core.domain.model.AppDrawerViewMode
 import com.unfold.core.domain.model.AppDrawerSearchBarPosition
 import com.unfold.core.domain.model.AppDrawerStyleMode
 import com.unfold.core.ui.components.CarvedIcon
+import com.unfold.core.ui.util.LauncherUtils
 import com.unfold.core.ui.theme.LocalUnfoldTheme
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -132,7 +133,6 @@ fun AppDrawerScreen(
     val state by viewModel.uiState.collectAsState()
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
-    NotificationBadgeStore.initialize(context)
     val notificationBadges by NotificationBadgeStore.counts.collectAsState()
     val badgeColor = remember(state.badgeColorHex) {
         runCatching { Color(android.graphics.Color.parseColor(state.badgeColorHex)) }
@@ -356,7 +356,7 @@ fun AppDrawerScreen(
                                             NotificationBadgeStore.clearInstance(
                                                 NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
                                             )
-                                            launchApp(context, app)
+                                            LauncherUtils.launchApp(context, app)
                                         },
                                         onLongPress = {
                                             selectedAppForMenu = app
@@ -392,7 +392,7 @@ fun AppDrawerScreen(
                                             NotificationBadgeStore.clearInstance(
                                                 NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
                                             )
-                                            launchApp(context, app)
+                                            LauncherUtils.launchApp(context, app)
                                         },
                                         onAppLongPress = { app -> selectedAppForMenu = app }
                                     )
@@ -423,7 +423,7 @@ fun AppDrawerScreen(
                                             NotificationBadgeStore.clearInstance(
                                                 NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
                                             )
-                                            launchApp(context, app)
+                                            LauncherUtils.launchApp(context, app)
                                         },
                                         onAppLongPress = { app -> selectedAppForMenu = app }
                                     )
@@ -1535,29 +1535,6 @@ fun buildAlphabetSections(apps: List<AppInfo>): List<AppAlphabetSection> {
     return apps.groupBy { it.label.firstOrNull()?.uppercaseChar() ?: '#' }
         .map { (letter, sectionApps) -> AppAlphabetSection(letter, sectionApps.sortedBy { it.label.lowercase() }) }
         .sortedBy { if (it.letter == '#') '{' else it.letter }
-}
-
-private fun launchApp(context: Context, app: AppInfo) {
-    try {
-        val launcherApps = context.getSystemService(LauncherApps::class.java)
-        val userManager = context.getSystemService(UserManager::class.java)
-        val userHandle = userManager?.getUserForSerialNumber(app.userSerial)
-        if (launcherApps != null && userHandle != null && app.activityName.isNotBlank()) {
-            launcherApps.startMainActivity(
-                ComponentName(app.packageName, app.activityName),
-                userHandle,
-                null,
-                null
-            )
-            return
-        }
-
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        launchIntent?.let { context.startActivity(it) }
-    } catch (_: Exception) {
-    }
 }
 
 private fun drawerIconSize(rawSize: Int, columns: Int, viewMode: AppDrawerViewMode): Dp {

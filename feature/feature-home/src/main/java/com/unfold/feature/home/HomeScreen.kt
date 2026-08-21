@@ -91,6 +91,8 @@ import com.unfold.core.ui.components.hud.*
 import com.unfold.core.ui.theme.LocalUnfoldTheme
 import com.unfold.core.ui.notification.NotificationBadgeStore
 import coil.compose.rememberAsyncImagePainter
+import com.unfold.core.ui.util.LauncherUtils
+import com.unfold.core.ui.util.drawableToCircularImageBitmap
 import kotlinx.coroutines.launch
 
 private enum class SoundMode {
@@ -113,7 +115,6 @@ fun HomeScreen(
     val state by viewModel.uiState.collectAsState()
     val theme = LocalUnfoldTheme.current
     val context = LocalContext.current
-    NotificationBadgeStore.initialize(context)
     val notificationBadges by NotificationBadgeStore.counts.collectAsState()
     val badgeColor = remember(state.badgeColorHex) {
         runCatching { Color(android.graphics.Color.parseColor(state.badgeColorHex)) }
@@ -675,7 +676,7 @@ fun HomeScreen(
                                             NotificationBadgeStore.clearInstance(
                                                 NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
                                             )
-                                            launchApp(context, app)
+                                            LauncherUtils.launchApp(context, app)
                                         }
                                     )
 
@@ -907,7 +908,7 @@ fun HomeScreen(
                                                     NotificationBadgeStore.clearInstance(
                                                         NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
                                                     )
-                                                    launchApp(context, app)
+                                                    LauncherUtils.launchApp(context, app)
                                                 }
                                             )
 
@@ -1082,7 +1083,7 @@ fun HomeScreen(
                                                         NotificationBadgeStore.clearInstance(
                                                             NotificationBadgeStore.instanceKey(app.packageName, app.userSerial)
                                                         )
-                                                        launchApp(context, app)
+                                                        LauncherUtils.launchApp(context, app)
                                                     }
                                                 )
 
@@ -1610,30 +1611,6 @@ private fun handleAppDrop(
             // Swap: move the other app to source slot
             viewModel.onIntent(HomeUiIntent.MoveApp(appAtTarget.appId, sourcePos))
         }
-    }
-}
-
-private fun launchApp(context: Context, app: AppInfo) {
-    try {
-        val launcherApps = context.getSystemService(LauncherApps::class.java)
-        val userManager = context.getSystemService(UserManager::class.java)
-        val userHandle = userManager?.getUserForSerialNumber(app.userSerial)
-        if (launcherApps != null && userHandle != null && app.activityName.isNotBlank()) {
-            launcherApps.startMainActivity(
-                ComponentName(app.packageName, app.activityName),
-                userHandle,
-                null,
-                null
-            )
-            return
-        }
-
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        launchIntent?.let { context.startActivity(it) }
-    } catch (_: Exception) {
-        // Ignored
     }
 }
 

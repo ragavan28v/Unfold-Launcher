@@ -94,6 +94,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import com.unfold.core.ui.util.LauncherUtils
 import com.unfold.core.ui.components.GlassPanel
 import com.unfold.core.ui.components.CarvedIcon
 import com.unfold.core.domain.model.AppInfo
@@ -2255,7 +2256,7 @@ private fun HudFolderPopupDialog(
                                                 app.userSerial
                                             )
                                         )
-                                        launchApp(context, app)
+                                        com.unfold.core.ui.util.LauncherUtils.launchApp(context, app)
                                     }
                                 )
                             }
@@ -2723,28 +2724,6 @@ private fun HudConfirmDeleteDialog(
                 }
             }
         }
-    }
-}
-
-private fun launchApp(context: Context, app: AppInfo) {
-    try {
-        val launcherApps = context.getSystemService(android.content.pm.LauncherApps::class.java)
-        val userManager = context.getSystemService(android.os.UserManager::class.java)
-        val userHandle = userManager?.getUserForSerialNumber(app.userSerial)
-        if (launcherApps != null && userHandle != null && app.activityName.isNotBlank()) {
-            launcherApps.startMainActivity(
-                android.content.ComponentName(app.packageName, app.activityName),
-                userHandle,
-                null,
-                null
-            )
-            return
-        }
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)?.apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        launchIntent?.let { context.startActivity(it) }
-    } catch (_: Exception) {
     }
 }
 

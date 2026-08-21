@@ -17,6 +17,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -85,13 +88,23 @@ class UniversalSearchViewModel @Inject constructor(
     )
     val uiState: StateFlow<UniversalSearchUiState> = _uiState.asStateFlow()
 
+    private val searchQueryFlow = MutableStateFlow("")
     private var allApps: List<AppInfo> = emptyList()
+    private var searchJob: kotlinx.coroutines.Job? = null
 
     init {
+        searchQueryFlow
+            .debounce(200L)
+            .distinctUntilChanged()
+            .onEach { query ->
+                performSearch(query)
+            }
+            .launchIn(viewModelScope)
+
         getInstalledApps(includeHidden = false)
             .onEach { apps ->
                 allApps = apps
-                updateFilteredResults()
+                performSearch(searchQueryFlow.value)
             }
             .launchIn(viewModelScope)
 
@@ -118,12 +131,12 @@ class UniversalSearchViewModel @Inject constructor(
         when (intent) {
             is UniversalSearchUiIntent.QueryChanged -> {
                 _uiState.value = _uiState.value.copy(query = intent.query)
-                updateFilteredResults()
+                searchQueryFlow.value = intent.query
             }
 
             is UniversalSearchUiIntent.QuerySubmitted -> {
                 _uiState.value = _uiState.value.copy(query = intent.query)
-                updateFilteredResults()
+                searchQueryFlow.value = intent.query
                 viewModelScope.launch {
                     rememberQuery(intent.query)
                 }
@@ -131,18 +144,19 @@ class UniversalSearchViewModel @Inject constructor(
 
             is UniversalSearchUiIntent.RecentSelected -> {
                 _uiState.value = _uiState.value.copy(query = intent.query)
-                updateFilteredResults()
+                searchQueryFlow.value = intent.query
             }
         }
     }
 
-    private fun updateFilteredResults() {
-        viewModelScope.launch(Dispatchers.Default) {
-            val query = _uiState.value.query
+    private fun performSearch(query: String) {
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch(Dispatchers.Default) {
             val filteredApps = if (query.isBlank()) allApps.sortedBy { it.label.lowercase() }
             else allApps.filter {
                 it.label.contains(query, ignoreCase = true) ||
-                    it.packageName.contains(query, ignoreCase = true)
+                    it.packageName.contains(query, ignoreCase = true) ||
+                    (it.customLabel?.contains(query, ignoreCase = true) == true)
             }.sortedBy { it.label.lowercase() }
 
             val filteredContacts = searchContacts(query)
@@ -174,7 +188,7 @@ class UniversalSearchViewModel @Inject constructor(
         withContext(Dispatchers.Main) {
             _uiState.value = _uiState.value.copy(recentSearches = loadRecentSearches())
         }
-        updateFilteredResults()
+        performSearch(searchQueryFlow.value)
     }
 
     private fun searchContacts(query: String): List<UniversalSearchContact> {
@@ -186,8 +200,8 @@ class UniversalSearchViewModel @Inject constructor(
             ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
             ContactsContract.CommonDataKinds.Phone.NUMBER
         )
-        val selection = "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?"
-        val selectionArgs = arrayOf("%$query%")
+        val selection = "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ? OR ${ContactsContract.CommonDataKinds.Phone.NUMBER} LIKE ?"
+        val selectionArgs = arrayOf("%$query%", "%$query%")
 
         runCatching {
             resolver.query(
@@ -235,7 +249,9 @@ class UniversalSearchViewModel @Inject constructor(
         )
 
         val extensions = listOf(".pdf", ".txt", ".json", ".docx", ".doc", ".xlsx", ".pptx", ".png", ".jpg", ".jpeg", ".svg", ".gif", ".mp4", ".mkv", ".mp3", ".wav")
-        val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ? OR ${MediaStore.MediaColumns.DATA} LIKE ?"
+        
+        // Search by name or mime type (allows searching for "pdf", "image", etc.)
+        val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ? OR ${MediaStore.MediaColumns.MIME_TYPE} LIKE ?"
         val selectionArgs = arrayOf("%$query%", "%$query%")
 
         runCatching {

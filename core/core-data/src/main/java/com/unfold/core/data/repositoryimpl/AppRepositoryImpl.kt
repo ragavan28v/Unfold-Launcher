@@ -91,24 +91,6 @@ class AppRepositoryImpl @Inject constructor(
         val currentEntities = appDao.getAllApps().associateBy { it.appId }
         val discoveredApps = linkedMapOf<String, DiscoveredApp>()
 
-        fun registerResolveInfo(
-            info: android.content.pm.ResolveInfo,
-            userSerial: Long
-        ) {
-            val activityInfo = info.activityInfo ?: return
-            val packageName = activityInfo.packageName
-            val activityName = activityInfo.name
-            val label = info.loadLabel(pm).toString()
-            val appId = buildAppId(packageName, activityName, userSerial)
-            discoveredApps[appId] = DiscoveredApp(
-                appId = appId,
-                packageName = packageName,
-                activityName = activityName,
-                userSerial = userSerial,
-                label = label
-            )
-        }
-
         fun registerActivityInfo(
             packageName: String,
             activityName: String,
@@ -134,30 +116,23 @@ class AppRepositoryImpl @Inject constructor(
                     userManager?.getSerialNumberForUser(userHandle) ?: 0L
                 }.getOrDefault(0L)
 
-                    launcherApps.getActivityList(null, userHandle).forEach { activityInfo ->
-                        val componentName = activityInfo.componentName
-                        registerActivityInfo(
-                            packageName = componentName.packageName,
-                            activityName = componentName.className,
-                            label = activityInfo.label?.toString().orEmpty(),
-                            userSerial = userSerial
-                        )
-                    }
+                launcherApps.getActivityList(null, userHandle).forEach { activityInfo ->
+                    val componentName = activityInfo.componentName
+                    registerActivityInfo(
+                        packageName = componentName.packageName,
+                        activityName = componentName.className,
+                        label = activityInfo.label?.toString().orEmpty(),
+                        userSerial = userSerial
+                    )
                 }
+
+                // Also check for common categories that might not be in the default activity list
+                val intent = Intent(Intent.ACTION_MAIN, null).apply {
+                    addCategory(Intent.CATEGORY_APP_CONTACTS)
+                }
+                // For modern Android, we should use launcherApps.resolveActivity or similar if possible
+                // but PackageManager query with MATCH_ALL is mostly restricted to current user.
             }
-
-        val launcherIntent = Intent(Intent.ACTION_MAIN, null).apply {
-            addCategory(Intent.CATEGORY_LAUNCHER)
-        }
-        pm.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL).forEach { info ->
-            registerResolveInfo(info, 0L)
-        }
-
-        val contactsIntent = Intent(Intent.ACTION_MAIN, null).apply {
-            addCategory(Intent.CATEGORY_APP_CONTACTS)
-        }
-        pm.queryIntentActivities(contactsIntent, PackageManager.MATCH_ALL).forEach { info ->
-            registerResolveInfo(info, 0L)
         }
 
         val sortedApps = discoveredApps.values.sortedBy { it.label.lowercase() }
