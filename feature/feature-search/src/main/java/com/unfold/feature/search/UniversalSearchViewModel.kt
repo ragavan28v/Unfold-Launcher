@@ -29,12 +29,15 @@ data class UniversalSearchContact(
     val phoneNumber: String?
 )
 
+enum class FileCategory { IMAGE, VIDEO, AUDIO, DOCUMENT }
+
 data class UniversalSearchFile(
     val id: Long,
     val name: String,
     val uri: Uri,
     val mimeType: String?,
-    val folderPath: String?
+    val folderPath: String?,
+    val category: FileCategory
 )
 
 data class UniversalSearchFolder(
@@ -44,73 +47,22 @@ data class UniversalSearchFolder(
 
 data class UniversalSearchUiState(
     val query: String = "",
-    val apps: List<AppInfo> = emptyList(),
-    val contacts: List<UniversalSearchContact> = emptyList(),
-    val files: List<UniversalSearchFile> = emptyList(),
-    val folders: List<UniversalSearchFolder> = emptyList(),
+    val filteredApps: List<AppInfo> = emptyList(),
+    val filteredContacts: List<UniversalSearchContact> = emptyList(),
+    val filteredImages: List<UniversalSearchFile> = emptyList(),
+    val filteredVideos: List<UniversalSearchFile> = emptyList(),
+    val filteredAudio: List<UniversalSearchFile> = emptyList(),
+    val filteredDocuments: List<UniversalSearchFile> = emptyList(),
+    val filteredFolders: List<UniversalSearchFolder> = emptyList(),
     val recentSearches: List<String> = emptyList(),
     val isLoading: Boolean = true,
     val iconPackPackage: String = ""
 ) {
-    val filteredApps: List<AppInfo>
-        get() = filterApps(apps, query)
-
-    val filteredContacts: List<UniversalSearchContact>
-        get() = filterContacts(contacts, query)
-
-    val filteredFiles: List<UniversalSearchFile>
-        get() = filterFiles(files, query)
-
-    val filteredFolders: List<UniversalSearchFolder>
-        get() = filterFolders(folders, query)
-
     val hasAnyResults: Boolean
         get() = filteredApps.isNotEmpty() || filteredContacts.isNotEmpty() ||
-            filteredFiles.isNotEmpty() || filteredFolders.isNotEmpty()
-
-    companion object {
-        private fun filterApps(apps: List<AppInfo>, query: String): List<AppInfo> {
-            if (query.isBlank()) return apps.sortedBy { it.label.lowercase() }
-            return apps.filter {
-                it.label.contains(query, ignoreCase = true) ||
-                    it.packageName.contains(query, ignoreCase = true)
-            }.sortedBy { it.label.lowercase() }
-        }
-
-        private fun filterContacts(
-            contacts: List<UniversalSearchContact>,
-            query: String
-        ): List<UniversalSearchContact> {
-            if (query.isBlank()) return contacts
-            return contacts.filter {
-                it.name.contains(query, ignoreCase = true) ||
-                    it.phoneNumber?.contains(query, ignoreCase = true) == true
-            }
-        }
-
-        private fun filterFiles(
-            files: List<UniversalSearchFile>,
-            query: String
-        ): List<UniversalSearchFile> {
-            if (query.isBlank()) return files
-            return files.filter {
-                it.name.contains(query, ignoreCase = true) ||
-                    it.folderPath?.contains(query, ignoreCase = true) == true ||
-                    it.mimeType?.contains(query, ignoreCase = true) == true
-            }
-        }
-
-        private fun filterFolders(
-            folders: List<UniversalSearchFolder>,
-            query: String
-        ): List<UniversalSearchFolder> {
-            if (query.isBlank()) return folders
-            return folders.filter {
-                it.name.contains(query, ignoreCase = true) ||
-                    it.path.contains(query, ignoreCase = true)
-            }
-        }
-    }
+            filteredImages.isNotEmpty() || filteredVideos.isNotEmpty() ||
+            filteredAudio.isNotEmpty() || filteredDocuments.isNotEmpty() ||
+            filteredFolders.isNotEmpty()
 }
 
 sealed interface UniversalSearchUiIntent {
@@ -133,14 +85,13 @@ class UniversalSearchViewModel @Inject constructor(
     )
     val uiState: StateFlow<UniversalSearchUiState> = _uiState.asStateFlow()
 
+    private var allApps: List<AppInfo> = emptyList()
+
     init {
         getInstalledApps(includeHidden = false)
             .onEach { apps ->
-                _uiState.value = _uiState.value.copy(
-                    apps = apps,
-                    recentSearches = loadRecentSearches(),
-                    isLoading = false
-                )
+                allApps = apps
+                updateFilteredResults()
             }
             .launchIn(viewModelScope)
 
@@ -167,10 +118,12 @@ class UniversalSearchViewModel @Inject constructor(
         when (intent) {
             is UniversalSearchUiIntent.QueryChanged -> {
                 _uiState.value = _uiState.value.copy(query = intent.query)
+                updateFilteredResults()
             }
 
             is UniversalSearchUiIntent.QuerySubmitted -> {
                 _uiState.value = _uiState.value.copy(query = intent.query)
+                updateFilteredResults()
                 viewModelScope.launch {
                     rememberQuery(intent.query)
                 }
@@ -178,38 +131,70 @@ class UniversalSearchViewModel @Inject constructor(
 
             is UniversalSearchUiIntent.RecentSelected -> {
                 _uiState.value = _uiState.value.copy(query = intent.query)
+                updateFilteredResults()
+            }
+        }
+    }
+
+    private fun updateFilteredResults() {
+        viewModelScope.launch(Dispatchers.Default) {
+            val query = _uiState.value.query
+            val filteredApps = if (query.isBlank()) allApps.sortedBy { it.label.lowercase() }
+            else allApps.filter {
+                it.label.contains(query, ignoreCase = true) ||
+                    it.packageName.contains(query, ignoreCase = true)
+            }.sortedBy { it.label.lowercase() }
+
+            val filteredContacts = searchContacts(query)
+            val filteredFilesRaw = searchFiles(query)
+
+            val filteredImages = filteredFilesRaw.filter { it.category == FileCategory.IMAGE }
+            val filteredVideos = filteredFilesRaw.filter { it.category == FileCategory.VIDEO }
+            val filteredAudio = filteredFilesRaw.filter { it.category == FileCategory.AUDIO }
+            val filteredDocuments = filteredFilesRaw.filter { it.category == FileCategory.DOCUMENT }
+
+            val filteredFolders = emptyList<UniversalSearchFolder>()
+
+            withContext(Dispatchers.Main) {
+                _uiState.value = _uiState.value.copy(
+                    filteredApps = filteredApps,
+                    filteredContacts = filteredContacts,
+                    filteredImages = filteredImages,
+                    filteredVideos = filteredVideos,
+                    filteredAudio = filteredAudio,
+                    filteredDocuments = filteredDocuments,
+                    filteredFolders = filteredFolders,
+                    isLoading = false
+                )
             }
         }
     }
 
     private suspend fun loadDeviceSources() = withContext(Dispatchers.IO) {
-        val contacts = loadContacts()
-        val (files, folders) = loadFilesAndFolders()
         withContext(Dispatchers.Main) {
-            _uiState.value = _uiState.value.copy(
-                contacts = contacts,
-                files = files,
-                folders = folders,
-                recentSearches = loadRecentSearches()
-            )
+            _uiState.value = _uiState.value.copy(recentSearches = loadRecentSearches())
         }
+        updateFilteredResults()
     }
 
-    private fun loadContacts(): List<UniversalSearchContact> {
+    private fun searchContacts(query: String): List<UniversalSearchContact> {
         val contacts = mutableListOf<UniversalSearchContact>()
+        if (query.isBlank()) return contacts
         val resolver = context.contentResolver
         val projection = arrayOf(
             ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
             ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
             ContactsContract.CommonDataKinds.Phone.NUMBER
         )
+        val selection = "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?"
+        val selectionArgs = arrayOf("%$query%")
 
         runCatching {
             resolver.query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
                 projection,
-                null,
-                null,
+                selection,
+                selectionArgs,
                 "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} COLLATE NOCASE ASC"
             )?.use { cursor ->
                 val idIndex = cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
@@ -217,28 +202,23 @@ class UniversalSearchViewModel @Inject constructor(
                 val numberIndex = cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER)
                 val seen = linkedSetOf<String>()
 
-                while (cursor.moveToNext()) {
+                while (cursor.moveToNext() && contacts.size < 15) {
                     val id = cursor.getLong(idIndex)
                     val name = cursor.getString(nameIndex)?.trim().orEmpty()
                     val number = cursor.getString(numberIndex)?.trim()
                     val key = "$name|$number"
                     if (name.isNotBlank() && seen.add(key)) {
-                        contacts += UniversalSearchContact(
-                            id = id,
-                            name = name,
-                            phoneNumber = number
-                        )
+                        contacts += UniversalSearchContact(id, name, number)
                     }
                 }
             }
         }
-
         return contacts
     }
 
-    private fun loadFilesAndFolders(): Pair<List<UniversalSearchFile>, List<UniversalSearchFolder>> {
+    private fun searchFiles(query: String): List<UniversalSearchFile> {
         val files = mutableListOf<UniversalSearchFile>()
-        val folderMap = linkedMapOf<String, UniversalSearchFolder>()
+        if (query.isBlank()) return files
         val resolver = context.contentResolver
 
         val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -251,55 +231,62 @@ class UniversalSearchViewModel @Inject constructor(
             BaseColumns._ID,
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.MIME_TYPE,
-            MediaStore.MediaColumns.RELATIVE_PATH
+            MediaStore.MediaColumns.DATA
         )
+
+        val extensions = listOf(".pdf", ".txt", ".json", ".docx", ".doc", ".xlsx", ".pptx", ".png", ".jpg", ".jpeg", ".svg", ".gif", ".mp4", ".mkv", ".mp3", ".wav")
+        val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ? OR ${MediaStore.MediaColumns.DATA} LIKE ?"
+        val selectionArgs = arrayOf("%$query%", "%$query%")
 
         runCatching {
             resolver.query(
                 collection,
                 projection,
-                null,
-                null,
+                selection,
+                selectionArgs,
                 "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
             )?.use { cursor ->
                 val idIndex = cursor.getColumnIndexOrThrow(BaseColumns._ID)
                 val nameIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                 val mimeIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
-                val pathIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
+                val pathIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA)
 
-                while (cursor.moveToNext()) {
+                while (cursor.moveToNext() && files.size < 50) {
                     val id = cursor.getLong(idIndex)
-                    val name = cursor.getString(nameIndex)?.trim().orEmpty()
+                    val dataPath = cursor.getString(pathIndex)?.trim().orEmpty()
+                    var name = cursor.getString(nameIndex)?.trim()
+                    
+                    if (name.isNullOrBlank() && dataPath.isNotBlank()) {
+                        name = dataPath.substringAfterLast('/')
+                    }
+
+                    if (name.isNullOrBlank()) continue
+                    
+                    val lowerName = name.lowercase()
+                    if (!extensions.any { lowerName.endsWith(it) }) continue
+
                     val mimeType = cursor.getString(mimeIndex)?.trim()
-                    val relativePath = cursor.getString(pathIndex)?.trim()
-                        ?.trimEnd('/')
-                        ?.takeIf { it.isNotBlank() }
+                    val folderPath = if (dataPath.contains('/')) dataPath.substringBeforeLast('/') else null
 
-                    if (name.isNotBlank()) {
-                        files += UniversalSearchFile(
-                            id = id,
-                            name = name,
-                            uri = ContentUris.withAppendedId(collection, id),
-                            mimeType = mimeType,
-                            folderPath = relativePath
-                        )
+                    val category = when {
+                        mimeType?.startsWith("image/", ignoreCase = true) == true || lowerName.endsWith(".png") || lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg") || lowerName.endsWith(".svg") || lowerName.endsWith(".gif") -> FileCategory.IMAGE
+                        mimeType?.startsWith("video/", ignoreCase = true) == true || lowerName.endsWith(".mp4") || lowerName.endsWith(".mkv") -> FileCategory.VIDEO
+                        mimeType?.startsWith("audio/", ignoreCase = true) == true || lowerName.endsWith(".mp3") || lowerName.endsWith(".wav") -> FileCategory.AUDIO
+                        else -> FileCategory.DOCUMENT
                     }
 
-                    if (!relativePath.isNullOrBlank()) {
-                        val folderName = relativePath.substringAfterLast('/', relativePath)
-                        folderMap.putIfAbsent(
-                            relativePath,
-                            UniversalSearchFolder(
-                                path = relativePath,
-                                name = folderName.ifBlank { relativePath }
-                            )
-                        )
-                    }
+                    files += UniversalSearchFile(
+                        id = id,
+                        name = name,
+                        uri = ContentUris.withAppendedId(collection, id),
+                        mimeType = mimeType,
+                        folderPath = folderPath,
+                        category = category
+                    )
                 }
             }
         }
-
-        return files to folderMap.values.sortedBy { it.name.lowercase() }
+        return files
     }
 
     private fun rememberQuery(query: String) {

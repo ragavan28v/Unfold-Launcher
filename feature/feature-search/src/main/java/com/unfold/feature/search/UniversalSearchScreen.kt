@@ -122,6 +122,17 @@ fun UniversalSearchScreen(
         if (missingPermissions.isNotEmpty()) {
             permissionLauncher.launch(missingPermissions.toTypedArray())
         } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !android.os.Environment.isExternalStorageManager()) {
+                try {
+                    val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    val intent = Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    context.startActivity(intent)
+                }
+            }
             viewModel.refreshDeviceSources()
         }
     }
@@ -259,7 +270,7 @@ fun UniversalSearchScreen(
                             itemContact(
                                 contact = contact,
                                 onClick = {
-                                    launchContacts(context)
+                                    launchContact(context, contact.id, contact.phoneNumber)
                                 }
                             )
                         }
@@ -268,18 +279,67 @@ fun UniversalSearchScreen(
 
                 item {
                     SearchResultSection(
-                        title = "FILES",
-                        emptyHint = "No files found",
-                        count = state.filteredFiles.size
+                        title = "PHOTOS",
+                        emptyHint = "No photos found",
+                        count = state.filteredImages.size
                     ) {
-                        state.filteredFiles.forEach { file ->
+                        state.filteredImages.forEach { file ->
                             itemFile(
                                 name = file.name,
-                                subtitle = file.folderPath ?: "File",
+                                subtitle = file.folderPath ?: "Photo",
+                                iconGlyph = "P",
+                                onClick = { launchFile(context, file.uri, file.mimeType) }
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    SearchResultSection(
+                        title = "VIDEOS",
+                        emptyHint = "No videos found",
+                        count = state.filteredVideos.size
+                    ) {
+                        state.filteredVideos.forEach { file ->
+                            itemFile(
+                                name = file.name,
+                                subtitle = file.folderPath ?: "Video",
+                                iconGlyph = "V",
+                                onClick = { launchFile(context, file.uri, file.mimeType) }
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    SearchResultSection(
+                        title = "AUDIO",
+                        emptyHint = "No audio found",
+                        count = state.filteredAudio.size
+                    ) {
+                        state.filteredAudio.forEach { file ->
+                            itemFile(
+                                name = file.name,
+                                subtitle = file.folderPath ?: "Audio",
+                                iconGlyph = "A",
+                                onClick = { launchFile(context, file.uri, file.mimeType) }
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    SearchResultSection(
+                        title = "DOCUMENTS",
+                        emptyHint = "No documents found",
+                        count = state.filteredDocuments.size
+                    ) {
+                        state.filteredDocuments.forEach { file ->
+                            itemFile(
+                                name = file.name,
+                                subtitle = file.folderPath ?: "Document",
                                 iconGlyph = "F",
-                                onClick = {
-                                    launchFile(context, file.uri, file.mimeType)
-                                }
+                                onClick = { launchFile(context, file.uri, file.mimeType) }
                             )
                         }
                     }
@@ -574,12 +634,20 @@ private fun launchApp(context: Context, app: AppInfo) {
     }
 }
 
-private fun launchContacts(context: Context) {
+private fun launchContact(context: Context, contactId: Long, phoneNumber: String?) {
     try {
-        val intent = Intent(Intent.ACTION_VIEW, ContactsContract.Contacts.CONTENT_URI).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (!phoneNumber.isNullOrBlank()) {
+            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phoneNumber")).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } else {
+            val contactUri = android.content.ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId)
+            val intent = Intent(Intent.ACTION_VIEW, contactUri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
         }
-        context.startActivity(intent)
     } catch (_: Exception) {
     }
 }
