@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.app.role.RoleManager
 import android.os.Build
+import android.graphics.Color as AndroidColor
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
@@ -37,11 +38,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +51,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -56,7 +61,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -84,6 +88,7 @@ import com.unfold.feature.settings.LicenseScreen
 import com.unfold.feature.settings.ThirdPartyNoticesScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import androidx.core.view.WindowCompat
 
 @AndroidEntryPoint
 class MainActivity : androidx.fragment.app.FragmentActivity() {
@@ -93,6 +98,10 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.navigationBarColor = AndroidColor.TRANSPARENT
+        WindowCompat.getInsetsController(window, window.decorView)
+            .isAppearanceLightNavigationBars = false
         setContent {
             UnfoldTheme {
                 Surface(
@@ -189,7 +198,31 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                     val launcherContent: @Composable () -> Unit = {
                         NavHost(
                             navController = navController,
-                            startDestination = UnfoldRoute.Home.route
+                            startDestination = UnfoldRoute.Home.route,
+                            enterTransition = {
+                                slideIntoContainer(
+                                    AnimatedContentTransitionScope.SlideDirection.Left,
+                                    tween(220)
+                                ) + fadeIn(tween(220))
+                            },
+                            exitTransition = {
+                                slideOutOfContainer(
+                                    AnimatedContentTransitionScope.SlideDirection.Left,
+                                    tween(220)
+                                ) + fadeOut(tween(220))
+                            },
+                            popEnterTransition = {
+                                slideIntoContainer(
+                                    AnimatedContentTransitionScope.SlideDirection.Right,
+                                    tween(220)
+                                ) + fadeIn(tween(220))
+                            },
+                            popExitTransition = {
+                                slideOutOfContainer(
+                                    AnimatedContentTransitionScope.SlideDirection.Right,
+                                    tween(220)
+                                ) + fadeOut(tween(220))
+                            }
                         ) {
                             composable(UnfoldRoute.Home.route) {
                                 val homeViewModel: HomeViewModel = hiltViewModel()
@@ -291,12 +324,15 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                 launcherContent()
                             }
                         } else {
-                            launcherContent()
                             BottomEdgeHomeSwipeOverlay(
                                 onSwipeHome = {
-                                    navController.popBackStack(UnfoldRoute.Home.route, false)
+                                    scope.launch {
+                                        gestureActionResolver.execute(GestureType.EDGE_SWIPE, navController)
+                                    }
                                 }
-                            )
+                            ) {
+                                launcherContent()
+                            }
                         }
 
                         if (showDefaultLauncherPrompt) {
@@ -629,43 +665,67 @@ private fun FirstRunNotificationAccessPrompt(
 
 @Composable
 private fun BottomEdgeHomeSwipeOverlay(
-    onSwipeHome: () -> Unit
+    onSwipeHome: () -> Unit,
+    content: @Composable () -> Unit
 ) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val edgeHeightPx = with(density) { BOTTOM_EDGE_GESTURE_HEIGHT.toPx() }
+    val swipeThresholdPx = with(density) { BOTTOM_EDGE_SWIPE_THRESHOLD.toPx() }
+
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(onSwipeHome, edgeHeightPx, swipeThresholdPx) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(
+                        requireUnconsumed = false,
+                        pass = PointerEventPass.Initial
+                    )
+                    if (down.position.y < size.height - edgeHeightPx) {
+                        return@awaitEachGesture
+                    }
+
+                    var gestureCancelled = false
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) break
+
+                        val displacement = change.position - down.position
+                        val verticalDistance = -displacement.y
+                        val horizontalDistance = kotlin.math.abs(displacement.x)
+                        val hasMovedPastThreshold = displacement.getDistance() >= swipeThresholdPx
+                        val isClearlyVertical = verticalDistance >= horizontalDistance * 1.5f
+                        val isInwardSwipe = hasMovedPastThreshold &&
+                            verticalDistance >= swipeThresholdPx &&
+                            isClearlyVertical
+
+                        if (hasMovedPastThreshold && !isClearlyVertical && verticalDistance <= 0f) {
+                            gestureCancelled = true
+                        }
+                        if (gestureCancelled) break
+
+                        if (isInwardSwipe) {
+                            change.consume()
+                            onSwipeHome()
+                            break
+                        }
+                    }
+                }
+            }
     ) {
+        content()
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .height(48.dp)
-                .pointerInput(onSwipeHome) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        var totalDx = 0f
-                        var totalDy = 0f
-
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!change.pressed) {
-                                break
-                            }
-                            val delta = change.positionChange()
-                            totalDx += delta.x
-                            totalDy += delta.y
-
-                            if (totalDy < -96f && kotlin.math.abs(totalDx) < 72f) {
-                                change.consume()
-                                onSwipeHome()
-                                break
-                            }
-                        }
-                    }
-                }
+                .height(BOTTOM_EDGE_GESTURE_HEIGHT)
+                .systemGestureExclusion()
         )
     }
 }
+
+private val BOTTOM_EDGE_GESTURE_HEIGHT = 144.dp
+private val BOTTOM_EDGE_SWIPE_THRESHOLD = 40.dp
 
 

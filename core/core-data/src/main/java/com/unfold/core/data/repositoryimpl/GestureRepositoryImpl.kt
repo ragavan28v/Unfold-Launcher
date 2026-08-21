@@ -38,7 +38,8 @@ class GestureRepositoryImpl @Inject constructor(
             GestureEntity("SWIPE_LEFT_2F", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.HiddenSpace.route),
             GestureEntity("DOCK_SWIPE_HOLD", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.HiddenSpace.route),
             GestureEntity("SWIPE_RIGHT_2F", "OPEN_INTENT", targetIntentUri = "market://details?id="),
-            GestureEntity("SWIPE_DOWN_1F", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.UniversalSearch.route)
+            GestureEntity("SWIPE_DOWN_1F", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.UniversalSearch.route),
+            GestureEntity("EDGE_SWIPE", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.Home.route)
         )
         gestureDao.insertAll(defaultGestures)
     }

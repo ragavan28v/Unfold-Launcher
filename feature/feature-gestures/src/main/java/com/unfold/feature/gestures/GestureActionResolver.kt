@@ -9,6 +9,7 @@ import android.os.Process
 import androidx.navigation.NavController
 import com.unfold.core.domain.model.ActionType
 import com.unfold.core.domain.model.GestureType
+import com.unfold.core.domain.navigation.UnfoldRoute
 import com.unfold.core.domain.usecase.ResolveGestureActionUseCase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -20,6 +21,11 @@ class GestureActionResolver @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     suspend fun execute(gestureType: GestureType, navController: NavController) {
+        if (gestureType == GestureType.EDGE_SWIPE) {
+            returnToHome(navController)
+            return
+        }
+
         val binding = resolveAction(gestureType) ?: return
 
         val horizontalGestures = setOf(
@@ -100,6 +106,15 @@ class GestureActionResolver @Inject constructor(
                         fallback?.let { context.startActivity(it) }
                     }
                 }
+            }
+        }
+    }
+
+    private fun returnToHome(navController: NavController) {
+        if (!navController.popBackStack(UnfoldRoute.Home.route, inclusive = false)) {
+            navController.navigate(UnfoldRoute.Home.route) {
+                launchSingleTop = true
+                restoreState = true
             }
         }
     }

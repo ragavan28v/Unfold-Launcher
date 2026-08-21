@@ -209,7 +209,8 @@ object AppDatabaseSeedData {
         GestureEntity("DOCK_SWIPE_HOLD", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.HiddenSpace.route),
         GestureEntity("SWIPE_RIGHT_2F", "OPEN_INTENT", targetIntentUri = "market://details?id="),
         GestureEntity("SWIPE_DOWN_1F", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.UniversalSearch.route),
-        GestureEntity("SWIPE_UP_1F", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.AppDrawer.route)
+        GestureEntity("SWIPE_UP_1F", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.AppDrawer.route),
+        GestureEntity("EDGE_SWIPE", "OPEN_SCREEN", targetScreenRoute = UnfoldRoute.Home.route)
     )
 
     fun resolveCategory(packageName: String?, label: String?): String {

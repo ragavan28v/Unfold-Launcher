@@ -128,7 +128,6 @@ fun AboutScreen(
                 Spacer(Modifier.height(8.dp))
                 AboutBody("The original Unfold source code, interface implementation, artwork, branding, and other original project materials are subject to their applicable licenses and rights.")
             }
-            AboutActionRow("VIEW LICENSE", Icons.Default.Description, onOpenLicense)
         }
         AboutSection("UNFOLD ON THE WEB", Icons.Default.Language) {
             AboutCard {

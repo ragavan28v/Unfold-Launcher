@@ -2246,6 +2246,15 @@ fun GestureControlSettingsScreen(
                     )
                 }
                 item {
+                    GestureStaticRow(
+                        title = "Swipe from bottom edge inward",
+                        subtitle = "Return to the Home screen from any launcher page",
+                        value = "Home",
+                        icon = Icons.Default.Home,
+                        theme = theme
+                    )
+                }
+                item {
                     SectionHeader(
                         title = "Custom gestures",
                         subtitle = "Pick an app or shortcut for the side gestures."
