@@ -246,6 +246,7 @@ fun UniversalSearchScreen(
                                 app = app,
                                 iconPackPackage = state.iconPackPackage,
                                 onClick = {
+                                    viewModel.onIntent(UniversalSearchUiIntent.AppSelected(app.appId))
                                     viewModel.onIntent(UniversalSearchUiIntent.QuerySubmitted(state.query))
                                     NotificationBadgeStore.clearInstance(
                                         NotificationBadgeStore.instanceKey(
@@ -270,6 +271,7 @@ fun UniversalSearchScreen(
                             itemContact(
                                 contact = contact,
                                 onClick = {
+                                    viewModel.onIntent(UniversalSearchUiIntent.ContactSelected(contact.id))
                                     launchContact(context, contact.id, contact.phoneNumber)
                                 }
                             )
@@ -405,20 +407,11 @@ private fun SearchResultSection(
     content: @Composable () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
-    if (count > 0) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionLabel(text = title)
-            content()
-        }
-    } else {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionLabel(text = title)
-            Text(
-                text = emptyHint,
-                color = theme.textSecondary,
-                fontSize = 12.sp
-            )
-        }
+    if (count == 0) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionLabel(text = title)
+        content()
     }
 }
 

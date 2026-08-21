@@ -10,6 +10,7 @@ import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.unfold.core.domain.model.AppInfo
+import com.unfold.core.domain.repository.AppRepository
 import com.unfold.core.domain.usecase.GetInstalledAppsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -72,12 +73,15 @@ sealed interface UniversalSearchUiIntent {
     data class QueryChanged(val query: String) : UniversalSearchUiIntent
     data class QuerySubmitted(val query: String) : UniversalSearchUiIntent
     data class RecentSelected(val query: String) : UniversalSearchUiIntent
+    data class ContactSelected(val contactId: Long) : UniversalSearchUiIntent
+    data class AppSelected(val appId: String) : UniversalSearchUiIntent
 }
 
 @HiltViewModel
 class UniversalSearchViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val getInstalledApps: GetInstalledAppsUseCase,
+    private val appRepository: AppRepository,
     private val themeRepository: com.unfold.core.domain.repository.ThemeRepository
 ) : ViewModel() {
 
@@ -146,13 +150,28 @@ class UniversalSearchViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(query = intent.query)
                 searchQueryFlow.value = intent.query
             }
+
+            is UniversalSearchUiIntent.ContactSelected -> rememberContact(intent.contactId)
+
+            is UniversalSearchUiIntent.AppSelected -> {
+                viewModelScope.launch {
+                    appRepository.recordLaunch(intent.appId)
+                }
+            }
         }
     }
 
     private fun performSearch(query: String) {
         searchJob?.cancel()
         searchJob = viewModelScope.launch(Dispatchers.Default) {
-            val filteredApps = if (query.isBlank()) allApps.sortedBy { it.label.lowercase() }
+            val filteredApps = if (query.isBlank()) {
+                allApps.filter { it.lastUsedTimestamp > 0L || it.launchCount > 0L }
+                    .sortedWith(
+                    compareByDescending<AppInfo> { it.lastUsedTimestamp }
+                        .thenByDescending { it.launchCount }
+                        .thenBy { it.label.lowercase() }
+                    ).take(MAX_INITIAL_RESULTS)
+            }
             else allApps.filter {
                 it.label.contains(query, ignoreCase = true) ||
                     it.packageName.contains(query, ignoreCase = true) ||
@@ -193,15 +212,18 @@ class UniversalSearchViewModel @Inject constructor(
 
     private fun searchContacts(query: String): List<UniversalSearchContact> {
         val contacts = mutableListOf<UniversalSearchContact>()
-        if (query.isBlank()) return contacts
         val resolver = context.contentResolver
         val projection = arrayOf(
             ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
             ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
             ContactsContract.CommonDataKinds.Phone.NUMBER
         )
-        val selection = "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ? OR ${ContactsContract.CommonDataKinds.Phone.NUMBER} LIKE ?"
-        val selectionArgs = arrayOf("%$query%", "%$query%")
+        val isInitialSearch = query.isBlank()
+        val selection = if (isInitialSearch) null
+        else "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ? OR ${ContactsContract.CommonDataKinds.Phone.NUMBER} LIKE ?"
+        val selectionArgs = if (isInitialSearch) null else arrayOf("%$query%", "%$query%")
+        val recentContactIds = loadRecentContacts()
+        if (isInitialSearch && recentContactIds.isEmpty()) return contacts
 
         runCatching {
             resolver.query(
@@ -209,21 +231,27 @@ class UniversalSearchViewModel @Inject constructor(
                 projection,
                 selection,
                 selectionArgs,
-                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} COLLATE NOCASE ASC"
+                if (isInitialSearch) "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} COLLATE NOCASE ASC"
+                else "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} COLLATE NOCASE ASC"
             )?.use { cursor ->
                 val idIndex = cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
                 val nameIndex = cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
                 val numberIndex = cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER)
                 val seen = linkedSetOf<String>()
 
-                while (cursor.moveToNext() && contacts.size < 15) {
+                while (cursor.moveToNext() && contacts.size < if (isInitialSearch) MAX_INITIAL_RESULTS else MAX_QUERY_CONTACTS) {
                     val id = cursor.getLong(idIndex)
                     val name = cursor.getString(nameIndex)?.trim().orEmpty()
                     val number = cursor.getString(numberIndex)?.trim()
                     val key = "$name|$number"
-                    if (name.isNotBlank() && seen.add(key)) {
+                    if (name.isNotBlank() && seen.add(key) &&
+                        (!isInitialSearch || recentContactIds.contains(id))) {
                         contacts += UniversalSearchContact(id, name, number)
                     }
+                }
+
+                if (isInitialSearch) {
+                    contacts.sortBy { recentContactIds.indexOf(it.id) }
                 }
             }
         }
@@ -320,6 +348,24 @@ class UniversalSearchViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(recentSearches = loadRecentSearches())
     }
 
+    private fun rememberContact(contactId: Long) {
+        val updated = loadRecentContacts().toMutableList()
+        updated.remove(contactId)
+        updated.add(0, contactId)
+        prefs.edit()
+            .putString(KEY_RECENT_CONTACTS, updated.take(MAX_RECENT_CONTACTS).joinToString(DELIMITER))
+            .apply()
+    }
+
+    private fun loadRecentContacts(): List<Long> {
+        return prefs.getString(KEY_RECENT_CONTACTS, "")
+            ?.split(DELIMITER)
+            ?.mapNotNull { it.toLongOrNull() }
+            ?.distinct()
+            ?.take(MAX_RECENT_CONTACTS)
+            ?: emptyList()
+    }
+
     private fun loadRecentSearches(): List<String> {
         return prefs.getString(KEY_RECENT_SEARCHES, "")
             ?.split(DELIMITER)
@@ -334,6 +380,10 @@ class UniversalSearchViewModel @Inject constructor(
         const val PREFS_NAME = "universal_search_preferences"
         const val KEY_RECENT_SEARCHES = "recent_searches"
         const val MAX_RECENTS = 8
+        const val MAX_INITIAL_RESULTS = 8
+        const val MAX_QUERY_CONTACTS = 15
+        const val MAX_RECENT_CONTACTS = 8
+        const val KEY_RECENT_CONTACTS = "recent_contacts"
         const val DELIMITER = "\n"
     }
 }
