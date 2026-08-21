@@ -149,16 +149,17 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                         }
                     }
 
+                    fun shouldShowNotificationPrompt(): Boolean {
+                        return !permissionPrefs.getBoolean("notification_access_prompt_seen", false) &&
+                            !isNotificationAccessEnabled()
+                    }
+
                     LaunchedEffect(Unit) {
                         if (!permissionPrefs.getBoolean("default_launcher_prompt_seen", false) &&
                             !isDefaultLauncher()
                         ) {
                             showDefaultLauncherPrompt = true
-                        }
-                        if (!permissionPrefs.getBoolean("notification_access_prompt_seen", false) &&
-                            !isNotificationAccessEnabled() &&
-                            isDefaultLauncher()
-                        ) {
+                        } else if (shouldShowNotificationPrompt()) {
                             showNotificationAccessPrompt = true
                         }
                     }
@@ -176,6 +177,9 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                 permissionPrefs.edit()
                                     .putBoolean("default_launcher_prompt_seen", true)
                                     .apply()
+                                if (shouldShowNotificationPrompt()) {
+                                    showNotificationAccessPrompt = true
+                                }
                             }
                         }
                         lifecycle.addObserver(observer)
@@ -306,6 +310,9 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                     permissionPrefs.edit()
                                         .putBoolean("default_launcher_prompt_seen", true)
                                         .apply()
+                                    if (shouldShowNotificationPrompt()) {
+                                        showNotificationAccessPrompt = true
+                                    }
                                 }
                             )
                         } else if (showNotificationAccessPrompt) {
