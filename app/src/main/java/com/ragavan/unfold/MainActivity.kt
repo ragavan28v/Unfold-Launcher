@@ -96,6 +96,16 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     @javax.inject.Inject
     lateinit var gestureActionResolver: com.unfold.feature.gestures.GestureActionResolver
 
+    private val _newIntentFlow = kotlinx.coroutines.flow.MutableSharedFlow<Intent>(
+        replay = 1,
+        onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
+    )
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        _newIntentFlow.tryEmit(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -116,6 +126,16 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                     }
                     var showNotificationAccessPrompt by remember { mutableStateOf(false) }
                     var showDefaultLauncherPrompt by remember { mutableStateOf(false) }
+
+                    LaunchedEffect(Unit) {
+                        _newIntentFlow.collect { intent ->
+                            if (intent.hasCategory(Intent.CATEGORY_HOME)) {
+                                scope.launch {
+                                    gestureActionResolver.execute(GestureType.EDGE_SWIPE, navController)
+                                }
+                            }
+                        }
+                    }
 
                     fun isNotificationAccessEnabled(): Boolean {
                         val enabledListeners = Settings.Secure.getString(
@@ -686,29 +706,39 @@ private fun BottomEdgeHomeSwipeOverlay(
                     }
 
                     var gestureCancelled = false
+                    val startTime = System.currentTimeMillis()
+                    var lastDisplacement = Offset.Zero
+
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) break
+                        
+                        if (!change.pressed) {
+                            // Finger released
+                            val duration = System.currentTimeMillis() - startTime
+                            val verticalDistance = -lastDisplacement.y
+                            val horizontalDistance = kotlin.math.abs(lastDisplacement.x)
+                            
+                            val hasMovedPastThreshold = lastDisplacement.getDistance() >= swipeThresholdPx
+                            val isClearlyVertical = verticalDistance >= horizontalDistance * 1.5f
+                            val isQuickSwipe = duration < 300 // Quick swipe threshold (300ms)
+                            
+                            if (!gestureCancelled && hasMovedPastThreshold && verticalDistance >= swipeThresholdPx && isClearlyVertical && isQuickSwipe) {
+                                change.consume()
+                                onSwipeHome()
+                            }
+                            break
+                        }
 
-                        val displacement = change.position - down.position
-                        val verticalDistance = -displacement.y
-                        val horizontalDistance = kotlin.math.abs(displacement.x)
-                        val hasMovedPastThreshold = displacement.getDistance() >= swipeThresholdPx
+                        lastDisplacement = change.position - down.position
+                        
+                        val verticalDistance = -lastDisplacement.y
+                        val horizontalDistance = kotlin.math.abs(lastDisplacement.x)
+                        val hasMovedPastThreshold = lastDisplacement.getDistance() >= swipeThresholdPx
                         val isClearlyVertical = verticalDistance >= horizontalDistance * 1.5f
-                        val isInwardSwipe = hasMovedPastThreshold &&
-                            verticalDistance >= swipeThresholdPx &&
-                            isClearlyVertical
 
                         if (hasMovedPastThreshold && !isClearlyVertical && verticalDistance <= 0f) {
                             gestureCancelled = true
-                        }
-                        if (gestureCancelled) break
-
-                        if (isInwardSwipe) {
-                            change.consume()
-                            onSwipeHome()
-                            break
                         }
                     }
                 }
