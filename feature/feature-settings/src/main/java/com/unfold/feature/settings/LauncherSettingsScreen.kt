@@ -115,6 +115,8 @@ import com.unfold.core.ui.components.PillBadge
 import com.unfold.core.ui.theme.LocalUnfoldTheme
 import com.unfold.core.ui.theme.UnfoldThemeColors
 import androidx.compose.ui.platform.LocalContext
+import android.app.role.RoleManager
+import android.os.Build
 import com.unfold.core.domain.model.AppDrawerSearchBarPosition
 import com.unfold.core.domain.model.AppDrawerViewMode
 import com.unfold.core.domain.model.WallpaperMode
@@ -153,12 +155,15 @@ fun LauncherSettingsScreen(
     onOpenGestureControl: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenHiddenSpace: () -> Unit,
+    onOpenDefaultLauncherSettings: () -> Unit,
     viewModel: LauncherSettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val theme = LocalUnfoldTheme.current
+    val context = LocalContext.current
     var selectedPage by rememberSaveable { mutableStateOf<LauncherSettingsPage?>(null) }
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
+    val isDefaultLauncher = remember(context) { isDefaultHomeLauncher(context) }
     val pageTitle = when (selectedPage) {
         LauncherSettingsPage.HOME -> "HOME"
         LauncherSettingsPage.DOCK -> "DOCK"
@@ -306,6 +311,10 @@ fun LauncherSettingsScreen(
                 subtitle = pageSubtitle,
                 onBack = pageBackAction
             )
+
+            if (selectedPage == null && !isDefaultLauncher) {
+                DefaultLauncherSettingsBanner(onOpenDefaultLauncherSettings)
+            }
 
             Spacer(modifier = Modifier.height(18.dp))
 
@@ -500,6 +509,53 @@ private fun LauncherSettingsPageScaffold(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         content()
+    }
+}
+
+private fun isDefaultHomeLauncher(context: android.content.Context): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        context.getSystemService(RoleManager::class.java)
+            ?.isRoleHeld(RoleManager.ROLE_HOME) == true
+    } else {
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+        }
+        context.packageManager.resolveActivity(
+            intent,
+            android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
+        )?.activityInfo?.packageName == context.packageName
+    }
+}
+
+@Composable
+private fun DefaultLauncherSettingsBanner(onOpenSettings: () -> Unit) {
+    val theme = LocalUnfoldTheme.current
+    GlassPanel(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenSettings),
+        cornerRadius = 18.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            CarvedIcon(
+                size = 42.dp,
+                contentDescription = "Set Unfold as default launcher",
+                icon = {
+                    Icon(Icons.Default.Home, contentDescription = null, tint = theme.accentPrimary)
+                }
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text("SET UNFOLD AS DEFAULT", color = theme.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("Use Unfold whenever you press Home.", color = theme.textSecondary, fontSize = 11.sp)
+            }
+            TextButton(onClick = onOpenSettings) {
+                Text("OPEN", color = theme.accentPrimary, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 

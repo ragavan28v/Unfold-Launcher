@@ -4,29 +4,42 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.app.role.RoleManager
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.getValue
@@ -34,8 +47,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.text.font.FontWeight
@@ -84,6 +103,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                         getSharedPreferences("first_run_permissions", Context.MODE_PRIVATE)
                     }
                     var showNotificationAccessPrompt by remember { mutableStateOf(false) }
+                    var showDefaultLauncherPrompt by remember { mutableStateOf(false) }
 
                     fun isNotificationAccessEnabled(): Boolean {
                         val enabledListeners = Settings.Secure.getString(
@@ -93,9 +113,48 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                         return enabledListeners?.contains(packageName) == true
                     }
 
+                    fun isDefaultLauncher(): Boolean {
+                        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            getSystemService(RoleManager::class.java)
+                                ?.isRoleHeld(RoleManager.ROLE_HOME) == true
+                        } else {
+                            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                                addCategory(Intent.CATEGORY_HOME)
+                            }
+                            packageManager.resolveActivity(
+                                homeIntent,
+                                android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
+                            )?.activityInfo?.packageName == packageName
+                        }
+                    }
+
+                    fun openDefaultLauncherSettings() {
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                val roleManager = getSystemService(RoleManager::class.java)
+                                if (roleManager?.isRoleAvailable(RoleManager.ROLE_HOME) == true) {
+                                    startActivityForResult(
+                                        roleManager.createRequestRoleIntent(RoleManager.ROLE_HOME),
+                                        DEFAULT_HOME_REQUEST_CODE
+                                    )
+                                    return
+                                }
+                            }
+                            startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+                        } catch (_: Exception) {
+                            startActivity(Intent(Settings.ACTION_SETTINGS))
+                        }
+                    }
+
                     LaunchedEffect(Unit) {
+                        if (!permissionPrefs.getBoolean("default_launcher_prompt_seen", false) &&
+                            !isDefaultLauncher()
+                        ) {
+                            showDefaultLauncherPrompt = true
+                        }
                         if (!permissionPrefs.getBoolean("notification_access_prompt_seen", false) &&
-                            !isNotificationAccessEnabled()
+                            !isNotificationAccessEnabled() &&
+                            isDefaultLauncher()
                         ) {
                             showNotificationAccessPrompt = true
                         }
@@ -107,6 +166,12 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                 showNotificationAccessPrompt = false
                                 permissionPrefs.edit()
                                     .putBoolean("notification_access_prompt_seen", true)
+                                    .apply()
+                            }
+                            if (event == Lifecycle.Event.ON_RESUME && isDefaultLauncher()) {
+                                showDefaultLauncherPrompt = false
+                                permissionPrefs.edit()
+                                    .putBoolean("default_launcher_prompt_seen", true)
                                     .apply()
                             }
                         }
@@ -167,6 +232,9 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                     },
                                     onOpenHiddenSpace = {
                                         navController.navigate(UnfoldRoute.HiddenSpace.route)
+                                    },
+                                    onOpenDefaultLauncherSettings = {
+                                        openDefaultLauncherSettings()
                                     }
                                 )
                             }
@@ -205,7 +273,20 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                             )
                         }
 
-                        if (showNotificationAccessPrompt) {
+                        if (showDefaultLauncherPrompt) {
+                            DefaultLauncherPrompt(
+                                onOpenSettings = {
+                                    showDefaultLauncherPrompt = false
+                                    openDefaultLauncherSettings()
+                                },
+                                onLater = {
+                                    showDefaultLauncherPrompt = false
+                                    permissionPrefs.edit()
+                                        .putBoolean("default_launcher_prompt_seen", true)
+                                        .apply()
+                                }
+                            )
+                        } else if (showNotificationAccessPrompt) {
                             FirstRunNotificationAccessPrompt(
                                 onOpenSettings = {
                                     showNotificationAccessPrompt = false
@@ -226,6 +307,239 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    companion object {
+        private const val DEFAULT_HOME_REQUEST_CODE = 4101
+    }
+}
+
+@Composable
+private fun DefaultLauncherPrompt(
+    onOpenSettings: () -> Unit,
+    onLater: () -> Unit
+) {
+    val pulse by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = tween(durationMillis = 1600),
+        label = "welcome glow"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF02070D))
+            .padding(horizontal = 28.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .border(1.dp, Color(0xFF0879C9).copy(alpha = 0.55f), RoundedCornerShape(26.dp))
+                .background(Color(0xFF030B14).copy(alpha = 0.96f), RoundedCornerShape(26.dp))
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "WELCOME TO",
+                    color = Color(0xFF9AAABD),
+                    fontSize = 18.sp,
+                    letterSpacing = 2.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("U N F ", color = Color.White, fontSize = 40.sp, letterSpacing = 4.sp)
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .border(5.dp, Color(0xFF10A7F5), RoundedCornerShape(50))
+                    )
+                    Text(" L D", color = Color.White, fontSize = 40.sp, letterSpacing = 4.sp)
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                Box(modifier = Modifier.size(42.dp, 2.dp).background(Color(0xFF0EA5F7)))
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(
+                    text = "SIMPLIFY. FOCUS. UNFOLD.",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    letterSpacing = 1.5.sp
+                )
+                Text(
+                    text = "A clean, minimal launcher that keeps what matters, front and center.",
+                    color = Color(0xFF9AAABD),
+                    fontSize = 13.sp,
+                    lineHeight = 20.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 14.dp)
+                )
+            }
+
+            WelcomePhoneIllustration(glow = pulse)
+
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "DESIGNED FOR YOU",
+                    color = Color(0xFF0EA5F7),
+                    fontSize = 17.sp,
+                    letterSpacing = 1.3.sp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+                WelcomeFeature("⌂", "Minimal Home", "A clean and focused home screen.", Color(0xFF10A7F5))
+                WelcomeFeature("▦", "Smart Dock", "Quick access to your favorite apps.", Color(0xFF00D6A3))
+                WelcomeFeature(Icons.Default.TouchApp, "Gestures", "Intuitive gestures for a smoother experience.", Color(0xFFA56BFF))
+                WelcomeFeature("□", "App Drawer", "All your apps, organized and easy to find.", Color(0xFFFFAE2B))
+            }
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Button(
+                    onClick = onOpenSettings,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF087DF0)),
+                    shape = RoundedCornerShape(28.dp)
+                ) {
+                    Text("SET UNFOLD AS DEFAULT    ›", color = Color.White, fontSize = 15.sp, letterSpacing = 1.sp)
+                }
+                TextButton(onClick = onLater) {
+                    Text("I'LL SET IT LATER", color = Color(0xFF0EA5F7), fontSize = 13.sp, letterSpacing = 1.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WelcomePhoneIllustration(glow: Float) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1.2f),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val arcWidth = size.width * 0.84f
+            val arcHeight = size.height * 0.72f
+            val arcTop = size.height * 0.50f
+            val arcLeft = (size.width - arcWidth) / 2f
+            val arcSize = Size(arcWidth, arcHeight)
+            val arcTopLeft = Offset(arcLeft, arcTop)
+            val arcColor = Color(0xFF0B8FFF)
+
+            drawArc(
+                color = arcColor.copy(alpha = 0.08f * glow),
+                startAngle = 200f,
+                sweepAngle = 140f,
+                useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
+                style = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
+            )
+            drawArc(
+                color = arcColor.copy(alpha = 0.14f * glow),
+                startAngle = 200f,
+                sweepAngle = 140f,
+                useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
+                style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
+            )
+            drawArc(
+                color = arcColor.copy(alpha = 0.58f * glow),
+                startAngle = 200f,
+                sweepAngle = 140f,
+                useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
+                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+            )
+            drawArc(
+                color = arcColor.copy(alpha = 0.72f * glow),
+                startAngle = 200f,
+                sweepAngle = 140f,
+                useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
+                style = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxHeight(0.88f)
+                .aspectRatio(0.56f)
+                .border(2.dp, Color(0xFF2E5B88), RoundedCornerShape(28.dp))
+                .background(Color(0xFF02070D), RoundedCornerShape(28.dp))
+                .padding(14.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(modifier = Modifier.size(34.dp, 4.dp).background(Color(0xFF0B1A2A), RoundedCornerShape(4.dp)))
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    repeat(2) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            repeat(2) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .background(Color(0xFF0B1828), RoundedCornerShape(11.dp))
+                                )
+                            }
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF071726), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)
+                ) {
+                    repeat(4) {
+                        Box(modifier = Modifier.size(16.dp).background(Color(0xFF1C4165), RoundedCornerShape(50)))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WelcomeFeature(icon: String, title: String, subtitle: String, color: Color) {
+    WelcomeFeatureContent(icon, title, subtitle, color)
+}
+
+@Composable
+private fun WelcomeFeature(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, color: Color) {
+    WelcomeFeatureContent(icon, title, subtitle, color)
+}
+
+@Composable
+private fun WelcomeFeatureContent(icon: Any, title: String, subtitle: String, color: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(50)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (icon is String) {
+                Text(icon, color = color, fontSize = 24.sp, textAlign = TextAlign.Center)
+            } else if (icon is androidx.compose.ui.graphics.vector.ImageVector) {
+                Icon(icon, contentDescription = title, tint = color, modifier = Modifier.size(24.dp))
+            }
+        }
+        Column(modifier = Modifier.padding(start = 14.dp)) {
+            Text(title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(subtitle, color = Color(0xFF9AAABD), fontSize = 11.sp)
         }
     }
 }

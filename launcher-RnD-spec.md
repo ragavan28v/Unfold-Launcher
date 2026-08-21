@@ -438,3 +438,19 @@ data class GestureBinding(
 ## 9. Next Step
 
 Once you've reviewed this, the natural next artifact is a **Compose implementation of `CarvedIcon.kt` + `GlassPanel.kt`** (Section 3.2's render recipe as actual working code) — that single component, once nailed, defines the visual identity of the entire launcher and everything else is built by composing it. Say the word and I'll build that component next.
+
+## 10. Default Launcher Onboarding
+
+The first launcher session shows a concise HUD-styled prompt when Unfold is not the active HOME role. On Android 10 and newer it requests `RoleManager.ROLE_HOME`; on older devices or OEMs that do not expose the role request, it opens `Settings.ACTION_HOME_SETTINGS`, with a general Settings fallback if needed.
+
+After `Later`, the prompt is not shown again automatically. The launcher Settings page keeps a prominent **Set Unfold as default** banner until another launcher is selected. The banner is hidden when Unfold already holds the HOME role.
+
+### Verification Checklist
+
+- Fresh install: launch Unfold and verify the default-home prompt appears once.
+- Tap **Set Unfold as default** and select Unfold; return and verify the prompt and Settings banner are absent.
+- Tap **Later**; reopen Settings and verify the banner remains available.
+- Dismiss or cancel the system picker; verify launcher content remains usable.
+- Test Android 9 fallback through Home settings and Android 10+ through the HOME role picker.
+- Test an OEM that limits role prompts; verify the general Settings fallback opens without crashing.
+- Enable notification access separately and verify the existing badge/music permission onboarding remains reachable.
