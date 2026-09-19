@@ -90,6 +90,7 @@ data class ThemeConfig(
     val applyIconPackRing: Boolean = false,
     val showNotificationBadges: Boolean = true,
     val badgeColorHex: String = "#F44336",
+    val launcherUiVersion: Int = 1,
     val soundFeedbackEnabled: Boolean = false
 )
 

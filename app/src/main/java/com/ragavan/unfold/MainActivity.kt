@@ -45,6 +45,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,11 +75,14 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.unfold.core.domain.navigation.UnfoldRoute
 import com.unfold.core.domain.model.GestureType
+import com.unfold.core.domain.model.ThemeConfig
+import com.unfold.core.domain.repository.ThemeRepository
 import com.unfold.core.ui.theme.UnfoldTheme
 import com.unfold.feature.drawer.AppDrawerScreen
 import com.unfold.feature.drawer.AppDrawerViewModel
 import com.unfold.feature.home.HomeScreen
 import com.unfold.feature.home.HomeViewModel
+import com.unfold.feature.home.LauncherV2HomeScreen
 import com.unfold.feature.hiddenspace.HiddenAppsScreen
 import com.unfold.feature.search.UniversalSearchScreen
 import com.unfold.feature.search.UniversalSearchViewModel
@@ -95,6 +99,9 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 
     @javax.inject.Inject
     lateinit var gestureActionResolver: com.unfold.feature.gestures.GestureActionResolver
+
+    @javax.inject.Inject
+    lateinit var themeRepository: ThemeRepository
 
     private val _newIntentFlow = kotlinx.coroutines.flow.MutableSharedFlow<Intent>(
         replay = 1,
@@ -216,6 +223,8 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                     }
 
                     val launcherContent: @Composable () -> Unit = {
+                        val themeConfig by themeRepository.observeTheme()
+                            .collectAsState(initial = ThemeConfig())
                         NavHost(
                             navController = navController,
                             startDestination = UnfoldRoute.Home.route,
@@ -245,24 +254,32 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                             }
                         ) {
                             composable(UnfoldRoute.Home.route) {
-                                val homeViewModel: HomeViewModel = hiltViewModel()
-                                HomeScreen(
-                                    viewModel = homeViewModel,
-                                    onNavigateToSearch = {
-                                        navController.navigate(UnfoldRoute.UniversalSearch.route)
-                                    },
-                                    onNavigateToDrawer = {
-                                        navController.navigate(UnfoldRoute.AppDrawer.route)
-                                    },
-                                    onNavigateToSettings = {
-                                        navController.navigate(UnfoldRoute.Settings.route)
-                                    },
-                                    onDockSwipeHold = {
-                                        scope.launch {
-                                            gestureActionResolver.execute(GestureType.DOCK_SWIPE_HOLD, navController)
+                                if (themeConfig.launcherUiVersion == 2) {
+                                    LauncherV2HomeScreen(
+                                        onOpenSettings = {
+                                            navController.navigate(UnfoldRoute.Settings.route)
                                         }
-                                    }
-                                )
+                                    )
+                                } else {
+                                    val homeViewModel: HomeViewModel = hiltViewModel()
+                                    HomeScreen(
+                                        viewModel = homeViewModel,
+                                        onNavigateToSearch = {
+                                            navController.navigate(UnfoldRoute.UniversalSearch.route)
+                                        },
+                                        onNavigateToDrawer = {
+                                            navController.navigate(UnfoldRoute.AppDrawer.route)
+                                        },
+                                        onNavigateToSettings = {
+                                            navController.navigate(UnfoldRoute.Settings.route)
+                                        },
+                                        onDockSwipeHold = {
+                                            scope.launch {
+                                                gestureActionResolver.execute(GestureType.DOCK_SWIPE_HOLD, navController)
+                                            }
+                                        }
+                                    )
+                                }
                             }
 
                             composable(UnfoldRoute.UniversalSearch.route) {

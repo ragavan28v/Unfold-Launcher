@@ -94,6 +94,7 @@ object ThemeConfigSerializer : Serializer<ThemeConfig> {
                 applyIconPackRing = json.optBoolean("apply_icon_pack_ring", false),
                 showNotificationBadges = json.optBoolean("show_notification_badges", true),
                 badgeColorHex = json.optString("badge_color_hex", "#F44336"),
+                launcherUiVersion = json.optInt("launcher_ui_version", 1).coerceIn(1, 2),
                 soundFeedbackEnabled = json.optBoolean("sound_feedback_enabled", false)
             )
         } catch (e: Exception) {
@@ -140,6 +141,7 @@ object ThemeConfigSerializer : Serializer<ThemeConfig> {
             put("apply_icon_pack_ring", t.applyIconPackRing)
             put("badge_color_hex", t.badgeColorHex)
             put("show_notification_badges", t.showNotificationBadges)
+            put("launcher_ui_version", t.launcherUiVersion)
             put("sound_feedback_enabled", t.soundFeedbackEnabled)
         }
         withContext(Dispatchers.IO) {

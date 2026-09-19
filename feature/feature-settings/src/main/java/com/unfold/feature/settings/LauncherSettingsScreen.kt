@@ -141,6 +141,7 @@ private data class WallpaperPreset(
 )
 
 private enum class LauncherSettingsPage {
+    LAUNCHER_UI,
     HOME,
     DOCK,
     APP_DRAWER,
@@ -167,6 +168,7 @@ fun LauncherSettingsScreen(
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
     val isDefaultLauncher = remember(context) { isDefaultHomeLauncher(context) }
     val pageTitle = when (selectedPage) {
+        LauncherSettingsPage.LAUNCHER_UI -> "LAUNCHER UI"
         LauncherSettingsPage.HOME -> "HOME"
         LauncherSettingsPage.DOCK -> "DOCK"
         LauncherSettingsPage.APP_DRAWER -> "APP DRAWER"
@@ -176,6 +178,7 @@ fun LauncherSettingsScreen(
         null -> "LAUNCHER SETTINGS"
     }
     val pageSubtitle = when (selectedPage) {
+        LauncherSettingsPage.LAUNCHER_UI -> "Choose between the current launcher and the version 2 design preview."
         LauncherSettingsPage.HOME -> "Adjust the home screen grid and placement behavior."
         LauncherSettingsPage.DOCK -> "Adjust dock rows, icon count, icon sizing, and background behavior."
         LauncherSettingsPage.APP_DRAWER -> "Adjust drawer layout, grid, sorting, search position and keyboard behavior."
@@ -191,6 +194,14 @@ fun LauncherSettingsScreen(
 
     val sections = remember {
         listOf(
+            SettingsSectionInfo(
+                title = "Launcher UI",
+                subtitle = "Switch between the current launcher and the empty version 2 design preview.",
+                badge = "V2",
+                icon = Icons.Default.Settings,
+                clickable = true,
+                onClick = { selectedPage = LauncherSettingsPage.LAUNCHER_UI }
+            ),
             SettingsSectionInfo(
                 title = "Home",
                 subtitle = "Grid rows 1-3, columns 3-6, icon size 30-100, labels on/off, app placement, wallpaper behavior, and pages.",
@@ -329,6 +340,15 @@ fun LauncherSettingsScreen(
             Spacer(modifier = Modifier.height(18.dp))
 
             when (selectedPage) {
+                LauncherSettingsPage.LAUNCHER_UI -> LauncherSettingsPageScaffold(
+                    modifier = Modifier.weight(1f),
+                    content = {
+                        LauncherUiVersionPanel(
+                            config = state.themeConfig,
+                            onUpdate = viewModel::updateThemeConfig
+                        )
+                    }
+                )
                 LauncherSettingsPage.HOME -> LauncherSettingsPageScaffold(
                     modifier = Modifier.weight(1f),
                     content = {
@@ -662,6 +682,56 @@ private fun NotificationBadgeSettingsPanel(
                 checked = config.showNotificationBadges,
                 onCheckedChange = { onUpdate(config.copy(showNotificationBadges = it)) }
             )
+        }
+    }
+}
+
+@Composable
+private fun LauncherUiVersionPanel(
+    config: com.unfold.core.domain.model.ThemeConfig,
+    onUpdate: (com.unfold.core.domain.model.ThemeConfig) -> Unit
+) {
+    val theme = LocalUnfoldTheme.current
+
+    GlassPanel(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = 18.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "LAUNCHER UI VERSION",
+                color = theme.accentSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+            Text(
+                text = "Version 2 is an empty design workspace. Your existing launcher remains available by selecting Version 1.",
+                color = theme.textSecondary,
+                fontSize = 11.sp
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = { onUpdate(config.copy(launcherUiVersion = 1)) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (config.launcherUiVersion == 1) {
+                            theme.accentPrimary
+                        } else {
+                            theme.accentPrimary.copy(alpha = 0.18f)
+                        }
+                    )
+                ) {
+                    Text("VERSION 1", color = if (config.launcherUiVersion == 1) theme.bgVoid else theme.accentPrimary)
+                }
+                OutlinedButton(
+                    onClick = { onUpdate(config.copy(launcherUiVersion = 2)) }
+                ) {
+                    Text("VERSION 2", color = theme.accentPrimary)
+                }
+            }
         }
     }
 }
