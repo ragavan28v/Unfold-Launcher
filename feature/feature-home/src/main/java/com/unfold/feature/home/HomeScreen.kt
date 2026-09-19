@@ -1401,7 +1401,7 @@ fun HomeAppGridItem(
     }
 }
 
-private fun launcherGridIconSize(rawSize: Int, columns: Int): Dp {
+internal fun launcherGridIconSize(rawSize: Int, columns: Int): Dp {
     val normalized = ((rawSize.coerceIn(30, 100) - 30) / 70f).coerceIn(0f, 1f)
     val maxSize = when (columns.coerceIn(3, 6)) {
         3 -> 56f
@@ -1700,7 +1700,7 @@ private fun resolveDropTarget(
     return nearestSlot(homeSlots)
 }
 
-private fun drawableToImageBitmap(drawable: android.graphics.drawable.Drawable): ImageBitmap? {
+internal fun drawableToImageBitmap(drawable: android.graphics.drawable.Drawable): ImageBitmap? {
     return try {
         val width = drawable.intrinsicWidth.coerceAtLeast(1)
         val height = drawable.intrinsicHeight.coerceAtLeast(1)

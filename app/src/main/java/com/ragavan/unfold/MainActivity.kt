@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
@@ -57,6 +58,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Offset
@@ -66,6 +68,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -133,6 +137,10 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                     }
                     var showNotificationAccessPrompt by remember { mutableStateOf(false) }
                     var showDefaultLauncherPrompt by remember { mutableStateOf(false) }
+                    var showV2Drawer by remember { mutableStateOf(false) }
+                    var v2DrawerProgress by remember { mutableStateOf(0f) }
+                    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
+                    val screenWidthPx = with(LocalDensity.current) { screenWidthDp.toPx() }
 
                     LaunchedEffect(Unit) {
                         _newIntentFlow.collect { intent ->
@@ -258,6 +266,21 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                 if (themeConfig.launcherUiVersion == 2) {
                                     LauncherV2HomeScreen(
                                         viewModel = homeViewModel,
+                                        onDrawerDragDistance = { distancePx ->
+                                            showV2Drawer = true
+                                            v2DrawerProgress = (-distancePx / screenWidthPx).coerceIn(0f, 1f)
+                                        },
+                                        onDrawerDragEnd = { distancePx, velocityPxPerSecond ->
+                                            val progress = (-distancePx / screenWidthPx).coerceIn(0f, 1f)
+                                            val opened = progress >= 0.32f || velocityPxPerSecond < -1400f
+                                            if (opened) {
+                                                showV2Drawer = true
+                                                v2DrawerProgress = 1f
+                                            } else {
+                                                showV2Drawer = false
+                                                v2DrawerProgress = 0f
+                                            }
+                                        },
                                         onOpenSettings = {
                                             navController.navigate(UnfoldRoute.Settings.route)
                                         }
@@ -371,6 +394,21 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                             ) {
                                 launcherContent()
                             }
+                        }
+
+                        if (showV2Drawer && currentRoute == UnfoldRoute.Home.route) {
+                            val drawerViewModel: AppDrawerViewModel = hiltViewModel()
+                            AppDrawerScreen(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .offset(x = screenWidthDp * (1f - v2DrawerProgress))
+                                    .alpha((v2DrawerProgress * 1.35f).coerceIn(0f, 1f)),
+                                viewModel = drawerViewModel,
+                                onBack = {
+                                    showV2Drawer = false
+                                    v2DrawerProgress = 0f
+                                }
+                            )
                         }
 
                         if (showDefaultLauncherPrompt) {
