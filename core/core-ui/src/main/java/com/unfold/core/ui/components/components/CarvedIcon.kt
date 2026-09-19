@@ -42,9 +42,8 @@ fun CarvedIcon(
     isPressed: Boolean = false,
     accentTint: Color = LocalUnfoldTheme.current.accentPrimary,
     bevelIntensity: Float = LocalUnfoldTheme.current.bevelIntensity,
-    badgeCount: Int? = null,
+    showBadge: Boolean = false,
     badgeColor: Color = Color(0xFFF44336),
-    showBadgeCount: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
     contentDescription: String
@@ -91,7 +90,7 @@ fun CarvedIcon(
             icon()
         }
 
-        val badgeVisible = badgeCount != null && badgeCount > 0
+        val badgeVisible = showBadge
         val badgeAlpha by animateFloatAsState(
             targetValue = if (badgeVisible) 1f else 0f,
             label = "badge visibility"
@@ -111,20 +110,11 @@ fun CarvedIcon(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(if (showBadgeCount) 20.dp else 14.dp)
+                        .size(14.dp)
                         .clip(CircleShape)
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         drawCircle(color = animatedBadgeColor)
-                    }
-                    if (showBadgeCount) {
-                        Text(
-                            text = if (badgeCount!! > 99) "99+" else badgeCount.toString(),
-                            color = Color.White,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.align(Alignment.Center)
-                        )
                     }
                 }
             }

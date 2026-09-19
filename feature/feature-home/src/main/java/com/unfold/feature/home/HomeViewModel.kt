@@ -59,8 +59,8 @@ data class HomeUiState(
     val drawerWallpaperPattern: WallpaperPatternMode = WallpaperPatternMode.MINIMAL,
     val drawerWallpaperImageUri: String = "",
     val iconPackPackage: String = "",
-    val badgeColorHex: String = "#F44336",
-    val showBadgeCount: Boolean = false
+    val showNotificationBadges: Boolean = true,
+    val badgeColorHex: String = "#F44336"
 )
 
 sealed interface HomeUiIntent {
@@ -269,7 +269,7 @@ class HomeViewModel @Inject constructor(
                     drawerWallpaperImageUri = themeConfig.drawerWallpaperImageUri,
                     iconPackPackage = themeConfig.iconPackPackage,
                     badgeColorHex = themeConfig.badgeColorHex,
-                    showBadgeCount = themeConfig.showBadgeCount
+                    showNotificationBadges = themeConfig.showNotificationBadges
                 )
             }
             .launchIn(viewModelScope)

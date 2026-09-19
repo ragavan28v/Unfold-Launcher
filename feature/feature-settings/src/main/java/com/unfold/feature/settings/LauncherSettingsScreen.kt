@@ -271,7 +271,7 @@ fun LauncherSettingsScreen(
             ),
             SettingsSectionInfo(
                 title = "Notifications and Badges",
-                subtitle = "Choose one global dot color and optionally show unread counts inside it.",
+                subtitle = "Show a dot on apps with unread notifications.",
                 badge = "",
                 icon = Icons.Default.Notifications,
                 clickable = true,
@@ -602,7 +602,7 @@ private fun NotificationBadgeSettingsPanel(
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "A single top-right dot marks apps with active notifications.",
+                text = "A single top-right dot marks apps with new notifications until opened.",
                 color = theme.textSecondary,
                 fontSize = 11.sp
             )
@@ -658,9 +658,9 @@ private fun NotificationBadgeSettingsPanel(
             }
             Spacer(modifier = Modifier.height(14.dp))
             ToggleSettingRow(
-                label = "Show count inside dot",
-                checked = config.showBadgeCount,
-                onCheckedChange = { onUpdate(config.copy(showBadgeCount = it)) }
+                label = "Show notification badges",
+                checked = config.showNotificationBadges,
+                onCheckedChange = { onUpdate(config.copy(showNotificationBadges = it)) }
             )
         }
     }

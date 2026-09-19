@@ -650,7 +650,7 @@ private fun FirstRunNotificationAccessPrompt(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "This permission enables notification badges, unread counts, live music track details, and media controls.",
+                text = "This permission enables notification badges, live music track details, and media controls.",
                 color = Color.White.copy(alpha = 0.82f),
                 fontSize = 13.sp
             )

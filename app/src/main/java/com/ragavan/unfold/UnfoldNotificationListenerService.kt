@@ -59,7 +59,6 @@ class UnfoldNotificationListenerService : NotificationListenerService() {
         super.onListenerConnected()
         try {
             NotificationBadgeStore.initialize(this)
-            refreshNotificationBadges()
             val component = ComponentName(this, UnfoldNotificationListenerService::class.java)
             mediaSessionManager.addOnActiveSessionsChangedListener(sessionListener, component)
             val controllers = mediaSessionManager.getActiveSessions(component)
@@ -71,35 +70,29 @@ class UnfoldNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (sbn.packageName != packageName) {
+        if (isBadgeNotification(sbn)) {
             NotificationBadgeStore.recordNotification(
-                notificationKey = sbn.key,
-                instanceKey = NotificationBadgeStore.instanceKey(
-                    sbn.packageName,
-                    userSerial(sbn)
-                )
+                NotificationBadgeStore.instanceKey(sbn.packageName, userSerial(sbn))
             )
         }
     }
 
-    override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        // Keep the record: clearing the tray does not mean the app item was opened.
+    override fun onNotificationRemoved(
+        sbn: StatusBarNotification,
+        rankingMap: NotificationListenerService.RankingMap,
+        reason: Int
+    ) {
+        if (reason == NotificationListenerService.REASON_CLICK && sbn.packageName != packageName) {
+            NotificationBadgeStore.clearInstance(
+                NotificationBadgeStore.instanceKey(sbn.packageName, userSerial(sbn))
+            )
+        }
     }
 
-    private fun refreshNotificationBadges() {
-        activeNotifications
-            .asSequence()
-            .filter { it.packageName != packageName }
-            .forEach { sbn ->
-                NotificationBadgeStore.recordNotification(
-                    notificationKey = sbn.key,
-                    instanceKey = NotificationBadgeStore.instanceKey(
-                        sbn.packageName,
-                        userSerial(sbn)
-                    )
-                )
-            }
-    }
+    private fun isBadgeNotification(sbn: StatusBarNotification): Boolean =
+        sbn.packageName != packageName &&
+            !sbn.isOngoing &&
+            sbn.notification.flags and android.app.Notification.FLAG_GROUP_SUMMARY == 0
 
     private fun userSerial(sbn: StatusBarNotification): Long {
         val userManager = getSystemService(UserManager::class.java)
