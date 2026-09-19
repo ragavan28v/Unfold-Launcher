@@ -254,14 +254,15 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                             }
                         ) {
                             composable(UnfoldRoute.Home.route) {
+                                val homeViewModel: HomeViewModel = hiltViewModel()
                                 if (themeConfig.launcherUiVersion == 2) {
                                     LauncherV2HomeScreen(
+                                        viewModel = homeViewModel,
                                         onOpenSettings = {
                                             navController.navigate(UnfoldRoute.Settings.route)
                                         }
                                     )
                                 } else {
-                                    val homeViewModel: HomeViewModel = hiltViewModel()
                                     HomeScreen(
                                         viewModel = homeViewModel,
                                         onNavigateToSearch = {

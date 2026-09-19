@@ -11,8 +11,13 @@ import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -38,26 +43,41 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import kotlin.math.min
+import kotlinx.coroutines.launch
+import com.unfold.core.ui.components.hud.HudBackgroundGrid
+import com.unfold.core.ui.components.hud.HudCategories
+import com.unfold.core.ui.components.hud.HudFlow
+import com.unfold.core.ui.components.hud.HudGoogleFeed
+import com.unfold.core.ui.components.hud.HudHome
+import com.unfold.core.ui.components.hud.HudMusic
+import com.unfold.core.ui.components.hud.HudSystem
 import com.unfold.core.ui.components.hud.HudConnectorNode
 import com.unfold.core.ui.components.hud.HudRailItem
 import com.unfold.core.ui.components.hud.HudTrace
 import com.unfold.core.ui.theme.LocalUnfoldTheme
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LauncherV2HomeScreen(
+    viewModel: HomeViewModel,
     onOpenSettings: () -> Unit
 ) {
     val theme = LocalUnfoldTheme.current
     val panelBorder = Modifier.border(1.dp, theme.panelBorder)
+    val pagerState = rememberPagerState(pageCount = { 6 })
+    val coroutineScope = rememberCoroutineScope()
 
     Box(
         modifier = Modifier
@@ -84,6 +104,10 @@ fun LauncherV2HomeScreen(
                 ) {
                     VerticalHudRail(
                         onOpenSettings = onOpenSettings,
+                        currentPage = pagerState.currentPage,
+                        onPageSelected = { page ->
+                            coroutineScope.launch { pagerState.animateScrollToPage(page) }
+                        },
                         batteryText = rememberBatteryText()
                     )
                 }
@@ -94,11 +118,14 @@ fun LauncherV2HomeScreen(
                 ) {
                     NumberedPanel(
                         number = 2,
+                        showNumber = false,
                         modifier = panelBorder
                             .fillMaxWidth()
                             .weight(1f),
                         theme = theme
-                    )
+                    ) {
+                        V2HudPageDisplay(viewModel = viewModel, pagerState = pagerState)
+                    }
                     NumberedPanel(
                         number = 4,
                         modifier = panelBorder
@@ -149,29 +176,114 @@ fun LauncherV2HomeScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun V2HudPageDisplay(
+    viewModel: HomeViewModel,
+    pagerState: PagerState
+) {
+    val state by viewModel.uiState.collectAsState()
+    val rows = state.gridRows
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val scale = min(
+            maxHeight.value / 360f,
+            maxWidth.value / 320f
+        ).coerceIn(0.35f, 1.1f)
+
+        HudBackgroundGrid(modifier = Modifier.fillMaxSize())
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            val pageModifier = Modifier
+                .fillMaxSize()
+
+            when (page) {
+                0 -> HudHome(
+                    modifier = pageModifier,
+                    gridRows = rows,
+                    scale = scale,
+                    iconPackPackage = state.iconPackPackage
+                )
+                1 -> HudMusic(
+                    modifier = pageModifier,
+                    gridRows = rows,
+                    scale = scale,
+                    iconPackPackage = state.iconPackPackage
+                )
+                2 -> HudSystem(
+                    batteryPercent = state.systemStats?.batteryPercent ?: 0.5f,
+                    batteryText = state.systemStats?.batteryText ?: "50%",
+                    ramUsedText = state.systemStats?.ramUsedText ?: "4.2 GB / 8.0 GB",
+                    ramUsedPercent = state.systemStats?.ramUsedPercent ?: 0.5f,
+                    storageUsedText = state.systemStats?.storageUsedText ?: "64 GB / 128 GB",
+                    storageUsedPercent = state.systemStats?.storageUsedPercent ?: 0.5f,
+                    cpuTempText = state.systemStats?.cpuTempText ?: "36°C",
+                    cpuTemp = state.systemStats?.cpuTemp ?: 36f,
+                    modifier = pageModifier,
+                    gridRows = rows,
+                    scale = scale,
+                    iconPackPackage = state.iconPackPackage
+                )
+                3 -> HudGoogleFeed(
+                    modifier = pageModifier,
+                    gridRows = rows,
+                    scale = scale
+                )
+                4 -> HudFlow(
+                    timelineItems = state.timelineItems,
+                    notes = state.notes,
+                    modifier = pageModifier,
+                    gridRows = rows,
+                    scale = scale,
+                    onLoadMore = { viewModel.loadMoreTimelineEvents() },
+                    onRefreshTimeline = { viewModel.refreshTimelineEvents() },
+                    onSaveNote = { viewModel.saveNote(it) },
+                    onDeleteNote = { viewModel.deleteNote(it) }
+                )
+                5 -> HudCategories(
+                    folders = state.folders,
+                    allApps = state.installedApps,
+                    modifier = pageModifier,
+                    gridRows = rows,
+                    scale = scale,
+                    iconPackPackage = state.iconPackPackage,
+                    onCreateFolder = { name, appIds -> viewModel.createFolder(name, appIds) },
+                    onRenameFolder = { folderId, name -> viewModel.renameFolder(folderId, name) },
+                    onDeleteFolder = { folderId -> viewModel.deleteFolder(folderId) },
+                    onUpdateFolderApps = { folderId, appIds -> viewModel.updateFolderApps(folderId, appIds) },
+                    onReorderFolders = { folderIds -> viewModel.reorderFolders(folderIds) }
+                )
+            }
+        }
+    }
+}
+
 private data class V2RailNode(
     val icon: ImageVector,
-    val selected: Boolean = false
+    val page: Int? = null
 )
 
 @Composable
 private fun VerticalHudRail(
     onOpenSettings: () -> Unit,
+    currentPage: Int,
+    onPageSelected: (Int) -> Unit,
     batteryText: String
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val theme = LocalUnfoldTheme.current
-    var selectedNode by remember { mutableStateOf(0) }
     var flashlightEnabled by remember { mutableStateOf(false) }
     var soundMode by remember { mutableStateOf(detectSoundMode(context)) }
     val nodes = listOf(
-        V2RailNode(Icons.Default.Home),
-        V2RailNode(Icons.Default.MusicNote),
-        V2RailNode(Icons.Default.Memory),
+        V2RailNode(Icons.Default.Home, page = 0),
+        V2RailNode(Icons.Default.MusicNote, page = 1),
+        V2RailNode(Icons.Default.Memory, page = 2),
         V2RailNode(if (flashlightEnabled) Icons.Default.FlashlightOn else Icons.Default.FlashlightOff),
-        V2RailNode(Icons.Default.Search),
-        V2RailNode(Icons.Default.ViewStream),
-        V2RailNode(Icons.Default.GridView)
+        V2RailNode(Icons.Default.Search, page = 3),
+        V2RailNode(Icons.Default.ViewStream, page = 4),
+        V2RailNode(Icons.Default.GridView, page = 5)
     )
 
     Column(
@@ -191,13 +303,13 @@ private fun VerticalHudRail(
             nodes.forEachIndexed { index, node ->
                 HudRailItem(
                     icon = node.icon,
-                    isSelected = selectedNode == index || (index == 3 && flashlightEnabled),
+                    isSelected = node.page == currentPage || (index == 3 && flashlightEnabled),
                     onClick = {
                         if (index == 3) {
                             flashlightEnabled = !flashlightEnabled
                             toggleFlashlight(context, flashlightEnabled)
-                        } else {
-                            selectedNode = index
+                        } else if (node.page != null) {
+                            onPageSelected(node.page)
                         }
                     },
                     sizeMultiplier = 1f
@@ -381,13 +493,12 @@ private fun NumberedPanel(
                 text = number.toString(),
                 color = theme.textPrimary
             )
-        } else {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                content()
-            }
+        }
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            content()
         }
     }
 }
