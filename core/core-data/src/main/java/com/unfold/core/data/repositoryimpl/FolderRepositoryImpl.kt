@@ -43,11 +43,11 @@ class FolderRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun createFolder(name: String, appIds: List<String>): String = withContext(Dispatchers.IO) {
+    override suspend fun createFolder(name: String, appIds: List<String>, gridPosition: Int?): String = withContext(Dispatchers.IO) {
         val trimmedName = name.trim()
         require(trimmedName.isNotBlank()) { "Folder name cannot be blank" }
 
-        val nextPosition = (folderDao.getAllFolders().maxOfOrNull { it.gridPosition } ?: -1) + 1
+        val nextPosition = gridPosition ?: (folderDao.getAllFolders().maxOfOrNull { it.gridPosition } ?: -1) + 1
         val folderId = "folder_${System.currentTimeMillis()}"
 
         folderDao.insertFolder(
@@ -92,5 +92,9 @@ class FolderRepositoryImpl @Inject constructor(
         folderIdsInOrder.distinct().forEachIndexed { index, folderId ->
             folderDao.updateFolderPosition(folderId, index)
         }
+    }
+
+    override suspend fun moveFolder(folderId: String, gridPosition: Int) = withContext(Dispatchers.IO) {
+        folderDao.updateFolderPosition(folderId, gridPosition)
     }
 }

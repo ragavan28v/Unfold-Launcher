@@ -317,6 +317,19 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun createDockFolder(slot: Int, name: String, appIds: List<String>) {
+        viewModelScope.launch {
+            folderRepository.createFolder(name, appIds, gridPosition = slot)
+            appIds.forEach { appRepository.setGridPosition(it, null) }
+        }
+    }
+
+    fun moveFolder(folderId: String, targetPosition: Int) {
+        viewModelScope.launch {
+            folderRepository.moveFolder(folderId, targetPosition)
+        }
+    }
+
     fun renameFolder(folderId: String, name: String) {
         viewModelScope.launch {
             folderRepository.renameFolder(folderId, name)
@@ -341,4 +354,3 @@ class HomeViewModel @Inject constructor(
         }
     }
 }
-

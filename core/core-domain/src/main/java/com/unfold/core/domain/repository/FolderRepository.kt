@@ -5,9 +5,10 @@ import kotlinx.coroutines.flow.Flow
 
 interface FolderRepository {
     fun observeFolders(): Flow<List<FolderInfo>>
-    suspend fun createFolder(name: String, appIds: List<String>): String
+    suspend fun createFolder(name: String, appIds: List<String>, gridPosition: Int? = null): String
     suspend fun renameFolder(folderId: String, name: String)
     suspend fun deleteFolder(folderId: String)
     suspend fun updateFolderApps(folderId: String, appIds: List<String>)
     suspend fun reorderFolders(folderIdsInOrder: List<String>)
+    suspend fun moveFolder(folderId: String, gridPosition: Int)
 }

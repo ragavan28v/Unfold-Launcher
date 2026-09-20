@@ -17,6 +17,9 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
@@ -24,11 +27,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -37,6 +44,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FlashlightOff
 import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Memory
@@ -51,11 +59,17 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -64,6 +78,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
@@ -77,10 +92,17 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.window.Dialog
+import coil.compose.rememberAsyncImagePainter
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -97,6 +119,7 @@ import com.unfold.core.ui.components.hud.HudSystem
 import com.unfold.core.ui.components.hud.HudConnectorNode
 import com.unfold.core.ui.components.hud.HudRailItem
 import com.unfold.core.ui.components.hud.HudTrace
+import com.unfold.core.ui.components.CarvedIcon
 import com.unfold.core.ui.theme.LocalUnfoldTheme
 import com.unfold.core.ui.util.LauncherUtils
 import com.unfold.core.ui.notification.NotificationBadgeStore
@@ -118,12 +141,22 @@ fun LauncherV2HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .statusBarsPadding()
             .background(theme.bgVoid)
             .border(1.dp, theme.panelBorder)
     ) {
+        V2WallpaperBackdrop(
+            modifier = Modifier.fillMaxSize(),
+            mode = homeState.homeWallpaperMode,
+            colorHex = homeState.homeWallpaperHex,
+            pattern = homeState.homeWallpaperPattern,
+            imageUri = homeState.homeWallpaperImageUri,
+            fallbackColor = theme.bgVoid
+        )
+
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
         ) {
             Row(
                 modifier = Modifier
@@ -241,11 +274,25 @@ fun LauncherV2HomeScreen(
                 }
                 NumberedPanel(
                     number = 6,
+                    showNumber = false,
                     modifier = panelBorder
                         .fillMaxHeight()
                         .weight(3f),
                     theme = theme
-                )
+                ) {
+                    V2DockPanel(
+                        apps = homeState.gridApps,
+                        folders = homeState.folders,
+                        allApps = homeState.installedApps,
+                        iconPackPackage = homeState.iconPackPackage,
+                        onMoveApp = { app, slot -> viewModel.onIntent(HomeUiIntent.MoveApp(app.appId, slot)) },
+                        onRemoveApp = { app -> viewModel.onIntent(HomeUiIntent.UnpinApp(app.appId)) },
+                        onCreateFolder = { slot, name, appIds -> viewModel.createDockFolder(slot, name, appIds) },
+                        onUpdateFolderApps = { folderId, appIds -> viewModel.updateFolderApps(folderId, appIds) },
+                        onRemoveFolder = { folderId -> viewModel.deleteFolder(folderId) },
+                        onMoveFolder = { folderId, slot -> viewModel.moveFolder(folderId, slot) }
+                    )
+                }
                 NumberedPanel(
                     number = 7,
                     showNumber = false,
@@ -255,6 +302,96 @@ fun LauncherV2HomeScreen(
                     theme = theme
                 ) {
                     CameraPanelAction()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun V2WallpaperBackdrop(
+    modifier: Modifier = Modifier,
+    mode: com.unfold.core.domain.model.WallpaperMode,
+    colorHex: String,
+    pattern: com.unfold.core.domain.model.WallpaperPatternMode,
+    imageUri: String,
+    fallbackColor: Color
+) {
+    val baseColor = remember(colorHex) {
+        runCatching { Color(android.graphics.Color.parseColor(colorHex)) }
+            .getOrElse { fallbackColor }
+    }
+
+    Box(modifier = modifier) {
+        when (mode) {
+            com.unfold.core.domain.model.WallpaperMode.SOLID -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(baseColor)
+                )
+            }
+            com.unfold.core.domain.model.WallpaperMode.PATTERN -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(baseColor)
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val tint = Color.White.copy(alpha = 0.05f)
+                        when (pattern) {
+                            com.unfold.core.domain.model.WallpaperPatternMode.GEOMETRIC -> {
+                                repeat(7) { index ->
+                                    val size = (40 + index * 18).dp.toPx()
+                                    drawCircle(
+                                        color = tint,
+                                        radius = size,
+                                        center = Offset(size * 1.8f, size * 0.9f + index * 110f)
+                                    )
+                                }
+                            }
+                            com.unfold.core.domain.model.WallpaperPatternMode.ABSTRACT -> {
+                                repeat(6) { index ->
+                                    val y = 120f + index * 160f
+                                    drawLine(
+                                        color = tint,
+                                        start = Offset(0f, y),
+                                        end = Offset(size.width, y + 24f),
+                                        strokeWidth = 10f
+                                    )
+                                }
+                            }
+                            com.unfold.core.domain.model.WallpaperPatternMode.MINIMAL -> {
+                                repeat(22) { index ->
+                                    drawCircle(
+                                        color = tint.copy(alpha = 0.03f),
+                                        radius = 18f + (index % 4) * 3f,
+                                        center = Offset(
+                                            (index * 67f) % size.width,
+                                            (index * 103f) % size.height
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            com.unfold.core.domain.model.WallpaperMode.PRESET,
+            com.unfold.core.domain.model.WallpaperMode.CUSTOM -> {
+                if (imageUri.isNotBlank()) {
+                    Image(
+                        painter = rememberAsyncImagePainter(imageUri),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(baseColor)
+                    )
                 }
             }
         }
@@ -595,6 +732,452 @@ private fun CameraPanelAction() {
     )
 }
 
+private sealed interface V2DockEntry {
+    val slot: Int
+    data class AppEntry(val app: AppInfo) : V2DockEntry { override val slot = app.gridPosition ?: 100 }
+    data class FolderEntry(val folder: com.unfold.core.domain.model.FolderInfo) : V2DockEntry { override val slot = folder.gridPosition }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun V2DockPanel(
+    apps: List<AppInfo>,
+    folders: List<com.unfold.core.domain.model.FolderInfo>,
+    allApps: List<AppInfo>,
+    iconPackPackage: String,
+    onMoveApp: (AppInfo, Int) -> Unit,
+    onRemoveApp: (AppInfo) -> Unit,
+    onCreateFolder: (Int, String, List<String>) -> Unit,
+    onUpdateFolderApps: (String, List<String>) -> Unit,
+    onRemoveFolder: (String) -> Unit,
+    onMoveFolder: (String, Int) -> Unit
+) {
+    val theme = LocalUnfoldTheme.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val entries: List<V2DockEntry> = buildList {
+        apps.filter { it.gridPosition in 100..102 }.forEach { add(V2DockEntry.AppEntry(it)) }
+        folders.filter { it.gridPosition in 100..102 }.forEach { folder ->
+            if (none { it.slot == folder.gridPosition }) add(V2DockEntry.FolderEntry(folder))
+        }
+    }
+    var draggedEntry by remember { mutableStateOf<V2DockEntry?>(null) }
+    var dragPosition by remember { mutableStateOf(Offset.Zero) }
+    var dragOrigin by remember { mutableStateOf(Offset.Zero) }
+    val slotBounds = remember { mutableMapOf<Int, androidx.compose.ui.geometry.Rect>() }
+    var appMenu by remember { mutableStateOf<AppInfo?>(null) }
+    var folderMenu by remember { mutableStateOf<com.unfold.core.domain.model.FolderInfo?>(null) }
+    var createFromApp by remember { mutableStateOf<Pair<AppInfo, Int>?>(null) }
+    var manageFolder by remember { mutableStateOf<com.unfold.core.domain.model.FolderInfo?>(null) }
+    var openFolder by remember { mutableStateOf<com.unfold.core.domain.model.FolderInfo?>(null) }
+    var pendingFolderSlot by remember { mutableStateOf<Int?>(null) }
+    var pickAppSlot by remember { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(folders, pendingFolderSlot) {
+        pendingFolderSlot?.let { slot ->
+            folders.firstOrNull { it.gridPosition == slot }?.let { folder ->
+                openFolder = folder
+                pendingFolderSlot = null
+            }
+        }
+    }
+
+    fun move(entry: V2DockEntry, slot: Int) = when (entry) {
+        is V2DockEntry.AppEntry -> onMoveApp(entry.app, slot)
+        is V2DockEntry.FolderEntry -> onMoveFolder(entry.folder.id, slot)
+    }
+
+    Row(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(3) { index ->
+            val slot = 100 + index
+            val entry = entries.firstOrNull { it.slot == slot }
+            Box(
+                modifier = Modifier.weight(1f).fillMaxHeight()
+                    .onGloballyPositioned { slotBounds[slot] = it.boundsInRoot() },
+                contentAlignment = Alignment.Center
+            ) {
+                if (entry == null) {
+                    Text(
+                        text = "+",
+                        color = theme.textMuted,
+                        modifier = Modifier.combinedClickable(onClick = { pickAppSlot = slot }, onLongClick = { pickAppSlot = slot })
+                    )
+                } else {
+                    V2DockEntryItem(
+                        entry = entry,
+                        iconPackPackage = iconPackPackage,
+                        isDragging = draggedEntry == entry,
+                        dragPosition = dragPosition,
+                        dragOrigin = dragOrigin,
+                        onTap = {
+                            when (entry) {
+                                is V2DockEntry.AppEntry -> LauncherUtils.launchApp(context, entry.app)
+                                is V2DockEntry.FolderEntry -> openFolder = entry.folder
+                            }
+                        },
+                        onDragStart = { bounds ->
+                            draggedEntry = entry
+                            dragOrigin = bounds.topLeft
+                            dragPosition = bounds.topLeft
+                        },
+                        onDrag = { dragPosition += it },
+                        onLongPressRelease = {
+                            when (entry) {
+                                is V2DockEntry.AppEntry -> appMenu = entry.app
+                                is V2DockEntry.FolderEntry -> folderMenu = entry.folder
+                            }
+                        },
+                        onDrop = {
+                            val target = slotBounds.minByOrNull { (_, bounds) ->
+                                val x = (bounds.left + bounds.right) / 2f - dragPosition.x
+                                val y = (bounds.top + bounds.bottom) / 2f - dragPosition.y
+                                x * x + y * y
+                            }?.key
+                            if (target != null && target != entry.slot) {
+                                entries.firstOrNull { it.slot == target }?.let { move(it, entry.slot) }
+                                move(entry, target)
+                            }
+                            draggedEntry = null
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    appMenu?.let { app ->
+        V2DockActionDialog(
+            title = app.label,
+            actions = listOf(
+                "MAKE FOLDER" to { createFromApp = app to (app.gridPosition ?: 100); appMenu = null },
+                "REMOVE FROM DOCK" to { onRemoveApp(app); appMenu = null }
+            ),
+            onDismiss = { appMenu = null }
+        )
+    }
+    folderMenu?.let { folder ->
+        V2DockActionDialog(
+            title = folder.name,
+            actions = listOf(
+                "MANAGE APPS" to { manageFolder = folder; folderMenu = null },
+                "REMOVE FROM DOCK" to { onRemoveFolder(folder.id); folderMenu = null }
+            ),
+            onDismiss = { folderMenu = null }
+        )
+    }
+    createFromApp?.let { (app, slot) ->
+        V2DockCreateFolderDialog(app.label, onDismiss = { createFromApp = null }) { name ->
+            onCreateFolder(slot, name, listOf(app.appId))
+            pendingFolderSlot = slot
+            createFromApp = null
+        }
+    }
+    manageFolder?.let { folder ->
+        V2DockFolderAppsDialog(folder, allApps, iconPackPackage, onDismiss = { manageFolder = null }) { appIds ->
+            onUpdateFolderApps(folder.id, appIds)
+            openFolder = folder.copy(apps = allApps.filter { it.appId in appIds })
+            manageFolder = null
+        }
+    }
+    openFolder?.let { folder ->
+        V2DockFolderContentsDialog(
+            folder = folder,
+            iconPackPackage = iconPackPackage,
+            onDismiss = { openFolder = null },
+            onManageApps = { manageFolder = folder; openFolder = null }
+        )
+    }
+    pickAppSlot?.let { slot ->
+        V2DockAppPickerDialog(allApps, iconPackPackage, onDismiss = { pickAppSlot = null }) { app ->
+            onMoveApp(app, slot); pickAppSlot = null
+        }
+    }
+}
+
+@Composable
+private fun V2DockEntryItem(
+    entry: V2DockEntry,
+    iconPackPackage: String,
+    isDragging: Boolean,
+    dragPosition: Offset,
+    dragOrigin: Offset,
+    onTap: () -> Unit,
+    onDragStart: (androidx.compose.ui.geometry.Rect) -> Unit,
+    onDrag: (Offset) -> Unit,
+    onLongPressRelease: () -> Unit,
+    onDrop: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var bounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    val iconBitmap by produceState<ImageBitmap?>(null, entry, iconPackPackage) {
+        val app = (entry as? V2DockEntry.AppEntry)?.app ?: return@produceState
+        value = withContext(Dispatchers.IO) {
+            com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(context, app.packageName, iconPackPackage.takeIf { it.isNotBlank() })?.let(::drawableToImageBitmap)
+        }
+    }
+    Box(
+        modifier = Modifier.alpha(1f)
+            .onGloballyPositioned { bounds = it.boundsInRoot() }
+            .offset { IntOffset((if (isDragging) dragPosition.x - dragOrigin.x else 0f).roundToInt(), (if (isDragging) dragPosition.y - dragOrigin.y else 0f).roundToInt()) }
+            .pointerInput(entry) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val longPress = awaitLongPressOrCancellation(down.id)
+                    if (longPress == null) onTap() else {
+                        onDragStart(bounds ?: return@awaitEachGesture)
+                        var distance = 0f
+                        while (true) {
+                            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) {
+                                if (distance < 14f) onLongPressRelease() else onDrop()
+                                if (distance < 14f) onDrop()
+                                break
+                            }
+                            val delta = change.position - change.previousPosition
+                            distance += delta.getDistance(); change.consume(); onDrag(delta)
+                        }
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        when (entry) {
+            is V2DockEntry.AppEntry -> CarvedIcon(
+                size = 44.dp,
+                raw = iconPackPackage.isNotBlank() && !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
+                icon = { if (iconBitmap != null) Image(iconBitmap!!, null, Modifier.fillMaxSize()) else Text(entry.app.label.take(2).uppercase()) },
+                contentDescription = entry.app.label,
+                onClick = onTap
+            )
+            is V2DockEntry.FolderEntry -> CarvedIcon(
+                size = 44.dp,
+                icon = { Icon(Icons.Default.Folder, entry.folder.name, tint = LocalUnfoldTheme.current.accentPrimary) },
+                contentDescription = entry.folder.name,
+                onClick = onTap
+            )
+        }
+    }
+}
+
+@Composable
+private fun V2DockCreateFolderDialog(defaultName: String, onDismiss: () -> Unit, onCreate: (String) -> Unit) {
+    val theme = LocalUnfoldTheme.current
+    var name by remember { mutableStateOf(defaultName) }
+    V2DockLauncherDialog(onDismiss) {
+        V2DockDialogTitle("CREATE FOLDER")
+        V2DockThemedTextInput(value = name, onValueChange = { name = it }, placeholder = "FOLDER NAME")
+        V2DockDialogButtons(onDismiss) { if (name.isNotBlank()) onCreate(name.trim()) }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun V2DockFolderAppsDialog(folder: com.unfold.core.domain.model.FolderInfo, allApps: List<AppInfo>, iconPackPackage: String, onDismiss: () -> Unit, onSave: (List<String>) -> Unit) {
+    var selectedIds by remember(folder.id, folder.apps) { mutableStateOf(folder.apps.map { it.appId }.toSet()) }
+    V2DockLauncherDialog(onDismiss) {
+        V2DockDialogTitle("MANAGE ${folder.name}")
+        Column(Modifier.height(300.dp).verticalScroll(rememberScrollState())) {
+            allApps.sortedBy { it.label }.forEach { app ->
+                V2DockManageAppRow(
+                    app = app,
+                    iconPackPackage = iconPackPackage,
+                    selected = app.appId in selectedIds,
+                    onToggle = { selectedIds = selectedIds.toggle(app.appId) }
+                )
+            }
+        }
+        V2DockDialogButtons(onDismiss) { onSave(selectedIds.toList()) }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun V2DockAppPickerDialog(allApps: List<AppInfo>, iconPackPackage: String, onDismiss: () -> Unit, onPick: (AppInfo) -> Unit) {
+    var selectedAppId by remember { mutableStateOf<String?>(null) }
+    V2DockLauncherDialog(onDismiss) {
+        V2DockDialogTitle("PIN TO DOCK")
+        Column(Modifier.height(300.dp).verticalScroll(rememberScrollState())) {
+            allApps.sortedBy { it.label }.forEach { app ->
+                V2DockManageAppRow(
+                    app = app,
+                    iconPackPackage = iconPackPackage,
+                    selected = selectedAppId == app.appId,
+                    onToggle = { selectedAppId = if (selectedAppId == app.appId) null else app.appId }
+                )
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = onDismiss) { Text("CANCEL", color = LocalUnfoldTheme.current.textSecondary) }
+            TextButton(onClick = {
+                allApps.firstOrNull { it.appId == selectedAppId }?.let(onPick)
+            }) { Text("PIN", color = LocalUnfoldTheme.current.accentPrimary) }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun V2DockFolderContentsDialog(
+    folder: com.unfold.core.domain.model.FolderInfo,
+    iconPackPackage: String,
+    onDismiss: () -> Unit,
+    onManageApps: () -> Unit
+) {
+    val theme = LocalUnfoldTheme.current
+    V2DockLauncherDialog(onDismiss) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            V2DockDialogTitle(folder.name, Modifier.weight(1f))
+            TextButton(onClick = onDismiss) { Text("CLOSE", color = theme.textSecondary) }
+        }
+        if (folder.apps.isEmpty()) {
+            Text("No apps in this folder yet.", color = theme.textSecondary)
+        } else {
+            Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
+                folder.apps.chunked(4).forEach { rowApps ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        rowApps.forEach { app -> V2DockFolderAppCell(app, iconPackPackage, onDismiss, Modifier.weight(1f)) }
+                        repeat(4 - rowApps.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
+        TextButton(onClick = onManageApps, modifier = Modifier.align(Alignment.End)) { Text("MANAGE APPS", color = theme.accentPrimary) }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun V2DockActionDialog(
+    title: String,
+    actions: List<Pair<String, () -> Unit>>,
+    onDismiss: () -> Unit
+) {
+    V2DockLauncherDialog(onDismiss) {
+        V2DockDialogTitle(title.uppercase())
+        actions.forEach { (label, action) ->
+            Text(
+                text = label,
+                color = LocalUnfoldTheme.current.textPrimary,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth().combinedClickable(onClick = action, onLongClick = {}).padding(horizontal = 10.dp, vertical = 12.dp)
+            )
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("CLOSE", color = LocalUnfoldTheme.current.textSecondary) }
+    }
+}
+
+@Composable
+private fun V2DockLauncherDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    val theme = LocalUnfoldTheme.current
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier.fillMaxWidth(0.9f)
+                .clip(RoundedCornerShape(18.dp))
+                .background(theme.bgPanel.copy(alpha = 0.84f))
+                .border(2.dp, theme.accentPrimary.copy(alpha = 0.82f), RoundedCornerShape(18.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            content = content
+        )
+    }
+}
+
+@Composable
+private fun V2DockDialogTitle(title: String, modifier: Modifier = Modifier) {
+    Text(title, modifier = modifier, color = LocalUnfoldTheme.current.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+}
+
+@Composable
+private fun V2DockDialogButtons(onDismiss: () -> Unit, onSave: () -> Unit) {
+    val theme = LocalUnfoldTheme.current
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        TextButton(onClick = onDismiss) { Text("CANCEL", color = theme.textSecondary) }
+        TextButton(onClick = onSave) { Text("SAVE", color = theme.accentPrimary) }
+    }
+}
+
+@Composable
+private fun V2DockThemedTextInput(value: String, onValueChange: (String) -> Unit, placeholder: String) {
+    val theme = LocalUnfoldTheme.current
+    Box(
+        modifier = Modifier.fillMaxWidth()
+            .border(1.dp, theme.panelBorder.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+            .background(theme.bgVoid.copy(alpha = 0.72f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 11.dp)
+    ) {
+        if (value.isBlank()) Text(placeholder, color = theme.textMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = androidx.compose.ui.text.TextStyle(color = theme.textPrimary, fontFamily = FontFamily.Monospace, fontSize = 13.sp),
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun V2DockManageAppRow(app: AppInfo, iconPackPackage: String, selected: Boolean, onToggle: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val theme = LocalUnfoldTheme.current
+    val iconBitmap by produceState<ImageBitmap?>(null, app.appId, iconPackPackage) {
+        value = withContext(Dispatchers.IO) {
+            com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(context, app.packageName, iconPackPackage.takeIf { it.isNotBlank() })?.let(::drawableToImageBitmap)
+        }
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .background(theme.bgVoid.copy(alpha = if (selected) 0.42f else 0.18f))
+            .border(1.dp, theme.panelBorder.copy(alpha = if (selected) 0.5f else 0.2f), RoundedCornerShape(10.dp))
+            .combinedClickable(onClick = onToggle, onLongClick = {}).padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        CarvedIcon(
+            size = 34.dp,
+            raw = iconPackPackage.isNotBlank() && !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
+            icon = { if (iconBitmap != null) Image(iconBitmap!!, app.label, Modifier.fillMaxSize()) else Text(app.label.take(2).uppercase(), color = theme.accentPrimary, fontSize = 9.sp) },
+            contentDescription = app.label,
+            onClick = onToggle
+        )
+        Text(app.label, color = theme.textPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Checkbox(checked = selected, onCheckedChange = { onToggle() })
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun V2DockFolderAppCell(app: AppInfo, iconPackPackage: String, onFolderDismiss: () -> Unit, modifier: Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val theme = LocalUnfoldTheme.current
+    val iconBitmap by produceState<ImageBitmap?>(null, app.appId, iconPackPackage) {
+        value = withContext(Dispatchers.IO) {
+            com.unfold.core.ui.iconpack.IconPackResolver.resolveAppIconDrawable(context, app.packageName, iconPackPackage.takeIf { it.isNotBlank() })?.let(::drawableToImageBitmap)
+        }
+    }
+    Column(
+        modifier = modifier.combinedClickable(onClick = { LauncherUtils.launchApp(context, app); onFolderDismiss() }, onLongClick = {}).padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        CarvedIcon(
+            size = 44.dp,
+            raw = iconPackPackage.isNotBlank() && !com.unfold.core.ui.iconpack.IconPackResolver.isLauncherRingEnabled(context),
+            icon = { if (iconBitmap != null) Image(iconBitmap!!, app.label, Modifier.fillMaxSize()) else Text(app.label.take(2).uppercase(), color = theme.accentPrimary, fontSize = 10.sp) },
+            contentDescription = app.label,
+            onClick = { LauncherUtils.launchApp(context, app); onFolderDismiss() }
+        )
+        Text(app.label, color = theme.textSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+private fun Set<String>.toggle(value: String): Set<String> = if (value in this) this - value else this + value
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun VerticalHomeGridItem(
@@ -629,7 +1212,7 @@ private fun VerticalHomeGridItem(
 
     Box(
         modifier = Modifier
-            .alpha(if (isDragging) 0.3f else 1f)
+            .alpha(1f)
             .onGloballyPositioned { itemBounds[app.appId] = it.boundsInRoot() }
             .offset {
                 IntOffset(
